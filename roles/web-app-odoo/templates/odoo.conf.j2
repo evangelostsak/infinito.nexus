@@ -1,0 +1,78 @@
+[options]
+; This is the password that allows database operations:
+admin_passwd = {{ ODOO_MASTER_PASSWORD }}
+
+; Database settings
+db_host = {{ ODOO_DATABASE_HOST }}
+db_port = {{ ODOO_DATABASE_PORT }}
+db_user = {{ ODOO_DATABASE_USER }}
+db_password = {{ ODOO_DATABASE_PASSWORD }}
+db_name = {{ ODOO_DATABASE_NAME }}
+
+; Limit database selection to specific database
+; dbfilter restricts visible databases to only the configured one
+; list_db must be True so Odoo can initialize/select the database
+dbfilter = ^{{ ODOO_DATABASE_NAME }}$
+list_db = True
+
+; Paths
+data_dir = /var/lib/odoo
+addons_path = /mnt/extra-addons,/usr/lib/python3/dist-packages/odoo/addons
+
+; Proxy mode - IMPORTANT for running behind reverse proxy
+proxy_mode = {{ ODOO_PROXY_MODE }}
+
+; Server configuration
+http_port = 8069
+longpolling_port = 8072
+http_interface = 0.0.0.0
+
+; Workers configuration for production
+; 0 = threaded mode (default, good for development)
+; >0 = multi-process mode (recommended for production)
+workers = {{ ODOO_WORKERS }}
+max_cron_threads = 1
+
+; Memory limits (in bytes)
+limit_memory_hard = {{ ODOO_LIMIT_MEMORY_HARD }}
+limit_memory_soft = {{ ODOO_LIMIT_MEMORY_SOFT }}
+
+; Time limits (in seconds)
+limit_time_cpu = {{ ODOO_LIMIT_TIME_CPU }}
+limit_time_real = {{ ODOO_LIMIT_TIME_REAL }}
+limit_time_real_cron = 300
+
+; Request limits
+limit_request = 8192
+
+; Logging
+log_level = {{ 'debug' if MODE_DEBUG | bool else 'info' }}
+logfile = 
+log_handler = :INFO
+
+{% if ODOO_EMAIL_ENABLED | bool %}
+; SMTP Configuration
+smtp_server = {{ ODOO_SMTP_HOST }}
+smtp_port = {{ ODOO_SMTP_PORT }}
+smtp_user = {{ ODOO_SMTP_USER }}
+smtp_password = {{ ODOO_SMTP_PASSWORD }}
+smtp_ssl = {{ ODOO_SMTP_SSL }}
+email_from = {{ users['no-reply'].email }}
+{% endif %}
+
+{% if ODOO_REDIS_ENABLED | bool %}
+; Redis session store
+; Note: Requires odoo_redis addon or similar
+; session_store_redis = True
+; redis_host = redis
+; redis_port = 6379
+{% endif %}
+
+; Security settings
+; server_wide_modules = base,web
+
+; Disable demo data for production
+without_demo = all
+
+; Unaccent for better search
+unaccent = True
