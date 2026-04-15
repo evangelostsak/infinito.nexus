@@ -1,0 +1,106 @@
+server:
+  csp:
+    flags:
+      script-src-elem:
+        unsafe-inline:  true
+        unsafe-eval:    true
+      style-src-elem:
+        unsafe-inline:  true
+      style-src-attr:
+        unsafe-inline:  true
+      script-src-attr:
+        unsafe-eval:    true
+    whitelist:
+      connect-src:
+        - "erp.{{ DOMAIN_PRIMARY }}"
+        - "wss://erp.{{ DOMAIN_PRIMARY }}"
+      frame-ancestors:
+        - "{{ DOMAIN_PRIMARY }}"
+        - "*.{{ DOMAIN_PRIMARY }}"
+      img-src:
+        - "data:"
+        - "blob:"
+      font-src:
+        - "data:"
+  domains:
+    canonical:
+      - "erp.{{ DOMAIN_PRIMARY }}"
+    aliases: []
+  # Odoo returns HTTP 303 (See Other) when redirecting to the login page
+  status_codes:
+    default:
+      - 200
+      - 301
+      - 302
+      - 303
+email:
+  from_name: "ERP ({{ DOMAIN_PRIMARY }})"
+modules:
+  # Core modules to install on first deployment
+  core:
+    - crm
+    - contacts
+    - sale_management
+    - account
+    - website
+    - project
+    - stock
+    - auth_oauth      # Required for OIDC/SSO authentication
+  # Additional modules that can be toggled via inventory
+  optional: []
+compose:
+  services:
+    oidc:
+      enabled: true
+      shared: true
+    ldap:
+      enabled: false
+      shared: false
+    logout:
+      enabled: true
+      shared: true
+    dashboard:
+      enabled: true
+      shared: true
+    matomo:
+      enabled: true
+      shared: true
+    email:
+      enabled: true
+      shared: true
+    database:
+      shared: true
+      type: "postgres"
+      enabled: true
+    odoo:
+      image:            "odoo"
+      version:          "18.0"
+      name:             "odoo"
+      min_storage:      "20GB"
+      cpus:             "2.0"
+      mem_reservation:  "2g"
+      mem_limit:        "4g"
+      pids_limit:       1024
+      backup:
+        no_stop_required: true
+    # Redis cache for session storage and caching (optional)
+    redis:
+      enabled: false
+      name:             "odoo-redis"
+      cpus:             "0.5"
+      mem_reservation:  "256m"
+      mem_limit:        "512m"
+      pids_limit:       256
+    css:
+      enabled: false
+      shared: true
+    javascript:
+      enabled: false
+      shared: true
+  volumes:
+    data:       odoo_data
+    addons:     odoo_addons
+    config:     odoo_config
+credentials:
+  # Master password for database management
+  master_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
