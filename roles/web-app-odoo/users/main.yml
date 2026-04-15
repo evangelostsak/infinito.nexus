@@ -1,0 +1,8 @@
+# Odoo User Configuration
+# This file defines users for the web-app-odoo role
+
+administrator:
+  create: true
+  username: "{{ users.administrator.username }}"
+  email: "{{ users.administrator.email }}"
+  role: admin
