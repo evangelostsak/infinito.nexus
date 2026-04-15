@@ -1,0 +1,135 @@
+---
+# Configure OIDC authentication for Odoo
+# Requires auth_oauth module and OAuth provider configuration
+
+- name: Check if auth_oauth module is installed
+  community.postgresql.postgresql_query:
+    db: "{{ ODOO_DATABASE_NAME }}"
+    login_user: "{{ ODOO_DATABASE_USER }}"
+    login_password: "{{ ODOO_DATABASE_PASSWORD }}"
+    login_host: "{{ lookup('database', application_id, 'reach_host') }}"
+    login_port: "{{ ODOO_DATABASE_PORT }}"
+    query: "SELECT id FROM ir_module_module WHERE name = 'auth_oauth' AND state = 'installed' LIMIT 1;"
+  register: oauth_module_check
+
+- name: Install auth_oauth module
+  command: >
+    container exec {{ ODOO_CONTAINER }}
+    odoo --no-http
+    --database={{ ODOO_DATABASE_NAME }}
+    --init=auth_oauth
+    --stop-after-init
+  when: oauth_module_check.query_result | length == 0
+  register: oauth_install
+  changed_when: "'Loading' in oauth_install.stdout"
+  async: "{{ ASYNC_TIME if ASYNC_ENABLED | bool else omit }}"
+  poll:  "{{ ASYNC_POLL if ASYNC_ENABLED | bool else omit }}"
+
+- name: Check if OAuth provider exists
+  community.postgresql.postgresql_query:
+    db: "{{ ODOO_DATABASE_NAME }}"
+    login_user: "{{ ODOO_DATABASE_USER }}"
+    login_password: "{{ ODOO_DATABASE_PASSWORD }}"
+    login_host: "{{ lookup('database', application_id, 'reach_host') }}"
+    login_port: "{{ ODOO_DATABASE_PORT }}"
+    query: "SELECT id FROM auth_oauth_provider WHERE name = 'Keycloak' LIMIT 1;"
+  register: oauth_provider_check
+
+# NOTE: Odoo 18 CE auth_oauth module uses OAuth2 implicit flow, not OIDC.
+# The schema has: name, client_id, auth_endpoint, scope, validation_endpoint, enabled, sequence, body, css_class
+# body field is translatable (JSON format in DB): {"en_US": "Label"}
+# For full OIDC support, consider installing auth_oauth_oidc community module.
+- name: Create Keycloak OAuth provider
+  community.postgresql.postgresql_query:
+    db: "{{ ODOO_DATABASE_NAME }}"
+    login_user: "{{ ODOO_DATABASE_USER }}"
+    login_password: "{{ ODOO_DATABASE_PASSWORD }}"
+    login_host: "{{ lookup('database', application_id, 'reach_host') }}"
+    login_port: "{{ ODOO_DATABASE_PORT }}"
+    query: >
+      INSERT INTO auth_oauth_provider (
+        name,
+        client_id,
+        auth_endpoint,
+        scope,
+        validation_endpoint,
+        enabled,
+        sequence,
+        body,
+        css_class
+      ) VALUES (
+        'Keycloak',
+        '{{ ODOO_OIDC_CLIENT_ID }}',
+        '{{ ODOO_OIDC_AUTHORIZATION_URL }}',
+        'openid email profile',
+        '{{ ODOO_OIDC_USERINFO_URL }}',
+        true,
+        1,
+        '{"en_US": "{{ OIDC.BUTTON_TEXT | default("SSO Login") }}"}'::jsonb,
+        'fa fa-sign-in'
+      );
+  when: oauth_provider_check.query_result | length == 0
+  async: "{{ ASYNC_TIME if ASYNC_ENABLED | bool else omit }}"
+  poll:  "{{ ASYNC_POLL if ASYNC_ENABLED | bool else omit }}"
+
+- name: Update Keycloak OAuth provider
+  community.postgresql.postgresql_query:
+    db: "{{ ODOO_DATABASE_NAME }}"
+    login_user: "{{ ODOO_DATABASE_USER }}"
+    login_password: "{{ ODOO_DATABASE_PASSWORD }}"
+    login_host: "{{ lookup('database', application_id, 'reach_host') }}"
+    login_port: "{{ ODOO_DATABASE_PORT }}"
+    query: >
+      UPDATE auth_oauth_provider SET
+        client_id = '{{ ODOO_OIDC_CLIENT_ID }}',
+        auth_endpoint = '{{ ODOO_OIDC_AUTHORIZATION_URL }}',
+        scope = 'openid email profile',
+        validation_endpoint = '{{ ODOO_OIDC_USERINFO_URL }}',
+        enabled = true,
+        body = '{"en_US": "{{ OIDC.BUTTON_TEXT | default("SSO Login") }}"}'::jsonb
+      WHERE name = 'Keycloak';
+  when: oauth_provider_check.query_result | length > 0
+  async: "{{ ASYNC_TIME if ASYNC_ENABLED | bool else omit }}"
+  poll:  "{{ ASYNC_POLL if ASYNC_ENABLED | bool else omit }}"
+
+- name: Enable OAuth login in system parameters
+  community.postgresql.postgresql_query:
+    db: "{{ ODOO_DATABASE_NAME }}"
+    login_user: "{{ ODOO_DATABASE_USER }}"
+    login_password: "{{ ODOO_DATABASE_PASSWORD }}"
+    login_host: "{{ lookup('database', application_id, 'reach_host') }}"
+    login_port: "{{ ODOO_DATABASE_PORT }}"
+    query: >
+      INSERT INTO ir_config_parameter (key, value)
+      VALUES ('auth_oauth.oauth_providers', 'true')
+      ON CONFLICT (key) DO UPDATE SET value = 'true';
+  async: "{{ ASYNC_TIME if ASYNC_ENABLED | bool else omit }}"
+  poll:  "{{ ASYNC_POLL if ASYNC_ENABLED | bool else omit }}"
+
+- name: Set web.base.url for correct HTTPS redirect URIs
+  community.postgresql.postgresql_query:
+    db: "{{ ODOO_DATABASE_NAME }}"
+    login_user: "{{ ODOO_DATABASE_USER }}"
+    login_password: "{{ ODOO_DATABASE_PASSWORD }}"
+    login_host: "{{ lookup('database', application_id, 'reach_host') }}"
+    login_port: "{{ ODOO_DATABASE_PORT }}"
+    query: >
+      INSERT INTO ir_config_parameter (key, value)
+      VALUES ('web.base.url', '{{ ODOO_URL }}')
+      ON CONFLICT (key) DO UPDATE SET value = '{{ ODOO_URL }}';
+  async: "{{ ASYNC_TIME if ASYNC_ENABLED | bool else omit }}"
+  poll:  "{{ ASYNC_POLL if ASYNC_ENABLED | bool else omit }}"
+
+- name: Freeze web.base.url to prevent auto-detection from overwriting
+  community.postgresql.postgresql_query:
+    db: "{{ ODOO_DATABASE_NAME }}"
+    login_user: "{{ ODOO_DATABASE_USER }}"
+    login_password: "{{ ODOO_DATABASE_PASSWORD }}"
+    login_host: "{{ lookup('database', application_id, 'reach_host') }}"
+    login_port: "{{ ODOO_DATABASE_PORT }}"
+    query: >
+      INSERT INTO ir_config_parameter (key, value)
+      VALUES ('web.base.url.freeze', 'True')
+      ON CONFLICT (key) DO UPDATE SET value = 'True';
+  async: "{{ ASYNC_TIME if ASYNC_ENABLED | bool else omit }}"
+  poll:  "{{ ASYNC_POLL if ASYNC_ENABLED | bool else omit }}"
