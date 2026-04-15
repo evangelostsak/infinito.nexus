@@ -1,0 +1,46 @@
+---
+# Configure administrator user for Odoo
+
+- name: Check if admin user exists
+  community.postgresql.postgresql_query:
+    db: "{{ ODOO_DATABASE_NAME }}"
+    login_user: "{{ ODOO_DATABASE_USER }}"
+    login_password: "{{ ODOO_DATABASE_PASSWORD }}"
+    login_host: "{{ lookup('database', application_id, 'reach_host') }}"
+    login_port: "{{ ODOO_DATABASE_PORT }}"
+    query: "SELECT id FROM res_users WHERE login = '{{ ODOO_ADMIN_USER }}' LIMIT 1;"
+  register: admin_check
+
+- name: Update admin user email if exists
+  community.postgresql.postgresql_query:
+    db: "{{ ODOO_DATABASE_NAME }}"
+    login_user: "{{ ODOO_DATABASE_USER }}"
+    login_password: "{{ ODOO_DATABASE_PASSWORD }}"
+    login_host: "{{ lookup('database', application_id, 'reach_host') }}"
+    login_port: "{{ ODOO_DATABASE_PORT }}"
+    query: >
+      UPDATE res_partner SET 
+        email = '{{ ODOO_ADMIN_EMAIL }}'
+      WHERE id = (SELECT partner_id FROM res_users WHERE login = '{{ ODOO_ADMIN_USER }}');
+  when: admin_check.query_result | length > 0
+  async: "{{ ASYNC_TIME if ASYNC_ENABLED | bool else omit }}"
+  poll:  "{{ ASYNC_POLL if ASYNC_ENABLED | bool else omit }}"
+
+- name: Update admin password via API
+  command: >
+    container exec {{ ODOO_CONTAINER }}
+    python3 -c "
+    import xmlrpc.client
+    common = xmlrpc.client.ServerProxy('http://localhost:8069/xmlrpc/2/common')
+    uid = common.authenticate('{{ ODOO_DATABASE_NAME }}', 'admin', 'admin', {})
+    if uid:
+        models = xmlrpc.client.ServerProxy('http://localhost:8069/xmlrpc/2/object')
+        models.execute_kw('{{ ODOO_DATABASE_NAME }}', uid, 'admin', 'res.users', 'write', 
+            [[uid], {'password': '{{ ODOO_ADMIN_PASSWORD }}', 'login': '{{ ODOO_ADMIN_USER }}'}])
+        print('Admin password updated')
+    else:
+        print('Admin user not found or already configured')
+    "
+  register: admin_update
+  changed_when: "'updated' in admin_update.stdout"
+  failed_when: false
