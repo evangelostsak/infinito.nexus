@@ -1,0 +1,95 @@
+---
+# Configure outgoing email settings for Odoo
+
+- name: Check if outgoing mail server exists
+  community.postgresql.postgresql_query:
+    db: "{{ ODOO_DATABASE_NAME }}"
+    login_user: "{{ ODOO_DATABASE_USER }}"
+    login_password: "{{ ODOO_DATABASE_PASSWORD }}"
+    login_host: "{{ lookup('database', application_id, 'reach_host') }}"
+    login_port: "{{ ODOO_DATABASE_PORT }}"
+    query: "SELECT id FROM ir_mail_server WHERE name = 'Default Mailer' LIMIT 1;"
+  register: mail_server_check
+
+# Odoo 18 uses smtp_encryption with values: 'none', 'starttls', 'ssl'
+- name: Create outgoing mail server
+  community.postgresql.postgresql_query:
+    db: "{{ ODOO_DATABASE_NAME }}"
+    login_user: "{{ ODOO_DATABASE_USER }}"
+    login_password: "{{ ODOO_DATABASE_PASSWORD }}"
+    login_host: "{{ lookup('database', application_id, 'reach_host') }}"
+    login_port: "{{ ODOO_DATABASE_PORT }}"
+    query: >
+      INSERT INTO ir_mail_server (
+        name,
+        smtp_host,
+        smtp_port,
+        smtp_user,
+        smtp_pass,
+        smtp_encryption,
+        smtp_authentication,
+        sequence,
+        active
+      ) VALUES (
+        'Default Mailer',
+        '{{ ODOO_SMTP_HOST }}',
+        {{ ODOO_SMTP_PORT }},
+        '{{ ODOO_SMTP_USER }}',
+        '{{ ODOO_SMTP_PASSWORD }}',
+        '{{ ODOO_SMTP_ENCRYPTION | default("starttls") }}',
+        'login',
+        10,
+        true
+      );
+  when: mail_server_check.query_result | length == 0
+  async: "{{ ASYNC_TIME if ASYNC_ENABLED | bool else omit }}"
+  poll:  "{{ ASYNC_POLL if ASYNC_ENABLED | bool else omit }}"
+
+- name: Update outgoing mail server
+  community.postgresql.postgresql_query:
+    db: "{{ ODOO_DATABASE_NAME }}"
+    login_user: "{{ ODOO_DATABASE_USER }}"
+    login_password: "{{ ODOO_DATABASE_PASSWORD }}"
+    login_host: "{{ lookup('database', application_id, 'reach_host') }}"
+    login_port: "{{ ODOO_DATABASE_PORT }}"
+    query: >
+      UPDATE ir_mail_server SET
+        smtp_host = '{{ ODOO_SMTP_HOST }}',
+        smtp_port = {{ ODOO_SMTP_PORT }},
+        smtp_user = '{{ ODOO_SMTP_USER }}',
+        smtp_pass = '{{ ODOO_SMTP_PASSWORD }}',
+        smtp_encryption = '{{ ODOO_SMTP_ENCRYPTION | default("starttls") }}',
+        smtp_authentication = 'login',
+        active = true
+      WHERE name = 'Default Mailer';
+  when: mail_server_check.query_result | length > 0
+  async: "{{ ASYNC_TIME if ASYNC_ENABLED | bool else omit }}"
+  poll:  "{{ ASYNC_POLL if ASYNC_ENABLED | bool else omit }}"
+
+- name: Configure system email from address
+  community.postgresql.postgresql_query:
+    db: "{{ ODOO_DATABASE_NAME }}"
+    login_user: "{{ ODOO_DATABASE_USER }}"
+    login_password: "{{ ODOO_DATABASE_PASSWORD }}"
+    login_host: "{{ lookup('database', application_id, 'reach_host') }}"
+    login_port: "{{ ODOO_DATABASE_PORT }}"
+    query: >
+      INSERT INTO ir_config_parameter (key, value)
+      VALUES ('mail.catchall.domain', '{{ DOMAIN_PRIMARY }}')
+      ON CONFLICT (key) DO UPDATE SET value = '{{ DOMAIN_PRIMARY }}';
+  async: "{{ ASYNC_TIME if ASYNC_ENABLED | bool else omit }}"
+  poll:  "{{ ASYNC_POLL if ASYNC_ENABLED | bool else omit }}"
+
+- name: Configure email bounce alias
+  community.postgresql.postgresql_query:
+    db: "{{ ODOO_DATABASE_NAME }}"
+    login_user: "{{ ODOO_DATABASE_USER }}"
+    login_password: "{{ ODOO_DATABASE_PASSWORD }}"
+    login_host: "{{ lookup('database', application_id, 'reach_host') }}"
+    login_port: "{{ ODOO_DATABASE_PORT }}"
+    query: >
+      INSERT INTO ir_config_parameter (key, value)
+      VALUES ('mail.bounce.alias', 'postmaster-odoo')
+      ON CONFLICT (key) DO UPDATE SET value = 'postmaster-odoo';
+  async: "{{ ASYNC_TIME if ASYNC_ENABLED | bool else omit }}"
+  poll:  "{{ ASYNC_POLL if ASYNC_ENABLED | bool else omit }}"
