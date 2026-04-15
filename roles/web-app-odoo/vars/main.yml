@@ -1,0 +1,97 @@
+# General
+application_id:                     "web-app-odoo"
+entity_name:                        "{{ application_id | get_entity_name }}"
+
+# Webserver
+http_port:                          "{{ ports.localhost.http[application_id] }}"
+webserver_client_max_body_size:     "100m"
+webserver_vhost_flavour:            "ws_generic"
+webserver_websocket_location:       "/websocket"
+websocket_port:                     "{{ ports.localhost.websocket[application_id] }}"
+
+# Odoo Container
+ODOO_VERSION:                       "{{ lookup('config', application_id, 'compose.services.odoo.version') }}"
+ODOO_IMAGE:                         "{{ lookup('config', application_id, 'compose.services.odoo.image') }}"
+ODOO_CONTAINER:                     "{{ lookup('config', application_id, 'compose.services.odoo.name') }}"
+ODOO_SERVICE:                       "odoo"
+ODOO_URL:                           "{{ lookup('tls', application_id, 'url.base') }}"
+
+# Volumes
+ODOO_DATA_VOLUME:                   "{{ lookup('config', application_id, 'compose.volumes.data') }}"
+ODOO_ADDONS_VOLUME:                 "{{ lookup('config', application_id, 'compose.volumes.addons') }}"
+ODOO_CONFIG_VOLUME:                 "{{ lookup('config', application_id, 'compose.volumes.config') }}"
+
+# Directories
+ODOO_CONFIG_DIRECTORY:              "{{ lookup('container', application_id, 'directories.config') }}"
+ODOO_VOLUMES_DIRECTORY:             "{{ lookup('container', application_id, 'directories.volumes') }}"
+ODOO_ADDONS_DIRECTORY:              "{{ ODOO_VOLUMES_DIRECTORY }}addons/"
+ODOO_CONF_FILE_PATH:                "{{ ODOO_CONFIG_DIRECTORY }}odoo.conf"
+
+# Database
+ODOO_DATABASE_NAME:                 "{{ lookup('database', application_id, 'name') }}"
+ODOO_DATABASE_USER:                 "{{ lookup('database', application_id, 'username') }}"
+ODOO_DATABASE_PASSWORD:             "{{ lookup('database', application_id, 'password') }}"
+ODOO_DATABASE_HOST:                 "{{ lookup('database', application_id, 'host') }}"
+ODOO_DATABASE_PORT:                 "{{ lookup('database', application_id, 'port') }}"
+ODOO_DATABASE_VOLUME:               "{{ lookup('database', application_id, 'volume') }}"
+
+# Master Password (for database management)
+ODOO_MASTER_PASSWORD:               "{{ lookup('config', application_id, 'credentials.master_password') }}"
+
+# Administrator
+ODOO_ADMIN_USER:                    "{{ users.administrator.username }}"
+ODOO_ADMIN_PASSWORD:                "{{ users.administrator.password }}"
+ODOO_ADMIN_EMAIL:                   "{{ users.administrator.email }}"
+
+# Redis (optional cache)
+ODOO_REDIS_ENABLED:                 "{{ lookup('config', application_id, 'compose.services.redis.enabled') | default(false) }}"
+ODOO_REDIS_CONTAINER:               "{{ lookup('config', application_id, 'compose.services.redis.name') }}"
+
+# Modules
+ODOO_MODULES_CORE:                  "{{ lookup('config', application_id, 'modules.core') }}"
+ODOO_MODULES_OPTIONAL:              "{{ lookup('config', application_id, 'modules.optional') | default([]) }}"
+ODOO_MODULES_ALL:                   "{{ ODOO_MODULES_CORE + ODOO_MODULES_OPTIONAL }}"
+ODOO_MODULES_INIT:                  "{{ ODOO_MODULES_ALL | join(',') }}"
+
+# Authentication
+ODOO_OIDC_ENABLED:                  "{{ lookup('config', application_id, 'compose.services.oidc.enabled') }}"
+ODOO_LDAP_ENABLED:                  "{{ lookup('config', application_id, 'compose.services.ldap.enabled') }}"
+
+# OIDC Configuration
+ODOO_OIDC_CLIENT_ID:                "{{ OIDC.CLIENT.ID }}"
+ODOO_OIDC_CLIENT_SECRET:            "{{ OIDC.CLIENT.SECRET }}"
+ODOO_OIDC_AUTHORIZATION_URL:        "{{ OIDC.CLIENT.AUTHORIZE_URL }}"
+ODOO_OIDC_TOKEN_URL:                "{{ OIDC.CLIENT.TOKEN_URL }}"
+ODOO_OIDC_USERINFO_URL:             "{{ OIDC.CLIENT.USER_INFO_URL }}"
+ODOO_OIDC_JWKS_URL:                 "{{ OIDC.CLIENT.CERTS }}"
+ODOO_OIDC_LOGOUT_URL:               "{{ OIDC.CLIENT.LOGOUT_URL }}"
+
+# LDAP Configuration
+ODOO_LDAP_SERVER:                   "{{ LDAP.SERVER.DOMAIN }}"
+ODOO_LDAP_PORT:                     "{{ LDAP.SERVER.PORT }}"
+ODOO_LDAP_BIND_DN:                  "{{ LDAP.DN.ADMINISTRATOR.DATA }}"
+ODOO_LDAP_BIND_PASSWORD:            "{{ LDAP.BIND_CREDENTIAL }}"
+ODOO_LDAP_BASE_DN:                  "{{ LDAP.DN.OU.USERS }}"
+ODOO_LDAP_USER_FILTER:              "(&(objectClass=inetOrgPerson)({{ LDAP.USER.ATTRIBUTES.ID }}=%s))"
+ODOO_LDAP_LDAP_TLS:                 "{{ 'true' if LDAP.SERVER.SECURITY in ['TLS', 'SSL'] else 'false' }}"
+
+# Email Configuration
+ODOO_EMAIL_ENABLED:                 "{{ SYSTEM_EMAIL_ENABLED | bool }}"
+ODOO_SMTP_HOST:                     "{{ SYSTEM_EMAIL_HOST }}"
+ODOO_SMTP_PORT:                     "{{ SYSTEM_EMAIL_PORT }}"
+ODOO_SMTP_USER:                     "{{ users['no-reply'].email }}"
+ODOO_SMTP_PASSWORD:                 "{{ users['no-reply'].tokens['web-app-mailu'] }}"
+ODOO_SMTP_SSL:                      "{{ 'true' if SYSTEM_EMAIL_START_TLS else 'false' }}"
+# Odoo 18 uses smtp_encryption with values: 'none', 'starttls', 'ssl'
+ODOO_SMTP_ENCRYPTION:               "{{ 'ssl' if SYSTEM_EMAIL_PORT | int == 465 else ('starttls' if SYSTEM_EMAIL_START_TLS else 'none') }}"
+ODOO_EMAIL_FROM:                    "{{ lookup('config', application_id, 'email.from_name') }}"
+
+# Proxy mode for running behind reverse proxy
+ODOO_PROXY_MODE:                    "true"
+
+# Workers configuration for production
+ODOO_WORKERS:                       "{{ [(ansible_processor_vcpus | default(4) / 2) | int, 2] | max }}"
+ODOO_LIMIT_TIME_CPU:                "600"
+ODOO_LIMIT_TIME_REAL:               "1200"
+ODOO_LIMIT_MEMORY_HARD:             "2684354560"
+ODOO_LIMIT_MEMORY_SOFT:             "2147483648"
