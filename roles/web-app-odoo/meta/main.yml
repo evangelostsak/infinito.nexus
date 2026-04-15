@@ -1,0 +1,47 @@
+galaxy_info:
+  author: Kevin Veen-Birkenbach
+  description: 'Deploy Odoo ERP, a powerful open-source business suite for CRM, sales, inventory, accounting, HR, and more.
+    Integrate seamlessly with your Infinito.Nexus ecosystem using OIDC/LDAP authentication, centralized backups, and
+    the unified application dashboard.'
+  license: Infinito.Nexus Community License (Non-Commercial)
+  license_url: https://s.infinito.nexus/license
+  company: |
+    Kevin Veen-Birkenbach
+    Consulting & Coaching Solutions
+    https://www.veen.world
+  min_ansible_version: '2.9'
+  platforms:
+  - name: Archlinux
+    versions:
+      - rolling
+  - name: Debian
+    versions:
+      - bookworm
+  galaxy_tags:
+    - odoo
+    - erp
+    - crm
+    - business
+    - finance
+    - inventory
+    - sales
+    - accounting
+    - hr
+    - docker
+    - compose
+    - oidc
+    - ldap
+    - sso
+    - automation
+    - infinito
+  repository: https://s.infinito.nexus/code
+  issue_tracker_url: https://s.infinito.nexus/issues
+  documentation: https://docs.infinito.nexus
+  logo:
+    class: fa-solid fa-building
+  run_after:
+    - web-app-matomo
+    - web-app-keycloak
+    - web-app-mailu
+  lifecycle: beta
+dependencies: []
