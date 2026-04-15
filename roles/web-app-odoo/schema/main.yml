@@ -1,0 +1,6 @@
+credentials:
+  master_password:
+    type: string
+    description: "Master password for Odoo database management operations"
+    required: true
+    secret: true
