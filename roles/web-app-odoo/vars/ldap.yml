@@ -1,0 +1,13 @@
+# LDAP Configuration Variables for Odoo
+# Loaded when LDAP authentication is enabled
+
+ODOO_LDAP:
+  name: "OpenLDAP"
+  host: "{{ ODOO_LDAP_SERVER }}"
+  port: "{{ ODOO_LDAP_PORT }}"
+  bind_dn: "{{ ODOO_LDAP_BIND_DN }}"
+  bind_password: "{{ ODOO_LDAP_BIND_PASSWORD }}"
+  base_dn: "{{ ODOO_LDAP_BASE_DN }}"
+  user_filter: "{{ ODOO_LDAP_USER_FILTER }}"
+  ldap_tls: "{{ ODOO_LDAP_LDAP_TLS }}"
+  create_user: true
