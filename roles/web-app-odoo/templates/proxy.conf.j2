@@ -1,0 +1,101 @@
+{# Odoo-specific proxy configuration.
+   Forces X-Forwarded-Proto based on TLS configuration instead of $scheme
+   to ensure OAuth redirect URIs use the correct protocol. #}
+server
+{
+  server_name {{ domain }};
+  {% include 'roles/sys-svc-proxy/templates/headers/buffers.conf.j2' %}
+  
+  {% if lookup('config',application_id, 'compose.services.oauth2.enabled', False) %}
+    {% include 'roles/web-app-oauth2-proxy/templates/endpoint.conf.j2'%}
+  {% endif %}
+
+  {% include 'roles/sys-front-inj-all/templates/server.conf.j2'%}
+  
+  {% if webserver_extra_configuration is defined %}
+    {# Additional Domain Specific Configuration #}
+    {{ webserver_extra_configuration }}
+  {% endif %}
+
+  {% include 'roles/sys-front-tls/templates/nginx_ssl_header.j2' %}
+
+  {# Odoo main location - using inline config to control X-Forwarded-Proto #}
+  {% set location = "/" %}
+  {% set oauth2_proxy_enabled = lookup('config',application_id, 'compose.services.oauth2.enabled', False) %}
+  location {{ location }}
+  {
+    {% if oauth2_proxy_enabled | default(false) | bool %}
+      {% include 'roles/web-app-oauth2-proxy/templates/following_directives.conf.j2'%}
+    {% endif %}
+
+    {% include 'roles/sys-svc-proxy/templates/headers/content_security_policy.conf.j2' %}
+
+    {% include 'roles/sys-svc-proxy/templates/headers/access_control_allow.conf.j2' %}
+
+    # Client Limits for Odoo
+    client_max_body_size {{ webserver_client_max_body_size | default('100m') }};
+
+    proxy_pass http://127.0.0.1:{{ http_port }}/;
+
+    # Proxy headers
+    proxy_set_header Host $host;
+    proxy_set_header Authorization $http_authorization;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    {# Force correct protocol based on TLS config - critical for OAuth redirect URIs #}
+    proxy_set_header X-Forwarded-Proto {{ lookup('tls', application_id, 'protocols.web') }};
+    proxy_set_header X-Forwarded-Port {{ lookup('tls', application_id, 'ports.web') }};
+    proxy_set_header X-Forwarded-Ssl {{ lookup('tls', application_id, 'enabled') | bool | ternary('on','off') }};
+    proxy_pass_request_headers on;
+
+    {% if lookup('tls', application_id, 'enabled') | bool %}
+    proxy_hide_header Strict-Transport-Security;
+    {% endif %}
+
+    # WebSocket specific header (for Odoo longpolling)
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+
+    # Timeouts
+    proxy_connect_timeout     5s;
+    proxy_send_timeout        900s;
+    proxy_read_timeout        900s;
+    send_timeout              900s;
+    
+    {% set proxy_lua_enabled = proxy_lua_enabled | default(true) | bool %}
+    # Buffering needs to be active so that lua can do str replaces
+    proxy_buffering           {{ 'on' if proxy_lua_enabled else 'off' }}; 
+    proxy_request_buffering   {{ 'on' if proxy_lua_enabled else 'off' }};
+
+    {% if proxy_lua_enabled %}
+    proxy_set_header Accept-Encoding "";
+    {% include 'roles/sys-front-inj-all/templates/location.lua.j2'%}
+    {% endif %}
+  }
+
+  {# Odoo longpolling/websocket endpoint #}
+  location /websocket {
+    proxy_pass http://127.0.0.1:{{ websocket_port }}/websocket;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto {{ lookup('tls', application_id, 'protocols.web') }};
+    proxy_read_timeout 86400;
+  }
+
+  location /longpolling {
+    proxy_pass http://127.0.0.1:{{ websocket_port }}/longpolling;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto {{ lookup('tls', application_id, 'protocols.web') }};
+    proxy_read_timeout 86400;
+  }
+}
