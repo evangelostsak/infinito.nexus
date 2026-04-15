@@ -1,0 +1,75 @@
+---
+- name: "load docker, db and proxy for {{ application_id }}"
+  include_role:
+    name: sys-stk-full
+  vars:
+    docker_compose_flush_handlers: false
+
+- name: "Create Odoo addons directory {{ ODOO_ADDONS_DIRECTORY }}"
+  file:
+    path: "{{ ODOO_ADDONS_DIRECTORY }}"
+    state: directory
+    mode: '0755'
+
+- name: "Create Odoo config directory {{ ODOO_CONFIG_DIRECTORY }}"
+  file:
+    path: "{{ ODOO_CONFIG_DIRECTORY }}"
+    state: directory
+    mode: '0755'
+
+- name: "Deploy Odoo configuration file"
+  template:
+    src: "odoo.conf.j2"
+    dest: "{{ ODOO_CONF_FILE_PATH }}"
+    mode: '0644'
+  notify:
+    - compose up
+
+- name: "Docker Compose Up for {{ application_id }}"
+  meta: flush_handlers
+
+- name: Wait for Odoo container to be running
+  command: container inspect --format {% raw %}'{{.State.Running}}'{% endraw %} {{ ODOO_CONTAINER }}
+  register: container_running
+  until: container_running.stdout | trim == 'true'
+  retries: 30
+  delay: 5
+  changed_when: false
+
+# Initialize database BEFORE health check - Odoo needs a valid database to serve /web/health
+- name: Initialize database and install modules
+  include_tasks: 01_init_database.yml
+
+# Wait for Odoo web server to be ready AFTER database init
+- name: Wait for Odoo web server to be ready
+  uri:
+    url: "http://127.0.0.1:{{ ports.localhost.http[application_id] }}/web/health"
+    method: GET
+    status_code: 200
+  register: odoo_health
+  until: odoo_health.status == 200
+  retries: 30
+  delay: 10
+  ignore_errors: true
+
+- name: Setup LDAP authentication
+  include_tasks: 02_ldap.yml
+  when: 
+    - ODOO_LDAP_ENABLED | bool
+    - odoo_health.status == 200
+
+- name: Setup OIDC authentication
+  include_tasks: 03_oidc.yml
+  when: 
+    - ODOO_OIDC_ENABLED | bool
+    - odoo_health.status == 200
+
+- name: Configure administrator user
+  include_tasks: 04_admin.yml
+  when: odoo_health.status == 200
+
+- name: Configure email settings
+  include_tasks: 05_email.yml
+  when: 
+    - ODOO_EMAIL_ENABLED | bool
+    - odoo_health.status == 200
