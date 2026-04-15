@@ -1,0 +1,57 @@
+{% include 'roles/sys-svc-compose/templates/base.yml.j2' %}
+
+{% set service_name = ODOO_SERVICE %}
+  {{ service_name }}:
+    image: "{{ ODOO_IMAGE }}:{{ ODOO_VERSION }}"
+    container_name: {{ ODOO_CONTAINER }}
+{% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+{% set container_port = 8069 %}
+{% set container_healthcheck = '/' %}
+{% include 'roles/sys-svc-container/templates/healthcheck/curl.yml.j2' %}
+    ports:
+      - "{{ DOCKER_BIND_HOST }}:{{ ports.localhost.http[application_id] }}:8069"
+      - "{{ DOCKER_BIND_HOST }}:{{ ports.localhost.websocket[application_id] }}:8072"
+    environment:
+      - HOST={{ ODOO_DATABASE_HOST }}
+      - PORT={{ ODOO_DATABASE_PORT }}
+      - USER={{ ODOO_DATABASE_USER }}
+      - PASSWORD={{ ODOO_DATABASE_PASSWORD }}
+{% include 'roles/sys-svc-container/templates/depends_on/dmbs_excl.yml.j2' %}
+{% if ODOO_REDIS_ENABLED | bool %}
+      redis:
+        condition: service_healthy
+{% endif %}
+{% include 'roles/sys-svc-container/templates/networks.yml.j2' %}
+    volumes:
+      - data:/var/lib/odoo
+      - addons:/mnt/extra-addons
+      - {{ ODOO_CONF_FILE_PATH }}:/etc/odoo/odoo.conf:ro
+
+{% if ODOO_REDIS_ENABLED | bool %}
+{% set service_name = 'redis' %}
+  {{ service_name }}:
+    image: redis:7-alpine
+    container_name: {{ ODOO_REDIS_CONTAINER }}
+{% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+{% include 'roles/sys-svc-container/templates/networks.yml.j2' %}
+    volumes:
+      - redis-data:/data
+{% endif %}
+
+{% set extra_vols = {'data': {'name': ODOO_DATA_VOLUME}, 'addons': {'name': ODOO_ADDONS_VOLUME}} %}
+{% if ODOO_REDIS_ENABLED | bool %}
+{% set extra_vols = extra_vols | combine({'redis-data': {}}) %}
+{% endif %}
+{{ applications | compose_volumes(
+    application_id,
+    database_volume=ODOO_DATABASE_VOLUME,
+    extra_volumes=extra_vols
+) }}
+{% include 'roles/sys-svc-compose/templates/networks.yml.j2' %}
