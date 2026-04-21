@@ -1,0 +1,65 @@
+---
+- name: "Load docker, db and proxy for {{ application_id }}"
+  ansible.builtin.include_role:
+    name: sys-stk-full
+  vars:
+    docker_compose_flush_handlers: true
+
+- name: "Flush Penpot handlers before provisioning"
+  ansible.builtin.meta: flush_handlers
+
+- name: "Wait for Penpot frontend health"
+  uri_retry:
+    url: "http://127.0.0.1:{{ ports.localhost.http[application_id] }}"
+    status_code: 200
+    timeout: 10
+  register: penpot_frontend_health
+  until: penpot_frontend_health.status == 200
+  retries: 30
+  delay: 5
+
+- name: "Check whether Penpot object-storage user exists in MinIO"
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
+  ansible.builtin.shell: >
+    docker run --rm
+    -e MC_HOST_minio={{ penpot_minio_mc_host_env | quote }}
+    {{ penpot_minio_mc_image }}
+    --insecure
+    admin user info minio {{ penpot_minio_access_key | quote }}
+  register: penpot_minio_user_info
+  failed_when: false
+  changed_when: false
+
+- name: "Create Penpot object-storage user in MinIO"
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
+  ansible.builtin.shell: >
+    docker run --rm
+    -e MC_HOST_minio={{ penpot_minio_mc_host_env | quote }}
+    {{ penpot_minio_mc_image }}
+    --insecure
+    admin user add minio
+    {{ penpot_minio_access_key | quote }}
+    {{ penpot_minio_secret_key | quote }}
+  changed_when: true
+  when: penpot_minio_user_info.rc != 0
+
+- name: "Attach readwrite policy to Penpot object-storage user"
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
+  ansible.builtin.shell: >
+    docker run --rm
+    -e MC_HOST_minio={{ penpot_minio_mc_host_env | quote }}
+    {{ penpot_minio_mc_image }}
+    --insecure
+    admin policy attach minio readwrite --user {{ penpot_minio_access_key | quote }}
+  changed_when: false
+
+- name: "Create Penpot object-storage bucket in MinIO"
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
+  ansible.builtin.shell: >
+    docker run --rm
+    -e MC_HOST_minio={{ penpot_minio_mc_host_env | quote }}
+    {{ penpot_minio_mc_image }}
+    --insecure
+    mb --ignore-existing {{ ('minio/' ~ penpot_minio_bucket) | quote }}
+  register: penpot_minio_bucket
+  changed_when: "'created' in (penpot_minio_bucket.stdout | default('') | lower)"

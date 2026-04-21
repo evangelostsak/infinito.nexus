@@ -1,0 +1,42 @@
+application_id: "web-app-penpot"
+js_application_name: "Penpot"
+entity_name: "{{ application_id | get_entity_name }}"
+
+penpot_version: "{{ lookup('config', application_id, 'compose.services.penpot.version') }}"
+penpot_backend_image: "{{ lookup('config', application_id, 'compose.services.penpot.image') }}"
+penpot_frontend_image: "{{ lookup('config', application_id, 'compose.services.penpot.frontend_image') }}"
+penpot_exporter_image: "{{ lookup('config', application_id, 'compose.services.penpot.exporter_image') }}"
+penpot_container: "{{ lookup('config', application_id, 'compose.services.penpot.name') }}"
+
+penpot_frontend_service: "penpot-frontend"
+penpot_backend_service: "penpot-backend"
+penpot_exporter_service: "penpot-exporter"
+penpot_http_port_internal: 8080
+penpot_backend_port_internal: 6060
+penpot_exporter_port_internal: 6061
+
+penpot_assets_volume: "{{ lookup('config', application_id, 'compose.volumes.assets') }}"
+penpot_public_url: "{{ lookup('tls', application_id, 'url.base') }}"
+penpot_secret_key: "{{ lookup('config', application_id, 'credentials.secret_key') }}"
+
+penpot_database_host: "{{ lookup('database', application_id, 'host') }}"
+penpot_database_port: "{{ lookup('database', application_id, 'port') }}"
+penpot_database_name: "{{ lookup('database', application_id, 'name') }}"
+penpot_database_username: "{{ lookup('database', application_id, 'username') }}"
+penpot_database_password: "{{ lookup('database', application_id, 'password') }}"
+penpot_database_uri: "postgresql://{{ penpot_database_host }}:{{ penpot_database_port }}/{{ penpot_database_name }}"
+
+penpot_redis_uri: "redis://redis:6379/0"
+
+penpot_minio_api_domain: "{{ lookup('config', 'web-app-minio', 'server.domains.canonical.api') }}"
+penpot_minio_endpoint: "{{ lookup('tls', 'web-app-minio', 'protocols.web') }}://{{ penpot_minio_api_domain }}"
+penpot_minio_region: "us-east-1"
+penpot_minio_bucket: "{{ lookup('config', application_id, 'credentials.objects_bucket_name') }}"
+penpot_minio_access_key: "{{ lookup('config', application_id, 'credentials.objects_access_key') }}"
+penpot_minio_secret_key: "{{ lookup('config', application_id, 'credentials.objects_secret_key') }}"
+penpot_minio_mc_image: "quay.io/minio/mc:latest"
+penpot_minio_mc_scheme: "{{ 'https' if (penpot_minio_endpoint is match('^https://')) else 'http' }}"
+penpot_minio_mc_host_only: "{{ penpot_minio_endpoint | regex_replace('^https?://', '') }}"
+penpot_minio_mc_user: "{{ users.administrator.username | urlencode }}"
+penpot_minio_mc_pass: "{{ users.administrator.password | urlencode }}"
+penpot_minio_mc_host_env: "{{ penpot_minio_mc_scheme }}://{{ penpot_minio_mc_user }}:{{ penpot_minio_mc_pass }}@{{ penpot_minio_mc_host_only }}"
