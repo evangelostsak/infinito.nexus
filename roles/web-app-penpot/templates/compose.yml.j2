@@ -12,7 +12,10 @@
       - "{{ DOCKER_BIND_HOST }}:{{ ports.localhost.http[application_id] }}:{{ container_port }}"
     volumes:
       - assets:/opt/data/assets
+{% set _actual_service_name = service_name %}
+{% set service_name = 'penpot' %}
 {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+{% set service_name = _actual_service_name %}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ container_port }}/ >/dev/null || curl -fsS http://127.0.0.1:{{ container_port }}/ >/dev/null"]
       interval: 30s
@@ -26,10 +29,24 @@
   {{ service_name }}:
     image: "{{ penpot_backend_image }}:{{ penpot_version }}"
     container_name: "{{ penpot_container }}-backend"
+    entrypoint: ["/bin/sh", "-ec"]
+    environment:
+      JVM_OPTS: "-Djavax.net.ssl.trustStore=/tmp/java-cacerts -Djavax.net.ssl.trustStorePassword=changeit"
+    command:
+      - |
+        cp /opt/jre/lib/security/cacerts /tmp/java-cacerts
+        /opt/jre/bin/keytool -importcert -noprompt -storepass changeit \
+          -alias infinito-root-ca \
+          -keystore /tmp/java-cacerts \
+          -file /tmp/infinito/ca/root-ca.crt >/dev/null 2>&1 || true
+        exec /opt/penpot/backend/run.sh app.main
 {% include 'roles/sys-svc-container/templates/depends_on/dmbs_excl.yml.j2' %}
     volumes:
       - assets:/opt/data/assets
+{% set _actual_service_name = service_name %}
+{% set service_name = 'penpot' %}
 {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+{% set service_name = _actual_service_name %}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ container_port }}/ >/dev/null || curl -fsS http://127.0.0.1:{{ container_port }}/ >/dev/null"]
       interval: 30s
@@ -44,7 +61,10 @@
     image: "{{ penpot_exporter_image }}:{{ penpot_version }}"
     container_name: "{{ penpot_container }}-exporter"
 {% include 'roles/sys-svc-container/templates/depends_on/dmbs_excl.yml.j2' %}
+{% set _actual_service_name = service_name %}
+{% set service_name = 'penpot' %}
 {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+{% set service_name = _actual_service_name %}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:{{ container_port }}/ >/dev/null || curl -fsS http://127.0.0.1:{{ container_port }}/ >/dev/null"]
       interval: 30s
