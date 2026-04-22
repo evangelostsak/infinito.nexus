@@ -32,7 +32,7 @@ penpot_minio_api_domain: "{{ lookup('config', 'web-app-minio', 'server.domains.c
 penpot_minio_api_port_public: "{{ ports.localhost.http['web-app-minio_api'] }}"
 penpot_minio_endpoint: "{{ lookup('tls', 'web-app-minio', 'protocols.web') }}://{{ penpot_minio_api_domain }}"
 penpot_minio_region: "us-east-1"
-penpot_minio_bucket: "{{ lookup('config', application_id, 'credentials.objects_bucket_name') }}"
+penpot_minio_bucket: "{{ lookup('config', application_id, 'credentials.objects_bucket_name') | default('penpot-assets', true) }}"
 penpot_minio_access_key: "{{ lookup('config', application_id, 'credentials.objects_access_key') }}"
 penpot_minio_secret_key: "{{ lookup('config', application_id, 'credentials.objects_secret_key') }}"
 penpot_minio_mc_image: "quay.io/minio/mc:latest"
