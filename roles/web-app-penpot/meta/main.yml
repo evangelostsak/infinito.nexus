@@ -1,0 +1,16 @@
+galaxy_info:
+  author: Kevin Veen-Birkenbach
+  description: Open-source design and prototyping platform deployed with backend, frontend, exporter, and shared service dependencies.
+  license: Infinito.Nexus Community License (Non-Commercial)
+  min_ansible_version: "2.15"
+  company: |
+    Kevin Veen-Birkenbach
+    Consulting & Coaching Solutions
+    https://www.veen.world
+  galaxy_tags:
+    - penpot
+    - design
+    - collaboration
+    - docker
+    - selfhosted
+  issue_tracker_url: https://s.infinito.nexus/issues
