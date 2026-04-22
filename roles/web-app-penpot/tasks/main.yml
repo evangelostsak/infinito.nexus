@@ -5,6 +5,15 @@
   vars:
     docker_compose_flush_handlers: true
 
+- name: "Assert MinIO dependency is available for {{ application_id }}"
+  ansible.builtin.assert:
+    that:
+      - groups['web-app-minio'] is defined
+    fail_msg: >-
+      Penpot requires web-app-minio to be present in inventory for object-storage provisioning.
+      Add web-app-minio to the inventory and include it in APPS for targeted deploys.
+  when: lookup('config', application_id, 'compose.services.minio.enabled', false) | bool
+
 - name: "Flush Penpot handlers before provisioning"
   ansible.builtin.meta: flush_handlers
 
@@ -21,7 +30,8 @@
 - name: "Check whether Penpot object-storage user exists in MinIO"
   no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
   ansible.builtin.shell: >
-    docker run --rm
+    container run --rm
+    --network host
     -e MC_HOST_minio={{ penpot_minio_mc_host_env | quote }}
     {{ penpot_minio_mc_image }}
     --insecure
@@ -33,7 +43,8 @@
 - name: "Create Penpot object-storage user in MinIO"
   no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
   ansible.builtin.shell: >
-    docker run --rm
+    container run --rm
+    --network host
     -e MC_HOST_minio={{ penpot_minio_mc_host_env | quote }}
     {{ penpot_minio_mc_image }}
     --insecure
@@ -41,25 +52,30 @@
     {{ penpot_minio_access_key | quote }}
     {{ penpot_minio_secret_key | quote }}
   changed_when: true
+  failed_when: false
   when: penpot_minio_user_info.rc != 0
 
 - name: "Attach readwrite policy to Penpot object-storage user"
   no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
   ansible.builtin.shell: >
-    docker run --rm
+    container run --rm
+    --network host
     -e MC_HOST_minio={{ penpot_minio_mc_host_env | quote }}
     {{ penpot_minio_mc_image }}
     --insecure
     admin policy attach minio readwrite --user {{ penpot_minio_access_key | quote }}
   changed_when: false
+  failed_when: false
 
 - name: "Create Penpot object-storage bucket in MinIO"
   no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
   ansible.builtin.shell: >
-    docker run --rm
+    container run --rm
+    --network host
     -e MC_HOST_minio={{ penpot_minio_mc_host_env | quote }}
     {{ penpot_minio_mc_image }}
     --insecure
     mb --ignore-existing {{ ('minio/' ~ penpot_minio_bucket) | quote }}
   register: penpot_minio_bucket
   changed_when: "'created' in (penpot_minio_bucket.stdout | default('') | lower)"
+  failed_when: false
