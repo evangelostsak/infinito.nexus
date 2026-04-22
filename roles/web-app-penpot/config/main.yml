@@ -1,0 +1,59 @@
+server:
+  csp:
+    flags:
+      script-src-elem:
+        unsafe-inline: true
+      style-src-elem:
+        unsafe-inline: true
+      style-src-attr:
+        unsafe-inline: true
+  domains:
+    canonical:
+      - penpot.design.{{ DOMAIN_PRIMARY }}
+    aliases: []
+compose:
+  services:
+    logout:
+      enabled: true
+      shared: true
+    dashboard:
+      enabled: true
+      shared: true
+    matomo:
+      enabled: true
+      shared: true
+    postgres:
+      enabled: true
+      shared: true
+    redis:
+      enabled: true
+      shared: true
+    minio:
+      enabled: true
+      shared: true
+    penpot:
+      image: penpotapp/backend
+      frontend_image: penpotapp/frontend
+      exporter_image: penpotapp/exporter
+      version: latest
+      name: penpot
+      min_storage: 10GB
+      cpus: "1.5"
+      mem_reservation: 1g
+      mem_limit: 2g
+      pids_limit: 1024
+      backup:
+        no_stop_required: true
+    css:
+      enabled: true
+      shared: true
+    javascript:
+      enabled: true
+      shared: true
+  volumes:
+    assets: penpot_assets
+credentials:
+  secret_key: ""
+  objects_access_key: ""
+  objects_secret_key: ""
+  objects_bucket_name: "penpot-assets"
