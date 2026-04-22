@@ -1,0 +1,20 @@
+credentials:
+  secret_key:
+    description: "Master key for Penpot session and token signing"
+    algorithm: "alphanumeric"
+    validation:
+      min_length: 64
+  objects_access_key:
+    description: "S3 access key used by Penpot for object storage"
+    algorithm: "alphanumeric"
+    validation:
+      min_length: 16
+  objects_secret_key:
+    description: "S3 secret key used by Penpot for object storage"
+    algorithm: "alphanumeric"
+    validation:
+      min_length: 32
+  objects_bucket_name:
+    description: "S3 bucket for Penpot assets"
+    algorithm: "none"
+    validation: "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
