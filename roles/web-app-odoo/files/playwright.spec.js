@@ -46,17 +46,21 @@ async function performOidcLogin(locator, username, password) {
 }
 
 // Click the "Login with SSO" button on Odoo's login page.
-// When auth_oauth is installed Odoo renders OAuth provider links in .o_auth_oauth_providers.
-// The oe_login_form has class 'd-none' (hidden) when OAuth providers are present,
-// so we must NOT wait for the form - we wait for the provider links directly.
-async function clickOdooSsoButton(locator) {
-  // Wait for the OAuth provider list to appear
-  const providerList = locator.locator(".o_auth_oauth_providers");
-  await providerList.first().waitFor({ state: "visible", timeout: 60_000 });
+// Odoo 19 renders the provider entries as list-group links and no longer exposes
+// the older .o_auth_oauth_providers wrapper consistently, so wait on the visible
+// provider link text itself.
+async function isOdooSsoLoginVisible(locator) {
+  try {
+    const ssoButton = locator.getByRole("link", { name: /login with sso/i });
+    return await ssoButton.first().isVisible().catch(() => false);
+  } catch {
+    return false;
+  }
+}
 
-  // Click the SSO provider link by its text
+async function clickOdooSsoButton(locator) {
   const ssoButton = locator.getByRole("link", { name: /login with sso/i });
-  await ssoButton.first().waitFor({ state: "visible", timeout: 15_000 });
+  await ssoButton.first().waitFor({ state: "visible", timeout: 60_000 });
   await ssoButton.first().click();
 }
 
@@ -264,7 +268,7 @@ test("dashboard to odoo: admin sso login, verify ui, logout", async ({ page }) =
   const odooFrameAfterLogout = page.frameLocator("#main iframe").first();
   await expect
     .poll(
-      async () => await isVisible(odooFrameAfterLogout.locator(".o_auth_oauth_providers")),
+      async () => await isOdooSsoLoginVisible(odooFrameAfterLogout),
       {
         timeout: 60_000,
         message: "Expected Odoo to return to login page after logout"
@@ -354,7 +358,7 @@ test("dashboard to odoo: biber sso login, verify ui, logout", async ({ page }) =
   const odooFrameAfterLogout = page.frameLocator("#main iframe").first();
   await expect
     .poll(
-      async () => await isVisible(odooFrameAfterLogout.locator(".o_auth_oauth_providers")),
+      async () => await isOdooSsoLoginVisible(odooFrameAfterLogout),
       {
         timeout: 60_000,
         message: "Expected Odoo to return to login page after logout"
