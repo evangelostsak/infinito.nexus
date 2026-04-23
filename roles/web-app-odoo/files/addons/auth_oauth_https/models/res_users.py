@@ -58,9 +58,11 @@ class ResUsersOAuthConfigurableUid(models.Model):
         Returns:
             Tuple of (db, login, credential) for session authentication
         """
-        # Map configured UID field to user_id if available
-        # This allows Odoo's standard logic to find/create users correctly
-        if OIDC_UID_FIELD in validation and "user_id" not in validation:
+        # Map configured UID field to user_id when available.
+        # Odoo 19 normalizes `sub` into `user_id` before this method is called,
+        # so we intentionally override it here to keep oauth_uid stable across
+        # stack apps (preferred_username by default).
+        if OIDC_UID_FIELD in validation:
             validation["user_id"] = validation[OIDC_UID_FIELD]
             _logger.debug(
                 "OAuth: Using %s '%s' as user_id",
