@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "OAuth HTTPS & Configurable UID",
-    "version": "18.0.1.2.0",
+    "version": "19.0.1.2.0",
     "category": "Authentication",
     "summary": "Force HTTPS redirect URIs and configurable OIDC UID field for OAuth",
     "description": """
