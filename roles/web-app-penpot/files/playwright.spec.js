@@ -67,17 +67,18 @@ function getPenpotOidcEntryLocators(locator) {
   const oidcLabelPattern = /oidc|single sign-on|sso|keycloak/i;
 
   return [
-    locator.locator("a.main_ui_auth_login__btn-oidc-auth, button.main_ui_auth_login__btn-oidc-auth"),
     locator.getByRole("link", { name: oidcLabelPattern }),
     locator.getByRole("button", { name: oidcLabelPattern }),
-    locator.locator("a[href*='login-with-oidc'], a[href*='/api/auth/oidc'], a[href*='oidc']"),
+    locator.locator("a[href*='login-with-oidc'], button[formaction*='login-with-oidc'], a[href*='/api/auth/oidc'], a[href*='oidc']"),
     locator.locator("button[data-testid*='oidc'], [data-testid*='oidc']"),
     locator.locator("[class*='oidc'], [class*='sso']")
   ];
 }
 
 async function triggerPenpotOidcLogin(page, iframeLocator, penpotFrame, expectedOidcAuthUrl) {
-  const directButton = penpotFrame.locator("a.main_ui_auth_login__btn-oidc-auth, button.main_ui_auth_login__btn-oidc-auth").first();
+  const directButton = penpotFrame
+    .locator("a[href*='login-with-oidc'], button[formaction*='login-with-oidc']")
+    .first();
 
   if (await directButton.count()) {
     await directButton.click({ force: true });
@@ -185,6 +186,24 @@ async function ensurePenpotLoggedOut(page, expectedPenpotBaseUrl) {
   await page.waitForTimeout(1_500);
 }
 
+async function expectPenpotAuthButtons(locator) {
+  const ssoEntry = await findFirstVisible([
+    locator.getByRole("link", { name: /login with sso|single sign-on|sso|keycloak/i }),
+    locator.getByRole("button", { name: /login with sso|single sign-on|sso|keycloak/i }),
+    locator.locator("a[href*='login-with-oidc'], button[formaction*='login-with-oidc']")
+  ]);
+  expect(ssoEntry, "Expected Penpot OIDC entry to be visible").not.toBeNull();
+  await expect(ssoEntry).toContainText(/login with sso|single sign-on|sso|keycloak/i, { timeout: 60_000 });
+
+  const ldapEntry = await findFirstVisible([
+    locator.getByRole("button", { name: /login with ldap/i }),
+    locator.getByRole("link", { name: /login with ldap/i }),
+    locator.locator("button.main_ui_auth_login__login-ldap-button, button.main_ui_auth_common__login-ldap-button")
+  ]);
+  expect(ldapEntry, "Expected Penpot LDAP entry to be visible").not.toBeNull();
+  await expect(ldapEntry).toContainText(/login with ldap/i, { timeout: 60_000 });
+}
+
 test.beforeEach(() => {
   expect(oidcIssuerUrl,  "OIDC_ISSUER_URL must be set in the Playwright env file").toBeTruthy();
   expect(penpotBaseUrl,  "PENPOT_BASE_URL must be set in the Playwright env file").toBeTruthy();
@@ -192,6 +211,13 @@ test.beforeEach(() => {
   expect(adminPassword,  "ADMIN_PASSWORD must be set in the Playwright env file").toBeTruthy();
   expect(biberUsername,  "BIBER_USERNAME must be set in the Playwright env file").toBeTruthy();
   expect(biberPassword,  "BIBER_PASSWORD must be set in the Playwright env file").toBeTruthy();
+});
+
+test("penpot login page shows sso and ldap buttons", async ({ page }) => {
+  const expectedPenpotBaseUrl = penpotBaseUrl.replace(/\/$/, "");
+
+  await page.goto(expectedPenpotBaseUrl);
+  await expectPenpotAuthButtons(page);
 });
 
 // Scenario I: dashboard → Penpot iframe → SSO login as admin → verify authenticated → logout

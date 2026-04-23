@@ -18,6 +18,17 @@ penpot_exporter_port_internal: 6061
 penpot_assets_volume: "{{ lookup('config', application_id, 'compose.volumes.assets') }}"
 penpot_public_url: "{{ lookup('tls', application_id, 'url.base') }}"
 penpot_secret_key: "{{ lookup('config', application_id, 'credentials.secret_key') }}"
+penpot_oidc_enabled: "{{ lookup('config', application_id, 'compose.services.oidc.enabled', false) | bool }}"
+penpot_ldap_enabled: "{{ lookup('config', application_id, 'compose.services.ldap.enabled', false) | bool }}"
+
+penpot_ldap_host: "{{ LDAP.SERVER.DOMAIN }}"
+penpot_ldap_port: "{{ LDAP.SERVER.PORT }}"
+penpot_ldap_ssl: false
+penpot_ldap_starttls: false
+penpot_ldap_base_dn: "{{ LDAP.DN.OU.USERS }}"
+penpot_ldap_bind_dn: "{{ LDAP.DN.ADMINISTRATOR.DATA }}"
+penpot_ldap_bind_password: "{{ LDAP.BIND_CREDENTIAL }}"
+penpot_ldap_user_query: "(&{{ LDAP.FILTERS.USERS.ALL }}(|({{ LDAP.USER.ATTRIBUTES.ID }}=:username)({{ LDAP.USER.ATTRIBUTES.MAIL }}=:username)))"
 
 penpot_database_host: "{{ lookup('database', application_id, 'host') }}"
 penpot_database_port: "{{ lookup('database', application_id, 'port') }}"
