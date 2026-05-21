@@ -4,7 +4,7 @@ set -euo pipefail
 # Update all apps cumulated from one or more inventory bundles (reuses inventory, no down/up, no purge).
 #
 # Usage:
-#   INFINITO_BUNDLES="education-suite,startup-essentials" make compose-deploymode=update
+#   INFINITO_BUNDLES="education-suite,startup-essentials" make compose-deploy mode=update
 #
 # Behavior:
 #   - Aggregates and deduplicates all role groups declared in each bundle's

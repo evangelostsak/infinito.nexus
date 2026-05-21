@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# In-container helper for `make compose-deploymode=update apps=…`.
+# In-container helper for `make compose-deploy mode=update apps=…`.
 #
 # Called from the host wrapper at
 # scripts/tests/deploy/local/deploy/apps/update/selection.sh via `docker exec`,

@@ -13,7 +13,7 @@ set -euo pipefail
 #   INFINITO_DEBUG       (default: false)
 #
 # Notes:
-# - This does NOT create the inventory. Run make compose-deployapps=<role> first.
+# - This does NOT create the inventory. Run make compose-deploy apps=<role> first.
 # - We recompute the app list to keep behavior deterministic with filters.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -45,7 +45,7 @@ pw_file="${inv_dir}/.password"
 
 if [[ ! -f "${inv_file}" ]]; then
 	echo "ERROR: inventory not found: ${inv_file}" >&2
-	echo "Run: make compose-deployapps=<role>" >&2
+	echo "Run: make compose-deploy apps=<role>" >&2
 	exit 2
 fi
 
