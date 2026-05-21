@@ -28,7 +28,7 @@
       - -p
       - Result
       - --value
-      - "{{ system_service_id }}.infinito.nexus.service"
+      - "{{ system_service_name }}"
   register: system_service_result
   changed_when: false
   failed_when: false
@@ -42,7 +42,7 @@
       - -p
       - ExecMainStatus
       - --value
-      - "{{ system_service_id }}.infinito.nexus.service"
+      - "{{ system_service_name }}"
   register: system_service_exec_status
   changed_when: false
   failed_when: false
@@ -63,4 +63,6 @@
       Unable to start service {{ system_service_name }}. See shared service diagnostics above.
   when:
     - not (system_service_suppress_flush | bool)
-    - (system_service_result.stdout | default('') | trim) not in ['success', ''] or (system_service_exec_status.stdout | default('') | trim) not in ['0', '']
+    - (systemd_set_state.failed | default(false) | bool)
+      or (system_service_result.stdout | default('') | trim) not in ['success', '']
+      or (system_service_exec_status.stdout | default('') | trim) not in ['0', '']
