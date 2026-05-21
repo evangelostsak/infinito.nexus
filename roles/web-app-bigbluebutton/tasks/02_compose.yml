@@ -24,4 +24,3 @@
   command:
     cmd: compose build etherpad
     chdir: "{{ lookup('container', application_id, 'directories.instance') }}"
-  when: RUNTIME == 'dev'

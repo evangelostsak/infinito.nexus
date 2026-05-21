@@ -39,22 +39,8 @@ make trust-ca
 | Start stack | `make up` | Starts the local development stack. |
 | Browser trust | `make trust-ca` | Trusts the generated local [CA](https://en.wikipedia.org/wiki/Certificate_authority) so `*.infinito.example` works correctly in your browser. |
 
-#### Optional Development Marker 🏷️
-
-If you want to mark this checkout as a development environment, run:
-
-```bash
-make mark-development
-```
-
-This step is optional.
-It creates an empty `env.development` file in the repository root.
-
-Several tools (e.g. `cli/administration/deploy/development/compose.py`, `scripts/meta/resolve/apps.sh`) let Docker Compose auto-load the generated `.env` (built from `env/default.env`) and, when `env.development` exists, pass it as an additional `--env-file`.
-Because Docker Compose applies the explicit `--env-file` after `.env`, any variable defined in `env.development` overrides the corresponding default.
-This lets you customize local settings (ports, image tags, flags) without modifying `env/default.env`.
-
-The `pre-commit` hooks are installed automatically by `make environment-bootstrap` and do not depend on this marker.
+The `pre-commit` hooks are installed automatically by `make environment-bootstrap`.
+Per-machine overrides go into the process environment before invoking `make` (e.g. `export INFINITO_FOO=…`); `make dotenv` honors caller-set values via setdefault semantics.
 
 ### Teardown 🧹
 

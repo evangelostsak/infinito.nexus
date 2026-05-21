@@ -48,17 +48,9 @@ if [[ -f "scripts/meta/env/load.sh" ]]; then
 fi
 
 compose_ci_exec() {
-	local -a compose_args=(docker compose)
-
-	if [[ -f "env.development" ]]; then
-		compose_args+=(--env-file env.development)
-	fi
-
-	compose_args+=(--profile ci exec -T infinito)
-
 	NIX_CONFIG="${NIX_CONFIG:-}" \
 		INFINITO_DISTRO="${INFINITO_DISTRO}" \
-		"${compose_args[@]}" "$@"
+		docker compose --profile ci exec -T infinito "$@"
 }
 
 emit_all() {

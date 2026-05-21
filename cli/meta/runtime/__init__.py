@@ -6,22 +6,23 @@ from pathlib import Path
 PROJECT_ROOT: Path = Path(__file__).resolve().parents[3]
 
 
-def detect_runtime(project_root: Path | None = None) -> str:
+def detect_runtime() -> str:
     """
     Detect the current execution runtime.
 
-    Returns one of:
+    Returns the value of the ``RUNTIME`` env var when set (callers pass
+    e.g. ``"dev"`` here to flag a local development compose run), or one
+    of the auto-detected labels otherwise:
+
       - "act"    : local GitHub Actions emulation (act)
       - "github" : real GitHub Actions runner
-      - "dev"    : local development compose stack
       - "host"   : native host execution (default)
 
     Precedence:
       1) RUNTIME (explicit override)
       2) act (must come before github because act sets GITHUB_ACTIONS=true)
       3) github
-      4) dev (marker relative to project root)
-      5) host
+      4) host
     """
     # 1) explicit override wins
     v = (os.getenv("RUNTIME") or "").strip()
@@ -39,11 +40,5 @@ def detect_runtime(project_root: Path | None = None) -> str:
     ):
         return "github"
 
-    # 4) local dev compose stack (project-root relative marker)
-    root = project_root or PROJECT_ROOT
-
-    if (root / "env.development").exists():
-        return "dev"
-
-    # 5) default
+    # 4) default
     return "host"

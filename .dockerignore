@@ -17,7 +17,6 @@ build/*
 .ruff_cache
 .agents
 collections/
-env.development
 .env
 logs/
 job-logs.txt

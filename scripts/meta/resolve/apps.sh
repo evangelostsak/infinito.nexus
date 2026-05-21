@@ -69,14 +69,9 @@ run_meta_cli() {
 		"${PYTHON}" "$@"
 		;;
 	docker)
-		local -a compose_args=(docker compose)
-		if [[ -f "env.development" ]]; then
-			compose_args+=(--env-file env.development)
-		fi
-		compose_args+=(--profile ci exec -T infinito)
 		NIX_CONFIG="${NIX_CONFIG:-}" \
 			INFINITO_DISTRO="${INFINITO_DISTRO}" \
-			"${compose_args[@]}" "${PYTHON}" "$@"
+			docker compose --profile ci exec -T infinito "${PYTHON}" "$@"
 		;;
 	*)
 		echo "apps.sh: unknown INFINITO_APP_DISCOVERY_RUNNER='${INFINITO_APP_DISCOVERY_RUNNER}' (expected: host|docker)" >&2

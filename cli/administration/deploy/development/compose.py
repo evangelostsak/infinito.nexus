@@ -192,17 +192,7 @@ class Compose:
         print(">>> NIX_CONFIG:", "<set>" if env.get("NIX_CONFIG") else "<empty>")
 
         no_build = env["INFINITO_BUILD"] != "1"
-        # Compose auto-loads `.env`; layer `env.development` on top when present.
-        args: list[str] = []
-
-        env_local = self.repo_root / "env.development"
-        if env_local.exists():
-            print(f">>> Using local env override: {env_local}")
-            args += ["--env-file", "env.development"]
-        else:
-            print(">>> No env.local found (skipping)")
-
-        args += ["up", "-d"]
+        args: list[str] = ["up", "-d"]
         if no_build:
             args.append("--no-build")
         # Cache services have `required: false` on infinito; list them

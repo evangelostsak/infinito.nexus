@@ -30,7 +30,7 @@ endif
 .PHONY: act-all act-app act-workflow
 .PHONY: deploy-fresh-kept-apps container-refresh-inventory deploy-reuse-kept-all container-purge-entity container-purge-system
 .PHONY: deploy-fresh-purged-apps deploy-reuse-kept-apps deploy-reuse-purged-apps deploy-fresh-kept-all deploy-bundles redeploy-bundles
-.PHONY: bootstrap mark-development
+.PHONY: bootstrap
 .PHONY: debug-network
 
 # Run all act-based deploy checks.
@@ -315,10 +315,6 @@ lint-shellcheck: install-lint
 list:
 	@echo "Generating the roles list"
 	@"$${PYTHON}" -m cli.build.list
-
-# Create the development setup marker.
-mark-development: dockerignore
-	touch env.development
 
 # Build the meta graph inputs.
 mig: list tree

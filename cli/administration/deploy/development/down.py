@@ -24,14 +24,7 @@ def _base_env(*, distro: str) -> dict[str, str]:
 
 
 def _compose_run(*, repo_root: Path, distro: str, args: list[str]) -> None:
-    cmd = ["docker", "compose"]
-    env_development = repo_root / "env.development"
-    if env_development.exists():
-        cmd += ["--env-file", "env.development"]
-
-    cmd += compose_file_args()
-    cmd += Profile().args()
-    cmd += list(args)
+    cmd = ["docker", "compose", *compose_file_args(), *Profile().args(), *args]
     env = _base_env(distro=distro)
     env.setdefault("NIX_CONFIG", "")
     subprocess.run(cmd, cwd=repo_root, env=env, check=True, text=True)
