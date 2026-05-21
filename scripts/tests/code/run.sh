@@ -13,15 +13,6 @@ unset _run_sh_dir
 : "${INFINITO_TEST_PATTERN:?INFINITO_TEST_PATTERN must be set}"
 : "${INFINITO_TEST_TYPE:?INFINITO_TEST_TYPE must be set}" # nocheck: makefile-supplied
 
-NIX_CONFIG_EFFECTIVE="$(
-	printf "%s\n%s\n" \
-		"${NIX_CONFIG:-}" \
-		"accept-flake-config = true" |
-		sed -e "s/[[:space:]]\+$//" -e "/^$/d" |
-		awk '!seen[$0]++'
-)"
-export NIX_CONFIG="${NIX_CONFIG_EFFECTIVE}"
-
 echo "PWD=$(pwd)"
 echo "PYTHON=${PYTHON:-<unset>}"
 
