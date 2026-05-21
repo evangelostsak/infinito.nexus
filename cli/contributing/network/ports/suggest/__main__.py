@@ -11,8 +11,8 @@ upstream image, not by a project-managed pool.
 
 Usage:
 
-  cli meta ports suggest --scope local --category http --count 3
-  cli meta ports suggest --scope public --category relay --length 10000 --count 1
+  cli contributing network ports suggest --scope local --category http --count 3
+  cli contributing network ports suggest --scope public --category relay --length 10000 --count 1
 """
 
 from __future__ import annotations
@@ -141,7 +141,7 @@ def suggest_relay_ranges(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="cli meta ports suggest",
+        prog="cli contributing network ports suggest",
         description=(
             "Suggest free host-bound ports based on the live role tree. "
             "Allocates from PORT_BANDS.<scope>.<category> in "

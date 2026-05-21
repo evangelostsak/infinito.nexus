@@ -7,9 +7,9 @@ fits the requested client count, and proposes free sub-blocks gap-first.
 
 Usage:
 
-  cli meta networks suggest --clients 14 --count 2
-  cli meta networks suggest --clients 254 --count 1
-  cli meta networks suggest --clients 14 --block 192.168.101.0/24
+  cli contributing network address suggest --clients 14 --count 2
+  cli contributing network address suggest --clients 254 --count 1
+  cli contributing network address suggest --clients 14 --block 192.168.101.0/24
 """
 
 from __future__ import annotations
@@ -134,7 +134,7 @@ def capacity_for(network: ipaddress.IPv4Network) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="cli meta networks suggest",
+        prog="cli contributing network address suggest",
         description=(
             "Suggest free per-role IPv4 subnets based on the live role tree. "
             "Picks the smallest CIDR prefix that fits --clients, then "

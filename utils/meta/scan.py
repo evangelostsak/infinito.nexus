@@ -1,9 +1,9 @@
 """Walk the role tree to collect occupied ports and subnets.
 
 Used by:
-  * `cli meta ports suggest`    — gap-first port allocation suggestions
-  * `cli meta networks suggest` — gap-first subnet allocation suggestions
-  * `tests/lint/...`            — collision/band checks
+  * `cli contributing network ports suggest`   gap-first port allocation suggestions
+  * `cli contributing network address suggest` gap-first subnet allocation suggestions
+  * `tests/lint/...`                           collision/band checks
 
 Reads only ``roles/*/meta/{services,server}.yml`` files.
 """

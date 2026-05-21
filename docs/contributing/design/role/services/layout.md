@@ -212,7 +212,7 @@ view:
 
 The per-category port ranges that the suggester proposes from and that the lint check enforces live as a single `PORT_BANDS` map in [group_vars/all/08_networks.yml](../../../../../group_vars/all/08_networks.yml).
 Suggesters and lint pick up new entries automatically, with no second registration step.
-See `cli meta ports suggest` in [ports-suggest.md](../../../tools/ports-suggest.md).
+See `cli contributing network ports suggest` in [port.md](../../../tools/network/port.md).
 
 ## `run_after` and `lifecycle` 🌱
 
@@ -306,5 +306,5 @@ The dashboard's `web-app-dashboard/lookup_plugins/docker_cards.py` reads `logo.c
 
 - [base.md](base.md) covers the service registration, loading, and injection model.
 - [email.md](email.md) covers the email lookup contract.
-- [ports-suggest.md](../../../tools/ports-suggest.md) describes the `cli meta ports suggest` helper.
-- [networks-suggest.md](../../../tools/networks-suggest.md) describes the `cli meta networks suggest` helper.
+- [port.md](../../../tools/network/port.md) describes the `cli contributing network ports suggest` helper.
+- [address.md](../../../tools/network/address.md) describes the `cli contributing network address suggest` helper.

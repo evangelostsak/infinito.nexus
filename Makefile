@@ -31,6 +31,7 @@ endif
 .PHONY: deploy-fresh-kept-apps container-refresh-inventory deploy-reuse-kept-all container-purge-entity container-purge-system
 .PHONY: deploy-fresh-purged-apps deploy-reuse-kept-apps deploy-reuse-purged-apps deploy-fresh-kept-all deploy-bundles redeploy-bundles
 .PHONY: bootstrap mark-development
+.PHONY: debug-network
 
 # Run all act-based deploy checks.
 act-all:
@@ -150,6 +151,10 @@ container-purge-system: container-purge-entity
 # Refresh the container inventory without deploying apps.
 container-refresh-inventory:
 	@bash scripts/tests/deploy/local/reset/inventory.sh
+
+# Run the network-diagnose script inside the infinito container (DNS/TCP/TLS/PMTU v4+v6).
+debug-network:
+	@$(MAKE) exec INFINITO_CMD="python3 -m cli.contributing.network.diagnose"
 
 # One-off deploy of all apps cumulated from one or more inventory bundles. Set INFINITO_FULL_CYCLE=true to also run the update pass (default: false).
 deploy-bundles: down up

@@ -1,4 +1,4 @@
-"""Unit tests for `cli meta ports suggest`.
+"""Unit tests for `cli contributing network ports suggest`.
 
 Covers gap-first / increment-fallback behaviour against synthetic
 role-tree fixtures plus the relay-range allocator.
@@ -10,7 +10,7 @@ import io
 import unittest
 from unittest.mock import patch
 
-import cli.meta.ports.suggest.__main__ as portsuggest
+import cli.contributing.network.ports.suggest.__main__ as portsuggest
 
 
 def _band(start: int, end: int) -> tuple[int, int]:

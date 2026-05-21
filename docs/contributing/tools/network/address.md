@@ -1,14 +1,14 @@
-# `cli meta networks suggest` 🌐
+# `cli contributing network address suggest` 🌐
 
-This page documents the contract of the `cli meta networks suggest` helper and the rules contributors MUST follow when calling it.
+This page documents the contract of the `cli contributing network address suggest` helper and the rules contributors MUST follow when calling it.
 
 Primary file:
 
-- [cli/meta/networks/suggest/__main__.py](../../../cli/meta/networks/suggest/__main__.py)
+- [__main__.py](../../../../cli/contributing/network/address/suggest/__main__.py)
 
 ## Purpose 🎯
 
-`cli meta networks suggest` proposes the next free per-role IPv4 subnet(s) based on the live role tree.
+`cli contributing network address suggest` proposes the next free per-role IPv4 subnet(s) based on the live role tree.
 It walks every `roles/*/meta/server.yml`, collects occupied `networks.local.subnet` assignments, picks the smallest CIDR prefix that fits the requested client count, and proposes free sub-blocks gap-first then by increment within the established umbrella blocks.
 
 ## Inputs 🔧
@@ -39,19 +39,19 @@ It walks every `roles/*/meta/server.yml`, collects occupied `networks.local.subn
 Suggest two free `/28` subnets (14 clients each) inside the established umbrella blocks:
 
 ```bash
-cli meta networks suggest --clients 14 --count 2
+cli contributing network address suggest --clients 14 --count 2
 ```
 
 Suggest one free `/24` subnet (254 clients) bootstrapped inside an explicit umbrella block:
 
 ```bash
-cli meta networks suggest --clients 254 --block 192.168.200.0/22
+cli contributing network address suggest --clients 254 --block 192.168.200.0/22
 ```
 
 Suggest a single `/28` subnet (the default `--count 1`):
 
 ```bash
-cli meta networks suggest --clients 14
+cli contributing network address suggest --clients 14
 ```
 
 ## Determinism 🧪
@@ -61,11 +61,11 @@ It exits non-zero with a clear error when the requested capacity cannot be satis
 
 ## Integration with `cli create role` 🧩
 
-When `cli create role` scaffolds a new role, it prompts for `--clients N` and calls `cli meta networks suggest --clients N --count 1` to fill in `meta/server.yml.networks.local.subnet` automatically.
+When `cli create role` scaffolds a new role, it prompts for `--clients N` and calls `cli contributing network address suggest --clients N --count 1` to fill in `meta/server.yml.networks.local.subnet` automatically.
 The contributor MAY override the suggestion interactively.
-See [ports-suggest.md](ports-suggest.md) for the matching ports flow.
+See [port.md](port.md) for the matching ports flow.
 
 ## Related Pages 📚
 
-- [ports-suggest.md](ports-suggest.md) is the sibling helper for host-bound ports.
-- [layout.md](../design/role/services/layout.md) describes the per-role `networks:` shape in `meta/server.yml`.
+- [port.md](port.md) is the sibling helper for host-bound ports.
+- [layout.md](../../design/role/services/layout.md) describes the per-role `networks:` shape in `meta/server.yml`.

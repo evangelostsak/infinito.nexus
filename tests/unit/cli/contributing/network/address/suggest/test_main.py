@@ -1,4 +1,4 @@
-"""Unit tests for `cli meta networks suggest`.
+"""Unit tests for `cli contributing network address suggest`.
 
 Covers the gap-first / increment-fallback path for synthetic role-tree
 fixtures.
@@ -11,7 +11,7 @@ import ipaddress
 import unittest
 from unittest.mock import patch
 
-import cli.meta.networks.suggest.__main__ as netsuggest
+import cli.contributing.network.address.suggest.__main__ as netsuggest
 
 
 def _net(cidr: str) -> ipaddress.IPv4Network:
