@@ -46,9 +46,6 @@
       --ignore-buildable
   register: pull
   changed_when: "'pulled' in pull.stdout"
-  environment:
-    COMPOSE_HTTP_TIMEOUT: "600"
-    DOCKER_CLIENT_TIMEOUT: "600"
   retries: 10
   delay: 30
   until: pull is succeeded
@@ -65,11 +62,6 @@
   args:
     chdir: "{{ lookup('container', application_id, 'directories.instance') }}"
     executable: /bin/bash
-  environment:
-    COMPOSE_HTTP_TIMEOUT: "600"
-    DOCKER_CLIENT_TIMEOUT: "600"
-    DOCKER_BUILDKIT: "{{ BUILDKIT_ENABLED | int }}"
-    COMPOSE_DOCKER_CLI_BUILD: "{{ BUILDKIT_ENABLED | int }}"
   listen:
     - compose build
 
@@ -80,8 +72,6 @@
   register: dc_up
   changed_when: true
   environment:
-    COMPOSE_HTTP_TIMEOUT: "600"
-    DOCKER_CLIENT_TIMEOUT: "600"
     COMPOSE_PARALLEL_LIMIT: "{{ '4' if (DOCKER_IN_CONTAINER | bool) else omit }}"
   args:
     chdir: "{{ lookup('container', application_id, 'directories.instance') }}"

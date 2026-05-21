@@ -6,6 +6,10 @@
     CA_TRUST_WRAPPER_HOST: "{{ CA_TRUST.wrapper_host }}"
     CA_TRUST_NAME: "{{ CA_TRUST.trust_name }}"
     CA_CONTAINER_ENABLED: "{{ CA_CONTAINER_ENABLED | int }}"
+    COMPOSE_HTTP_TIMEOUT: "600"
+    DOCKER_CLIENT_TIMEOUT: "600"
+    DOCKER_BUILDKIT: "{{ BUILDKIT_ENABLED | int }}"
+    COMPOSE_DOCKER_CLI_BUILD: "{{ BUILDKIT_ENABLED | int }}"
   tasks:
     - name: "Load 'constructor' tasks"
       include_tasks: "tasks/stages/01_constructor.yml"
