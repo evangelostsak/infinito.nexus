@@ -1,6 +1,6 @@
-"""Every key in env/default.env must be wired through a handler builder.
+"""Every key in default.env must be wired through a handler builder.
 
-env/default.env is the SPOT for static defaults. The handler builders
+default.env is the SPOT for static defaults. The handler builders
 under ``utils/env/handlers/`` are responsible for applying each entry
 as a ``setdefault`` on the EnvBuilder. If a key lives in default.env
 but no handler references it, the generated ``.env`` will silently
@@ -46,14 +46,14 @@ def _handler_referenced_keys(handlers_dir: Path) -> set[str]:
 
 class TestDefaultEnvKeysHandled(unittest.TestCase):
     def test_every_default_env_key_has_a_handler(self) -> None:
-        default_env_path = PROJECT_ROOT / "env" / "default.env"
+        default_env_path = PROJECT_ROOT / "default.env"
         handlers_dir = PROJECT_ROOT / "utils" / "env" / "handlers"
 
-        self.assertTrue(default_env_path.is_file(), "env/default.env not found")
+        self.assertTrue(default_env_path.is_file(), "default.env not found")
         self.assertTrue(handlers_dir.is_dir(), "utils/env/handlers/ not found")
 
         declared = _default_env_keys(default_env_path)
-        self.assertTrue(declared, "env/default.env has no INFINITO_* entries")
+        self.assertTrue(declared, "default.env has no INFINITO_* entries")
 
         referenced = _handler_referenced_keys(handlers_dir)
         missing = sorted(declared - referenced)
@@ -61,10 +61,10 @@ class TestDefaultEnvKeysHandled(unittest.TestCase):
             return
 
         lines = [
-            f"INFINITO_* keys in env/default.env are not wired through any handler "
+            f"INFINITO_* keys in default.env are not wired through any handler "
             f"({len(missing)} unhandled):",
             "",
-            "env/default.env is the SPOT for static defaults; each key MUST be "
+            "default.env is the SPOT for static defaults; each key MUST be "
             "applied via setdefault by a handler in utils/env/handlers/ "
             "(typically the static-passthrough handler). Add the key to the "
             "handler's STATIC_KEYS / KEY constant so `make dotenv` materialises "

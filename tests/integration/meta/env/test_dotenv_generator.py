@@ -1,11 +1,11 @@
 """Drift + smoke guards for the project env generator.
 
 The generator at ``cli/meta/env/__main__.py`` is the single source of
-truth that materialises ``.env`` from the committed ``env/default.env``
+truth that materialises ``.env`` from the committed ``default.env``
 at the repo root plus runtime context. This integration test locks in
 two invariants:
 
-1. **Drift**: every key declared in ``env/default.env`` is read by a
+1. **Drift**: every key declared in ``default.env`` is read by a
    handler in :mod:`utils.env.handlers` (exposed via
    ``PASSTHROUGH_STATIC_KEYS`` / ``GHA_STATIC_KEYS``). No silent drops.
    This is a cross-file consistency check, not a single-file lint.
@@ -33,7 +33,7 @@ from . import PROJECT_ROOT
 if TYPE_CHECKING:
     from pathlib import Path
 
-STATIC_ENV = PROJECT_ROOT / "env" / "default.env"
+STATIC_ENV = PROJECT_ROOT / "default.env"
 
 # Baseline keys the rest of the codebase relies on after a clean
 # (non-GHA, non-act) generation.
@@ -94,7 +94,7 @@ EXPECTED_BASELINE_KEYS = frozenset(
     }
 )
 
-# Same env/default.env parser as the generator (kept here to avoid importing
+# Same default.env parser as the generator (kept here to avoid importing
 # the generator module just for the helper).
 _LINE_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$")
 
@@ -153,12 +153,12 @@ def _dynamic_handler_static_reads() -> set[str]:
 
 
 def generator_referenced_keys() -> set[str]:
-    """Return the set of env/default.env keys the generator actually reads.
+    """Return the set of default.env keys the generator actually reads.
 
     Sourced from the handler registry's ``PASSTHROUGH_STATIC_KEYS`` and
     ``GHA_STATIC_KEYS`` tuples plus any dynamic handler module's
     ``STATIC_READS`` tuple. Catches the most common drift: a new key in
-    env/default.env that no handler references."""
+    default.env that no handler references."""
     return (
         set(PASSTHROUGH_STATIC_KEYS)
         | set(GHA_STATIC_KEYS)
@@ -173,7 +173,7 @@ class TestStaticYamlDrift(unittest.TestCase):
         unread = static_keys - ref_keys
         self.assertFalse(
             unread,
-            "Keys in env/default.env are not read by any handler under "
+            "Keys in default.env are not read by any handler under "
             "utils/env/handlers/ (silent drop). Add them to "
             "PASSTHROUGH_STATIC_KEYS or GHA_STATIC_KEYS: "
             f"{sorted(unread)}",
@@ -185,7 +185,7 @@ class TestStaticYamlDrift(unittest.TestCase):
         phantom = ref_keys - static_keys
         self.assertFalse(
             phantom,
-            "Generator references keys that do not exist in env/default.env: "
+            "Generator references keys that do not exist in default.env: "
             f"{sorted(phantom)}",
         )
 

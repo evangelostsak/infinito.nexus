@@ -25,10 +25,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Resolve INFINITO_SRC_DIR from env/default.env (SPOT)
+      - name: Resolve INFINITO_SRC_DIR from default.env (SPOT)
         run: |
-          src_dir="$(awk -F= '/^INFINITO_SRC_DIR=/{print $2; exit}' env/default.env)"
-          test -n "${src_dir}" || { echo "INFINITO_SRC_DIR not found in env/default.env" >&2; exit 1; }
+          src_dir="$(awk -F= '/^INFINITO_SRC_DIR=/{print $2; exit}' default.env)"
+          test -n "${src_dir}" || { echo "INFINITO_SRC_DIR not found in default.env" >&2; exit 1; }
           echo "INFINITO_SRC_DIR=${src_dir}" >> "$GITHUB_ENV"
 
       - name: Install & test in pkgmgr virgin container

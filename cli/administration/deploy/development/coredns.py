@@ -19,7 +19,7 @@ class CoreDNSCorefileRenderer:
     Render compose/coredns/Corefile from compose/coredns/Corefile.tmpl using envsubst.
 
     What this does:
-      - Reads variables from env file (default: .env, generated from env/default.env)
+      - Reads variables from env file (default: .env, generated from default.env)
       - Runs `envsubst` to substitute variables into the Corefile template
       - Writes the output atomically (tmp -> rename)
       - Optionally prints a preview of the first N lines

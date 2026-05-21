@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# Base image (pkgmgr) selector. SPOT lives in env/default.env's
+# Base image (pkgmgr) selector. SPOT lives in default.env's
 # INFINITO_PARENT_IMAGE and is forwarded as a build arg by compose.yml /
 # scripts/image/build.sh.
 # Example values:
@@ -16,7 +16,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-lc"]
 ARG NIX_CONFIG
 
 # SPOT for the bind-mounted source tree inside the container. The compose
-# stack forwards env/default.env's INFINITO_SRC_DIR as a build arg.
+# stack forwards default.env's INFINITO_SRC_DIR as a build arg.
 ARG INFINITO_SRC_DIR
 ENV INFINITO_SRC_DIR=${INFINITO_SRC_DIR}
 ENV PYTHON="/opt/venvs/infinito/bin/python"

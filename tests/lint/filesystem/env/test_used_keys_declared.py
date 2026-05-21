@@ -1,6 +1,6 @@
 """Every INFINITO_* used in `.sh` / `.py` must be declared as a default.
 
-Defaults live in ``env/default.env`` (the SPOT for static values) and
+Defaults live in ``default.env`` (the SPOT for static values) and
 in the handler modules under ``utils/env/handlers/`` (which apply
 dynamic defaults via ``setdefault``). Together they form the registry
 of valid INFINITO_* keys.
@@ -47,7 +47,7 @@ _EXCLUDED_PREFIXES = (
     "tests/lint/",
     "utils/env/handlers/",
     "scripts/meta/env/python.sh",
-    "env/",
+    "default.env",
 )
 
 
@@ -60,9 +60,9 @@ class _Reference:
 
 def _registered_keys() -> set[str]:
     keys: set[str] = set()
-    env_dir = PROJECT_ROOT / "env"
-    for env_file in sorted(env_dir.glob("*.env")):
-        for line in read_text(str(env_file)).splitlines():
+    default_env = PROJECT_ROOT / "default.env"
+    if default_env.is_file():
+        for line in read_text(str(default_env)).splitlines():
             match = _DEFAULT_ENV_KEY_RE.match(line)
             if match is not None:
                 keys.add(match.group("key"))
@@ -158,7 +158,7 @@ class TestUsedKeysDeclared(unittest.TestCase):
             f"INFINITO_* keys referenced in code without a registry entry "
             f"({len(unique_keys)} unknown key(s) across {len(violations)} use site(s)):",
             "",
-            "Add a default to env/default.env (and to the static-passthrough handler's "
+            "Add a default to default.env (and to the static-passthrough handler's "
             "STATIC_KEYS) for static values, or write a dedicated handler under "
             "utils/env/handlers/ that sets the key via eb.setdefault. "
             "Suppress per line with `# nocheck: <reason>` when the key legitimately "

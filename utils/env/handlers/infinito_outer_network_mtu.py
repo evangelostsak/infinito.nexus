@@ -2,7 +2,7 @@
 
 Derived from the host's default-route interface MTU so the compose bridge
 never exceeds the path MTU (TLS handshakes silently drop fragments otherwise).
-Falls back to the static default in ``env/default.env`` when detection fails
+Falls back to the static default in ``default.env`` when detection fails
 (no default route, no readable ``/sys/class/net/<iface>/mtu``, …).
 """
 

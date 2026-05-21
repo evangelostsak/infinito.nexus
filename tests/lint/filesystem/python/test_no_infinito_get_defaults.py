@@ -1,6 +1,6 @@
 """Lint guard: `.py` files MUST NOT declare INFINITO_* defaults in `.get(KEY, default)`.
 
-The single source of truth for INFINITO_* defaults is ``env/default.env``
+The single source of truth for INFINITO_* defaults is ``default.env``
 (materialised into ``.env`` by ``make dotenv`` and applied as
 ``setdefault`` by the handler builders in ``utils/env/handlers/``).
 Hardcoded fallbacks in Python contradict that contract -- if the
@@ -19,7 +19,7 @@ Forbidden:
   ``env.get("INFINITO_VAR", DEFAULT)``, etc.
 
 Suppress per line with a same-line ``# nocheck: <reason>`` marker.
-Use it only when the call genuinely cannot consume ``env/default.env``
+Use it only when the call genuinely cannot consume ``default.env``
 (e.g. bootstrap code that runs before the env loader).
 """
 
@@ -123,7 +123,7 @@ class TestPythonNoInfinitoGetDefaults(unittest.TestCase):
             f"INFINITO_* defaults declared in `.get(KEY, default)` "
             f"({len(violations)} violations across {len(grouped)} file(s)):",
             "",
-            "INFINITO_* defaults belong in env/default.env (SPOT); the "
+            "INFINITO_* defaults belong in default.env (SPOT); the "
             "handler builders in utils/env/handlers/ then apply them via "
             "setdefault. Use `os.environ.get(KEY)` (None when unset) or "
             "`os.environ[KEY]` (loud KeyError) instead -- the empty-string "

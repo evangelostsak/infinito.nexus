@@ -39,7 +39,7 @@ docker)
 		"${MAKE:-make}" up
 	fi
 
-	# Compose auto-loads `.env` (the SPOT generated from env/default.env),
+	# Compose auto-loads `.env` (the SPOT generated from default.env),
 	# which carries every INFINITO_* default (INFINITO_DNS_IP, INFINITO_IP4,
 	# INFINITO_DOMAIN, INFINITO_CONTAINER, INFINITO_SUBNET, ...).
 	# BASH_ENV makes `bash --login` source load.sh on startup, pulling

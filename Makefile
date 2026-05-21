@@ -204,7 +204,7 @@ dockerignore:
 	@echo "Create dockerignore"
 	cat .gitignore > .dockerignore
 
-# Regenerate .env (SPOT) from env/default.env + runtime context (distro, cache sizes, secrets, ...).
+# Regenerate .env (SPOT) from default.env + runtime context (distro, cache sizes, secrets, ...).
 dotenv:
 	@python3 -m cli.meta.env
 

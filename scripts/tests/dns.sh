@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ------------------------------------------------------------
-# Load environment (Single Source of Truth: .env from env/default.env)
+# Load environment (Single Source of Truth: .env from default.env)
 # ------------------------------------------------------------
 # shellcheck source=scripts/meta/env/load.sh
 source scripts/meta/env/load.sh

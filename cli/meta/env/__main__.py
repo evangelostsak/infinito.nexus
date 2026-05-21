@@ -12,7 +12,7 @@ from . import PROJECT_ROOT as REPO_ROOT
 
 
 def main() -> int:
-    static_path = REPO_ROOT / "env" / "default.env"
+    static_path = REPO_ROOT / "default.env"
     out_path = REPO_ROOT / ".env"
 
     if not static_path.is_file():

@@ -1,4 +1,4 @@
-"""Every key declared in `env/*.env` must carry the `INFINITO_` prefix.
+"""Every key declared in `default.env` must carry the `INFINITO_` prefix.
 
 The shared namespace exists so project env-vars never collide with
 generic shell or Ansible-role variables of the same short name. Any
@@ -46,13 +46,14 @@ def _scan_file(path: Path) -> list[_Violation]:
 
 
 def _scan_targets() -> list[Path]:
-    return sorted((PROJECT_ROOT / "env").glob("*.env"))
+    default_env = PROJECT_ROOT / "default.env"
+    return [default_env] if default_env.is_file() else []
 
 
 class TestEnvFilesInfinitoPrefix(unittest.TestCase):
     def test_every_env_file_key_carries_infinito_prefix(self) -> None:
         targets = _scan_targets()
-        self.assertTrue(targets, "no env/*.env files found to scan")
+        self.assertTrue(targets, "default.env not found to scan")
 
         violations: list[_Violation] = []
         for path in targets:
@@ -62,14 +63,14 @@ class TestEnvFilesInfinitoPrefix(unittest.TestCase):
             return
 
         lines = [
-            f"env/*.env keys without the INFINITO_ prefix "
+            f"default.env keys without the INFINITO_ prefix "
             f"({len(violations)} violations):",
             "",
-            "Every key in env/*.env must start with INFINITO_ so it cannot "
+            "Every key in default.env must start with INFINITO_ so it cannot "
             "collide with generic shell or Ansible-role variables of the "
             "same short name. Rename the key to INFINITO_<NAME> (and update "
-            "callers) or move it out of env/*.env if it is not part of the "
-            "project's INFINITO_* namespace.",
+            "callers) or move it out of default.env if it is not part of "
+            "the project's INFINITO_* namespace.",
             "",
             "Offenders:",
         ]
