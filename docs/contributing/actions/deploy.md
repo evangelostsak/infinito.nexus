@@ -8,7 +8,7 @@ Two layers exist for invoking a local deploy:
 
 | Layer | When to use |
 |---|---|
-| `make compose-deploy` in the [Makefile](../../../Makefile) | Default. Single entry point with short Make variables (`apps`, `mode`, `purge`, `type`) routed by [main.sh](../../../scripts/tests/deploy/local/deploy/main.sh). |
+| `make compose-deploy` in the [Makefile](../../../Makefile) | Default. Single entry point routed by [main.sh](../../../scripts/tests/deploy/local/deploy/main.sh). For the full Make-variable surface (`apps`, `mode`, `purge`, `type`, `bundles`, `disabled`, `full_cycle`, `variant`) run `make help target=compose-deploy`. |
 | `infinito administration deploy development <subcommand>` (Python CLI) | Direct invocation when you need a flag the make target does not expose, or when you script multi-step flows yourself. |
 
 The make target ultimately calls the same CLI, so any behaviour described here applies to both.

@@ -77,7 +77,8 @@ build-no-cache-all:
 	done
 
 .PHONY: clean
-# Remove ignored files from the working tree; falls back to sudo for container-owned __pycache__/*.pyc, warns and continues if both fail.
+# Remove ignored files from the working tree.
+# Note: falls back to sudo for container-owned __pycache__/*.pyc; warns and continues if both fail.
 clean:
 	@echo "Removing ignored git files"
 	@if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
@@ -94,12 +95,14 @@ clean:
 	fi
 
 .PHONY: clean-cache
-# Wipe on-disk caches under /var/cache/infinito/core/cache/ (stops cache containers first; re-run `make compose-up` to recreate).
+# Wipe on-disk caches under /var/cache/infinito/core/cache/.
+# Note: stops cache containers first; re-run `make compose-up` to recreate them.
 clean-cache:
 	@bash scripts/system/cache/clean.sh
 
 .PHONY: clean-pycache-dirs
-# Remove tracked directories whose only child is a __pycache__ folder (orphans left after moving / deleting source files).
+# Remove tracked directories whose only child is a __pycache__ folder.
+# Note: catches orphans left after moving or deleting source files.
 clean-pycache-dirs:
 	@"$${PYTHON}" -m utils.cleanup.pycache_only_dirs
 
@@ -110,7 +113,18 @@ clean-sudo:
 	sudo git clean -fdX;
 
 .PHONY: compose-deploy
-# Run the local deploy router. Args: mode=initialize|reinstall|update (default initialize), apps=<csv>, purge=true|false (default false), type=server|workstation|universal (default from default.env), bundles=<csv>, disabled=<csv>, full_cycle=true|false. Example: `make compose-deploy mode=reinstall apps=web-app-matomo full_cycle=true`. See scripts/tests/deploy/local/deploy/main.sh for the full table.
+# Run the local deploy router.
+# Usage: make compose-deploy [mode=...] [apps=...] [purge=...] [type=...] [bundles=...] [disabled=...] [full_cycle=...] [variant=...]
+# Example: make compose-deploy mode=reinstall apps=web-app-matomo full_cycle=true
+# Note: see scripts/tests/deploy/local/deploy/main.sh for the full routing table.
+# Param mode: initialize | reinstall | update (default: initialize)
+# Param apps: comma-separated app ids (e.g. web-app-matomo,web-app-keycloak)
+# Param purge: true | false (default: false) — purge entities before deploy
+# Param type: server | workstation | universal (default: from default.env)
+# Param bundles: comma-separated bundle names; overrides apps when set
+# Param disabled: comma-separated service names to render as disabled
+# Param full_cycle: true | false — when true, also run the async update pass
+# Param variant: matrix round index to pin the redeploy to a specific variant
 compose-deploy:
 	@$(if $(apps),INFINITO_APPS="$(apps)") \
 	 $(if $(mode),INFINITO_DEPLOY_MODE="$(mode)") \
@@ -119,6 +133,7 @@ compose-deploy:
 	 $(if $(bundles),INFINITO_BUNDLES="$(bundles)") \
 	 $(if $(disabled),INFINITO_SERVICES_DISABLED="$(disabled)") \
 	 $(if $(full_cycle),INFINITO_FULL_CYCLE="$(full_cycle)") \
+	 $(if $(variant),INFINITO_VARIANT="$(variant)") \
 	 bash scripts/tests/deploy/local/deploy/main.sh
 
 .PHONY: compose-down
@@ -132,12 +147,20 @@ compose-entity-purge:
 	@bash scripts/tests/deploy/local/purge/entity.sh
 
 .PHONY: compose-exec
-# Run a shell (`make compose-exec`) or command (`make compose-exec INFINITO_CMD="..."`) in the running container.
+# Run a shell or one-off command in the running development container.
+# Usage: make compose-exec [INFINITO_CMD="..."]
+# Example: make compose-exec INFINITO_CMD="ls /opt/src/infinito"
+# Param INFINITO_CMD: shell command to run; when unset, opens an interactive shell.
 compose-exec:
 	@bash scripts/tests/deploy/local/exec/container.sh
 
 .PHONY: compose-inner-run
-# Run a one-off `docker run` inside the running container.
+# Run a one-off `docker run` inside the running container (nested Docker-in-Docker).
+# Usage: IMAGE=<ref> [INFINITO_CMD="..."] [INFINITO_RUN_FLAGS="..."] make compose-inner-run
+# Example: IMAGE=alpine INFINITO_CMD='env' make compose-inner-run
+# Param IMAGE: image reference passed to `docker run` (required, e.g. alpine).
+# Param INFINITO_CMD: command to execute inside the sidecar; defaults to the image entrypoint.
+# Param INFINITO_RUN_FLAGS: extra flags forwarded verbatim to `docker run`.
 compose-inner-run:
 	@bash scripts/tests/deploy/local/exec/run.sh
 
@@ -178,7 +201,9 @@ compose-up: install
 	@"$${PYTHON}" -m cli.administration.deploy.development up
 
 .PHONY: console
-# Interactive REPL for the infinito.nexus CLI, running on the host. Each line is forwarded to `python -m cli`; Ctrl+C only cancels the current input — exit with `exit`, `quit`, or Ctrl+D.
+# Interactive REPL for the infinito.nexus CLI, running on the host.
+# Note: each line is forwarded to `python -m cli`; Ctrl+C only cancels the current input.
+# Note: exit with `exit`, `quit`, or Ctrl+D.
 console:
 	@"$${PYTHON}" -m cli.console
 
@@ -188,17 +213,20 @@ diagnose-disk-usage:
 	@bash scripts/system/meta/disk-usage.sh
 
 .PHONY: diagnose-network
-# Run the network-diagnose script inside the infinito container (DNS/TCP/TLS/PMTU v4+v6).
+# Run the network-diagnose script inside the infinito container.
+# Note: covers DNS, TCP, TLS, and PMTU on both IPv4 and IPv6.
 diagnose-network:
 	@$(MAKE) compose-exec INFINITO_CMD="python3 -m cli.contributing.network.diagnose"
 
 .PHONY: dotenv
-# Regenerate .env (SPOT) from default.env + runtime context (distro, cache sizes, secrets, ...).
+# Regenerate .env (SPOT) from default.env + runtime context.
+# Note: runtime context covers distro, cache sizes, secrets, and the like.
 dotenv:
 	@python3 -m cli.meta.env
 
 .PHONY: dotenv-force
-# Force a clean .env regeneration in a stripped env (avoids stale BASH_ENV INFINITO_* values pinning via setdefault).
+# Force a clean .env regeneration in a stripped environment.
+# Note: avoids stale BASH_ENV INFINITO_* values pinning via setdefault.
 dotenv-force:
 	@rm -f .env
 	@env -i HOME="$${HOME}" PATH="$${PATH}" python3 -m cli.meta.env
@@ -217,7 +245,9 @@ fix-chmod:
 	@find scripts/ -name "*.sh" -exec chmod +x {} \;
 
 .PHONY: fix-dockerignore
-# Regenerate .dockerignore from .gitignore (which carries the .git entry Docker needs). Race-safe under parallel make setup invocations.
+# Regenerate .dockerignore from .gitignore.
+# Note: .gitignore carries the `.git` entry Docker needs.
+# Note: race-safe under parallel `make setup` invocations.
 fix-dockerignore:
 	@echo "Create .dockerignore"
 	cat .gitignore > .dockerignore
@@ -230,12 +260,14 @@ help:
 	@bash scripts/make/help.sh $(target)
 
 .PHONY: install
-# Install all runtime dependencies, incremental via a stamp file (see scripts/install/all.sh).
+# Install all runtime dependencies.
+# Note: incremental via a stamp file (see scripts/install/all.sh).
 install:
 	@bash scripts/install/all.sh
 
 .PHONY: install-agent
-# Install OS-level sandbox dependencies (bubblewrap, socat) required by the Claude Code sandbox.
+# Install OS-level sandbox dependencies required by the Claude Code sandbox.
+# Note: pulls in bubblewrap and socat.
 install-agent:
 	@bash scripts/install/sandbox.sh
 
@@ -246,17 +278,20 @@ install-ansible:
 	bash scripts/install/ansible.sh
 
 .PHONY: install-force
-# Force a full reinstall (drop the stamp and rebuild it).
+# Force a full reinstall.
+# Note: drops the install stamp and rebuilds it.
 install-force:
 	@bash scripts/install/all.sh --force
 
 .PHONY: install-lint
-# Install lint deps (host/docker via INFINITO_LINT_RUNNER, per-env stamp).
+# Install lint dependencies.
+# Note: host or docker selected via INFINITO_LINT_RUNNER; incremental via a per-env stamp.
 install-lint:
 	@bash scripts/install/wrapper.sh
 
 .PHONY: install-lint-force
-# Force a full lint reinstall (drop the per-env stamp and rebuild it).
+# Force a full lint reinstall.
+# Note: drops the per-env stamp and rebuilds it.
 install-lint-force:
 	@bash scripts/install/wrapper.sh --force
 
@@ -287,7 +322,8 @@ install-venv: install-system-python
 	@bash scripts/install/venv.sh
 
 .PHONY: lint
-# Run all lint checks in parallel (per-check host/docker via INFINITO_LINT_RUNNER).
+# Run all lint checks in parallel.
+# Note: each check runs on host or in docker per INFINITO_LINT_RUNNER.
 lint: install-lint
 	@bash scripts/make/parallel.sh lint-action \
 		lint-ansible \
@@ -303,12 +339,14 @@ lint-action: install-lint
 	@bash scripts/lint/wrapper.sh action
 
 .PHONY: lint-ansible
-# Run Ansible lint checks (syntax-check + ansible-lint).
+# Run Ansible lint checks.
+# Note: runs ansible's syntax-check plus ansible-lint.
 lint-ansible: install-lint setup
 	@bash scripts/lint/wrapper.sh ansible
 
 .PHONY: lint-javascript
-# Run ESLint over the project's JavaScript files (Playwright specs + persona helpers).
+# Run ESLint over the project's JavaScript files.
+# Note: covers Playwright specs and persona helpers.
 lint-javascript: install-lint
 	@bash scripts/lint/wrapper.sh javascript
 
@@ -418,7 +456,8 @@ system-purge:
 	@bash scripts/system/purge/system.sh
 
 .PHONY: test
-# Run the full test pipeline (lint + tests) in parallel; fail-fast.
+# Run the full test pipeline (lint + tests).
+# Note: parallel execution with fail-fast.
 test: install install-lint
 	@bash scripts/make/parallel.sh \
 		lint \
@@ -449,7 +488,8 @@ test-lint: install
 	bash scripts/tests/code/wrapper.sh
 
 .PHONY: test-signed
-# Verify HEAD is signed (`git log %G?` returns N for unsigned); gates the pre-push hook against unsigned tips.
+# Verify HEAD is signed.
+# Note: `git log %G?` returns N for unsigned; gates the pre-push hook against unsigned tips.
 test-signed:
 	@status="$$(git log -1 --pretty=%G?)"; \
 	if [ "$$status" = "N" ]; then \

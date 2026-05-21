@@ -46,7 +46,7 @@ You MUST load the following pages before editing any file, in this order:
 
 ## Debugging in the nested docker daemon
 
-To validate a hypothesis without redeploying — e.g. rerun the Playwright image with a patched env or grep — use `make compose-inner-run IMAGE=<ref> [INFINITO_CMD=...] [INFINITO_RUN_FLAGS=...]`. You MAY hand-edit `/tmp/test-e2e-playwright/<role>/.env` for the diagnosis run only, but you MUST mirror any fix back into `roles/<role>/templates/playwright.env.j2` before the next deploy.
+To validate a hypothesis without redeploying — e.g. rerun the Playwright image with a patched env or grep — use `make compose-inner-run` (see `make help target=compose-inner-run` for `IMAGE` / `INFINITO_CMD` / `INFINITO_RUN_FLAGS`). You MAY hand-edit `/tmp/test-e2e-playwright/<role>/.env` for the diagnosis run only, but you MUST mirror any fix back into `roles/<role>/templates/playwright.env.j2` before the next deploy.
 
 ## Exit
 

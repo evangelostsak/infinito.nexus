@@ -76,6 +76,7 @@ if [[ $# -ge 1 && -n "$1" ]]; then
 fi
 
 printf '\n%sInfinito.Nexus Make targets%s\n' "${C_BOLD}${C_CYAN}" "${C_RESET}"
+# shellcheck disable=SC2016 # backticks are literal text in the rendered help banner
 printf '%sUsage: make <target> (or `make help target=<target>` for details)%s\n\n' "${C_DIM}" "${C_RESET}"
 
 awk '
