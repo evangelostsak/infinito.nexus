@@ -33,8 +33,7 @@ docker)
 
 	# Auto-bring-up: if the `infinito` container is not running, kick off
 	# `make up` first so test-* doesn't fail with "service not running".
-	if ! docker compose --profile ci \
-		ps -q infinito 2>/dev/null | grep -q .; then
+	if ! docker compose ps -q infinito 2>/dev/null | grep -q .; then
 		echo ">>> 'infinito' container not running; starting the stack via 'make up'..."
 		"${MAKE:-make}" up
 	fi
@@ -61,7 +60,7 @@ docker)
 		-e INFINITO_TEST_TYPE="${INFINITO_TEST_TYPE}" # nocheck: makefile-supplied
 	)
 	INFINITO_DISTRO="${INFINITO_DISTRO}" \
-		docker compose --profile ci exec -T \
+		docker compose exec -T \
 		"${exec_env_args[@]}" \
 		--workdir "${INFINITO_SRC_DIR}" \
 		infinito \

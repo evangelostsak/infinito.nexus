@@ -105,13 +105,13 @@ class TestComposeUpRetries(unittest.TestCase):
         clear=False,
     )
     @patch("subprocess.run", autospec=True)
-    def test_run_uses_only_ci_profile_on_github_runner(
+    def test_run_skips_cache_override_on_github_runner(
         self, run_mock: MagicMock
     ) -> None:
         compose = self._compose()
 
         run_mock.return_value = subprocess.CompletedProcess(
-            ["docker", "compose", "--profile", "ci", "ps", "-q", "infinito"],
+            ["docker", "compose", "ps", "-q", "infinito"],
             0,
             stdout="cid\n",
             stderr="",
@@ -125,7 +125,7 @@ class TestComposeUpRetries(unittest.TestCase):
         cmd = run_mock.call_args.args[0]
         env = run_mock.call_args.kwargs["env"]
 
-        # CI: only the ci profile fires; cache override is not layered in.
+        # CI: cache override is not layered in.
         self.assertEqual(
             cmd,
             [
@@ -133,8 +133,6 @@ class TestComposeUpRetries(unittest.TestCase):
                 "compose",
                 "-f",
                 "compose.yml",
-                "--profile",
-                "ci",
                 "ps",
                 "-q",
                 "infinito",
@@ -154,7 +152,7 @@ class TestComposeUpRetries(unittest.TestCase):
         clear=False,
     )
     @patch("subprocess.run", autospec=True)
-    def test_run_activates_cache_profile_locally(self, run_mock: MagicMock) -> None:
+    def test_run_layers_cache_override_locally(self, run_mock: MagicMock) -> None:
         compose = self._compose()
 
         run_mock.return_value = subprocess.CompletedProcess(
@@ -166,7 +164,7 @@ class TestComposeUpRetries(unittest.TestCase):
         cmd = run_mock.call_args.args[0]
         env = run_mock.call_args.kwargs["env"]
 
-        # Local: cache override is layered onto compose.yml; no --profile cache.
+        # Local: cache override is layered onto compose.yml.
         self.assertEqual(
             cmd,
             [
@@ -176,8 +174,6 @@ class TestComposeUpRetries(unittest.TestCase):
                 "compose.yml",
                 "-f",
                 "compose/cache.override.yml",
-                "--profile",
-                "ci",
                 "ps",
                 "-q",
                 "infinito",

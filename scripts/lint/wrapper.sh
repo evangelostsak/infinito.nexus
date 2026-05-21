@@ -42,8 +42,7 @@ docker)
 	echo ">>> Running lint '${lint_type}' in ${INFINITO_DISTRO} container (compose stack)"
 	echo "============================================================"
 
-	if ! docker compose --profile ci \
-		ps -q infinito 2>/dev/null | grep -q .; then
+	if ! docker compose ps -q infinito 2>/dev/null | grep -q .; then
 		echo ">>> 'infinito' container not running; starting the stack via 'make up'..."
 		"${MAKE:-make}" up
 	fi
@@ -53,7 +52,7 @@ docker)
 	# into the lint script's environment. Without this the script body
 	# would see `set -u` unbound-variable errors on first ${INFINITO_X}.
 	INFINITO_DISTRO="${INFINITO_DISTRO}" \
-		docker compose --profile ci exec -T \
+		docker compose exec -T \
 		-e ACT="${ACT:-}" \
 		-e BASH_ENV="${INFINITO_SRC_DIR}/scripts/meta/env/load.sh" \
 		-e GITHUB_ACTIONS="${GITHUB_ACTIONS:-}" \

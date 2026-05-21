@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 from . import PROJECT_ROOT
 from .common import compose_file_args, resolve_distro
-from .profile import Profile
 
 if TYPE_CHECKING:
     import argparse
@@ -24,7 +23,7 @@ def _base_env(*, distro: str) -> dict[str, str]:
 
 
 def _compose_run(*, repo_root: Path, distro: str, args: list[str]) -> None:
-    cmd = ["docker", "compose", *compose_file_args(), *Profile().args(), *args]
+    cmd = ["docker", "compose", *compose_file_args(), *args]
     env = _base_env(distro=distro)
     env.setdefault("NIX_CONFIG", "")
     subprocess.run(cmd, cwd=repo_root, env=env, check=True, text=True)

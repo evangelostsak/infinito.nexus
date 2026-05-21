@@ -50,7 +50,7 @@ fi
 compose_ci_exec() {
 	NIX_CONFIG="${NIX_CONFIG:-}" \
 		INFINITO_DISTRO="${INFINITO_DISTRO}" \
-		docker compose --profile ci exec -T infinito "$@"
+		docker compose exec -T infinito "$@"
 }
 
 emit_all() {

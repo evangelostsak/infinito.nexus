@@ -30,14 +30,13 @@ host)
 	exec python3 -m utils.install.lint "$@"
 	;;
 docker)
-	if ! docker compose --profile ci \
-		ps -q infinito 2>/dev/null | grep -q .; then
+	if ! docker compose ps -q infinito 2>/dev/null | grep -q .; then
 		echo ">>> 'infinito' container not running; starting the stack via 'make up'..."
 		"${MAKE:-make}" up
 	fi
 
 	INFINITO_DISTRO="${INFINITO_DISTRO}" \
-		docker compose --profile ci exec -T \
+		docker compose exec -T \
 		-e BASH_ENV="${INFINITO_SRC_DIR}/scripts/meta/env/load.sh" \
 		--workdir "${INFINITO_SRC_DIR}" \
 		infinito \

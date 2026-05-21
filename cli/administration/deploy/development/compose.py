@@ -54,13 +54,7 @@ class Compose:
         text: bool = True,
         extra_env: dict[str, str] | None = None,
     ) -> subprocess.CompletedProcess:
-        cmd = [
-            "docker",
-            "compose",
-            *compose_file_args(),
-            *self.profile.args(),
-            *args,
-        ]
+        cmd = ["docker", "compose", *compose_file_args(), *args]
         env = self._base_env()
         if extra_env:
             env.update({k: str(v) for k, v in extra_env.items()})

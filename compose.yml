@@ -11,7 +11,6 @@ services:
   coredns:
     image: coredns/coredns:1.14.3
     container_name: infinito-coredns
-    profiles: ["ci"]
     command: ["-conf", "/Corefile"]
     volumes:
       - ./compose/coredns/Corefile:/Corefile:ro
@@ -58,7 +57,6 @@ services:
 
     container_name: ${INFINITO_CONTAINER:?Run 'make dotenv' to generate the .env single source of truth}
     restart: "no"
-    profiles: ["ci"]
     # Defaults of 0 map to "unlimited" in dockerd.
     mem_limit: ${INFINITO_MEM_LIMIT:?Run 'make dotenv' to generate the .env single source of truth}
     memswap_limit: ${INFINITO_MEMSWAP_LIMIT:?Run 'make dotenv' to generate the .env single source of truth}

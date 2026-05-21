@@ -73,23 +73,5 @@ class TestProfileRegistryCacheActive(unittest.TestCase):
         self.assertEqual(p.registry_cache_active(), not p.is_ci())
 
 
-class TestProfileArgs(unittest.TestCase):
-    @patch.dict(os.environ, {**_BLANK_CI_ENV, "CI": "true"}, clear=False)
-    def test_args_ci_only_on_runner(self) -> None:
-        self.assertEqual(Profile().args(), ["--profile", "ci"])
-
-    @patch.dict(os.environ, _BLANK_CI_ENV, clear=False)
-    def test_args_returns_only_ci_profile_locally(self) -> None:
-        self.assertEqual(Profile().args(), ["--profile", "ci"])
-
-    @patch.dict(os.environ, _BLANK_CI_ENV, clear=False)
-    def test_args_returns_a_fresh_list_each_call(self) -> None:
-        # Callers may mutate the returned list.
-        p = Profile()
-        first = p.args()
-        first.append("--mutated")
-        self.assertNotIn("--mutated", p.args())
-
-
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
