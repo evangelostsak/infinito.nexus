@@ -279,7 +279,7 @@ lint-action: install-lint
 	@bash scripts/lint/wrapper.sh action
 
 # Run Ansible lint checks (syntax-check + ansible-lint).
-lint-ansible: install-lint
+lint-ansible: install-lint setup
 	@bash scripts/lint/wrapper.sh ansible
 
 # Run ESLint over the project's JavaScript files (Playwright specs + persona helpers).
