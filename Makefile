@@ -25,7 +25,7 @@ endif
 .PHONY: apparmor-teardown apparmor-restore
 .PHONY: disable-ipv6 restore-ipv6
 .PHONY: trust-ca
-.PHONY: restart refresh exec run up down stop
+.PHONY: restart refresh exec run up down stop console
 .PHONY: build build-missing build-no-cache build-no-cache-all build-cleanup build-dependency
 .PHONY: act-all act-app act-workflow
 .PHONY: deploy-fresh-kept-apps container-refresh-inventory deploy-reuse-kept-all container-purge-entity container-purge-system
@@ -137,6 +137,10 @@ clean-pycache-only-dirs:
 clean-sudo:
 	@echo "Removing ignored git files with sudo"
 	sudo git clean -fdX;
+
+# Interactive REPL for the infinito.nexus CLI, running on the host. Each line is forwarded to `python -m cli`; Ctrl+C only cancels the current input — exit with `exit`, `quit`, or Ctrl+D.
+console:
+	@"$${PYTHON}" -m cli.console
 
 # Purge one or more app entities from the container.
 container-purge-entity:

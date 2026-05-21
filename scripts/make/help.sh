@@ -65,14 +65,4 @@ awk '
 
 printf '\n'
 
-if command -v infinito >/dev/null 2>&1; then
-	printf '%sFor deployment & CLI help, run:%s\n' "${C_BOLD}" "${C_RESET}"
-	printf '  %sinfinito --help%s\n\n' "${C_GREEN}" "${C_RESET}"
-else
-	printf '%sFor deployment & CLI help, run:%s\n' "${C_BOLD}" "${C_RESET}"
-	printf '  %spython -m cli --help%s\n' "${C_GREEN}" "${C_RESET}"
-	# shellcheck disable=SC2016 # backticks are literal hint text, not command substitution
-	printf '  %s(Install the `infinito` console script via `make install-python-dev` to use `infinito --help` instead.)%s\n\n' "${C_DIM}" "${C_RESET}"
-fi
-
 printf '%sDocumentation:%s %s%s\n\n' "${C_BOLD}" "${C_RESET}" "${C_CYAN}https://docs.infinito.nexus${C_RESET}" ""
