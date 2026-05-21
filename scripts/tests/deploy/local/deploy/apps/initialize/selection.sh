@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Local app test without teardown/cleanup.
 # Usage:
-#   scripts/tests/deploy/local/deploy/fresh-kept-app.sh <app-id>  # nocheck: self-path-reference
+#   scripts/tests/deploy/local/deploy/apps/initialize/selection.sh <app-id>  # nocheck: self-path-reference
 #
 # Environment variables:
 #   INFINITO_DISTRO   arch|debian|ubuntu|fedora|centos (default from scripts/meta/env/load.sh)
@@ -12,16 +12,16 @@ set -euo pipefail
 #   INFINITO_DEBUG    true|false (default: true)
 #
 # Examples:
-#   scripts/tests/deploy/local/deploy/fresh-kept-app.sh web-app-mailu  # nocheck: self-path-reference
-#   INFINITO_DISTRO=arch INFINITO_DEBUG=false scripts/tests/deploy/local/deploy/fresh-kept-app.sh web-app-nextcloud  # nocheck: self-path-reference
+#   scripts/tests/deploy/local/deploy/apps/initialize/selection.sh web-app-mailu  # nocheck: self-path-reference
+#   INFINITO_DISTRO=arch INFINITO_DEBUG=false scripts/tests/deploy/local/deploy/apps/initialize/selection.sh web-app-nextcloud  # nocheck: self-path-reference
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../../../../.." && pwd)"
 
 # shellcheck source=scripts/tests/deploy/local/utils/lib.sh
-source "${SCRIPT_DIR}/../utils/lib.sh"
+source "${SCRIPT_DIR}/../../../utils/lib.sh"
 # shellcheck source=scripts/tests/deploy/local/utils/cache-retry.sh
-source "${SCRIPT_DIR}/../utils/cache-retry.sh"
+source "${SCRIPT_DIR}/../../../utils/cache-retry.sh"
 
 cd "${REPO_ROOT}"
 
@@ -38,7 +38,7 @@ fi
 usage() {
 	cat <<'EOF'
 Usage:
-  fresh-kept-app.sh <app-id>
+  initialize/selection.sh <app-id>
 
 ENV:
   INFINITO_DISTRO=<arch|debian|ubuntu|fedora|centos>
@@ -111,7 +111,7 @@ echo ">>> Creating inventory for app '${INFINITO_APPS}'"
 # to "host". Without an explicit override the matrix-init step would bake
 # `RUNTIME=host` into host_vars and the Playwright E2E gate
 # (RUNTIME in [dev, act, github]) would never fire — kept-deploys would
-# silently skip the test stage. Mirrors fresh-purged-app.sh.
+# silently skip the test stage. Mirrors apps/reinstall/selection.sh.
 "${PYTHON}" -m cli.administration.deploy.development init \
 	--apps "${INFINITO_APPS}" \
 	--inventory-dir "${INFINITO_INVENTORY_DIR}" \

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Reuse-kept deploy for a single app inside the running infinito container.
+# Update a selection of apps inside the running infinito container (reuses inventory, no down/up).
 # Expects (ALL required):
 #   INFINITO_APPS      e.g. web-app-nextcloud
 #   INFINITO_TEST_DEPLOY_TYPE   server|workstation|universal
@@ -46,10 +46,10 @@ true | false) ;;
 esac
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../../../../.." && pwd)"
 
 # shellcheck source=scripts/tests/deploy/local/utils/cache-retry.sh
-source "${SCRIPT_DIR}/../utils/cache-retry.sh"
+source "${SCRIPT_DIR}/../../../utils/cache-retry.sh"
 
 echo "=== rapid deploy: type=${INFINITO_TEST_DEPLOY_TYPE} app=${INFINITO_APPS} container=${INFINITO_CONTAINER} debug=${INFINITO_DEBUG} ==="
 echo "inventory_dir=${INFINITO_INVENTORY_DIR}"

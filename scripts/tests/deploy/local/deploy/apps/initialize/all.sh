@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Fresh-kept deploy for all discovered apps.
+# Initialize all discovered apps: fresh inventory, no entity purge, stack kept on disk.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../../../../.." && pwd)"
 cd "${REPO_ROOT}"
 
 # shellcheck source=scripts/tests/deploy/local/utils/cache-retry.sh
-source "${SCRIPT_DIR}/../utils/cache-retry.sh"
+source "${SCRIPT_DIR}/../../../utils/cache-retry.sh"
 
 # ---------------------------------------------------------------------------
 # Required environment

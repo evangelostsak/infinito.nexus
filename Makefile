@@ -161,30 +161,30 @@ debug-network:
 	@$(MAKE) exec INFINITO_CMD="python3 -m cli.contributing.network.diagnose"
 
 # One-off deploy of all apps cumulated from one or more inventory bundles. Set INFINITO_FULL_CYCLE=true to also run the update pass (default: false).
-deploy-bundles: down up
-	@bash scripts/tests/deploy/local/deploy/bundles.sh
+deploy-bundles:
+	@bash scripts/tests/deploy/local/deploy/bundles/fresh.sh
 
 # Create a fresh inventory and deploy all apps.
 deploy-fresh-kept-all:
 	@echo "=== local full deploy (type=$${INFINITO_TEST_DEPLOY_TYPE}, distro=$${INFINITO_DISTRO}) ==="
-	@bash scripts/tests/deploy/local/deploy/fresh-kept-all.sh
+	@bash scripts/tests/deploy/local/deploy/apps/initialize/all.sh
 
 # Create a fresh inventory and deploy one or more apps.
 deploy-fresh-kept-apps:
 	@: "$${INFINITO_APPS:?INFINITO_APPS must be set (e.g. INFINITO_APPS=web-app-nextcloud)}"
-	@bash scripts/tests/deploy/local/deploy/fresh-kept-app.sh "$${INFINITO_APPS}"
+	@bash scripts/tests/deploy/local/deploy/apps/initialize/selection.sh "$${INFINITO_APPS}"
 
 # Deploy one or more apps with purged entities. Set INFINITO_FULL_CYCLE=true to also run the update pass.
-deploy-fresh-purged-apps: down up
-	@bash scripts/tests/deploy/local/deploy/fresh-purged-app.sh
+deploy-fresh-purged-apps:
+	@bash scripts/tests/deploy/local/deploy/apps/reinstall/selection.sh
 
 # Redeploy all apps on an existing inventory.
 deploy-reuse-kept-all:
-	@bash scripts/tests/deploy/local/deploy/reuse-kept-all.sh
+	@bash scripts/tests/deploy/local/deploy/apps/update/all.sh
 
 # Redeploy one or more apps on an existing inventory.
 deploy-reuse-kept-apps:
-	@INFINITO_DEBUG=true bash scripts/tests/deploy/local/deploy/reuse-kept-app.sh
+	@INFINITO_DEBUG=true bash scripts/tests/deploy/local/deploy/apps/update/selection.sh
 
 # Purge one or more app entities, then redeploy them on existing inventory.
 deploy-reuse-purged-apps: container-purge-entity
@@ -326,7 +326,7 @@ mig: list tree
 
 # Redeploy all apps cumulated from inventory bundles on an existing inventory (no down/up, no entity purge; requires a prior deploy-bundles run).
 redeploy-bundles:
-	@bash scripts/tests/deploy/local/deploy/redeploy-bundles.sh
+	@bash scripts/tests/deploy/local/deploy/bundles/update.sh
 # Refresh the running development stack only when it already exists.
 refresh:
 	@bash scripts/system/network/docker/stack_refresh.sh

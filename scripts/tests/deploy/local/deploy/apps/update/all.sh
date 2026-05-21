@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Reuse-kept deploy for ALL apps using the already initialized local inventory.
+# Update all apps using the already-initialized local inventory (no down/up, no purge).
 #
 # Required:
 #   INFINITO_DISTRO   (arch|debian|ubuntu|fedora|centos)
@@ -19,11 +19,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # shellcheck source=scripts/tests/deploy/local/utils/lib.sh
-source "${SCRIPT_DIR}/../utils/lib.sh"
+source "${SCRIPT_DIR}/../../../utils/lib.sh"
 # shellcheck source=scripts/tests/deploy/local/utils/cache-retry.sh
-source "${SCRIPT_DIR}/../utils/cache-retry.sh"
+source "${SCRIPT_DIR}/../../../utils/cache-retry.sh"
 
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../../../../.." && pwd)"
 cd "${REPO_ROOT}"
 
 : "${INFINITO_DISTRO:?INFINITO_DISTRO must be set (arch|debian|ubuntu|fedora|centos)}"

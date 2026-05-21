@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Reuse-kept redeploy of all apps cumulated from one or more inventory bundles.
+# Update all apps cumulated from one or more inventory bundles (reuses inventory, no down/up, no purge).
 #
 # Usage:
 #   INFINITO_BUNDLES="education-suite,startup-essentials" make redeploy-bundles
@@ -9,14 +9,14 @@ set -euo pipefail
 # Behavior:
 #   - Aggregates and deduplicates all role groups declared in each bundle's
 #     inventory.yml (see utils.inventory.bundle_apps).
-#   - Exports INFINITO_APPS=<csv> and delegates to reuse-kept-app.sh.
+#   - Exports INFINITO_APPS=<csv> and delegates to apps/update/selection.sh.
 #   - Does NOT bring the stack down/up and does NOT purge entities.
 #   - Requires an already-initialized inventory (see deploy-bundles or
 #     deploy-fresh-kept-apps for the first run).
 #
 # Required env:
 #   INFINITO_BUNDLES            comma-separated bundle names
-# Optional env (forwarded to reuse-kept-app.sh):
+# Optional env (forwarded to apps/update/selection.sh):
 #   INFINITO_DEBUG              true (default) | false
 #   INFINITO_DISTRO             arch|debian|ubuntu|fedora|centos
 #   INFINITO_INVENTORY_DIR      /etc/inventories/local-full-server (typical)
@@ -26,7 +26,7 @@ set -euo pipefail
 : "${INFINITO_BUNDLES:?INFINITO_BUNDLES must be set (e.g. INFINITO_BUNDLES=education-suite,startup-essentials)}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../../../.." && pwd)"
 cd "${REPO_ROOT}"
 
 PYTHON="${PYTHON:-python3}"
@@ -47,4 +47,4 @@ echo "apps  = ${INFINITO_APPS}"
 echo "debug = ${INFINITO_DEBUG}"
 echo
 
-exec bash "${SCRIPT_DIR}/reuse-kept-app.sh"
+exec bash "${SCRIPT_DIR}/../apps/update/selection.sh"

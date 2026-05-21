@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Fresh-purged deploy: run exactly ONE app on ONE distro against the same stack.
+# Reinstall a selection of apps: cycle the stack (down + up), purge shared
+# entities, then run a fresh inventory + deploy on a single distro.
 # Same logic as CI version, but WITHOUT destructive cleanup.
 #
 # Required env:
@@ -31,19 +32,22 @@ server | workstation | universal) ;;
 esac
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../../../../.." && pwd)"
 cd "${REPO_ROOT}"
 
 # shellcheck source=scripts/meta/env/load.sh
 source "scripts/meta/env/load.sh"
 
 # shellcheck source=scripts/tests/deploy/local/utils/cache-retry.sh
-source "${SCRIPT_DIR}/../utils/cache-retry.sh"
+source "${SCRIPT_DIR}/../../../utils/cache-retry.sh"
 
 echo "=== LOCAL: distro=${INFINITO_DISTRO} type=${INFINITO_TEST_DEPLOY_TYPE} app=${INFINITO_APPS} full_cycle=${INFINITO_FULL_CYCLE} ==="
 echo "limit_host=${INFINITO_LIMIT_HOST}"
 echo "inventory_dir=${INFINITO_INVENTORY_DIR}"
 echo
+
+echo ">>> Bringing stack down (replaces former 'make down' prerequisite)"
+"${PYTHON}" -m cli.administration.deploy.development down
 
 echo ">>> Ensuring stack is up for distro ${INFINITO_DISTRO}"
 "${PYTHON}" -m cli.administration.deploy.development up \
