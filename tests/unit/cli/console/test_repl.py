@@ -1,71 +1,31 @@
+"""Main-loop integration tests for the console REPL.
+
+Per-module concerns live in their own test files:
+  - test_navigation.py — path resolve, normalize, prompt, category checks
+  - test_runner.py     — subprocess dispatch + clear_screen
+  - test_ls.py         — `ls` rendering + truncate
+"""
+
 import io
-import signal
-import sys
 import unittest
 from unittest.mock import patch
 
 from cli.console import repl
+from cli.console.constants import PROMPT_PREFIX
+
+DOTDOT = ".."  # nocheck: project-root-import  REPL nav segment, not path construction
+DOTDOT_DOTDOT = (
+    "../.."  # nocheck: project-root-import  REPL nav segment, not path construction
+)
 
 
-class TestNormalize(unittest.TestCase):
-    def test_empty_argv_becomes_help(self):
-        self.assertEqual(repl._normalize([]), ["--help"])
-
-    def test_strips_infinito_prefix(self):
-        self.assertEqual(repl._normalize(["infinito", "meta", "env"]), ["meta", "env"])
-
-    def test_strips_cli_prefix(self):
-        self.assertEqual(repl._normalize(["cli", "build", "tree"]), ["build", "tree"])
-
-    def test_bare_infinito_becomes_help(self):
-        self.assertEqual(repl._normalize(["infinito"]), ["--help"])
-
-    def test_help_alias_lowercase(self):
-        self.assertEqual(repl._normalize(["help"]), ["--help"])
-
-    def test_help_alias_question_mark(self):
-        self.assertEqual(repl._normalize(["?"]), ["--help"])
-
-    def test_help_alias_h(self):
-        self.assertEqual(repl._normalize(["h"]), ["--help"])
-
-    def test_help_alias_preserves_following_args(self):
-        self.assertEqual(repl._normalize(["help", "meta"]), ["--help", "meta"])
-
-    def test_pass_through_unknown(self):
-        self.assertEqual(repl._normalize(["meta", "env"]), ["meta", "env"])
-
-    def test_strip_then_help_alias(self):
-        self.assertEqual(repl._normalize(["infinito", "help"]), ["--help"])
-
-
-class TestRunCli(unittest.TestCase):
-    @patch("cli.console.repl.subprocess.run")
-    def test_invokes_python_m_cli_with_argv(self, mock_run):
-        mock_run.return_value.returncode = 0
-        rc = repl._run_cli(["meta", "env"])
-        self.assertEqual(rc, 0)
-        called_argv = mock_run.call_args[0][0]
-        self.assertEqual(called_argv[0], sys.executable)
-        self.assertEqual(called_argv[1:], ["-m", "cli", "meta", "env"])
-
-    @patch("cli.console.repl.subprocess.run")
-    def test_restores_sigint_handler(self, mock_run):
-        mock_run.return_value.returncode = 0
-        before = signal.signal(signal.SIGINT, signal.SIG_DFL)
-        try:
-            repl._run_cli(["x"])
-            after = signal.getsignal(signal.SIGINT)
-            self.assertEqual(after, signal.SIG_DFL)
-        finally:
-            signal.signal(signal.SIGINT, before)
-
-
-class TestMainLoop(unittest.TestCase):
+class _MainLoopHarness:
     def _run_with_inputs(self, inputs):
         captured_calls = []
+        captured_prompts = []
 
         def fake_input(prompt):
+            captured_prompts.append(prompt)
             if not inputs:
                 raise EOFError
             value = inputs.pop(0)
@@ -73,7 +33,7 @@ class TestMainLoop(unittest.TestCase):
                 raise value
             return value
 
-        def fake_run_cli(argv):
+        def fake_run_cli(argv, *, current=None):
             captured_calls.append(argv)
             return 0
 
@@ -84,59 +44,159 @@ class TestMainLoop(unittest.TestCase):
             patch("sys.stderr", new_callable=io.StringIO),
         ):
             rc = repl.main()
-        return rc, captured_calls, out.getvalue()
+        return rc, captured_calls, captured_prompts, out.getvalue()
 
+
+class TestExitPaths(_MainLoopHarness, unittest.TestCase):
     def test_eof_exits_cleanly(self):
-        rc, calls, _ = self._run_with_inputs([])
+        rc, calls, _, _ = self._run_with_inputs([])
         self.assertEqual(rc, 0)
         self.assertEqual(calls, [])
 
     def test_exit_token(self):
-        rc, calls, _ = self._run_with_inputs(["exit"])
+        rc, calls, _, _ = self._run_with_inputs(["exit"])
         self.assertEqual(rc, 0)
         self.assertEqual(calls, [])
 
     def test_quit_token(self):
-        rc, _calls, _ = self._run_with_inputs(["quit"])
+        rc, _calls, _, _ = self._run_with_inputs(["quit"])
         self.assertEqual(rc, 0)
 
     def test_vim_style_quit(self):
-        rc, _calls, _ = self._run_with_inputs([":q"])
+        rc, _calls, _, _ = self._run_with_inputs([":q"])
         self.assertEqual(rc, 0)
 
+
+class TestInputHandling(_MainLoopHarness, unittest.TestCase):
     def test_blank_input_is_skipped(self):
-        rc, calls, _ = self._run_with_inputs(["", "   ", "exit"])
+        rc, calls, _, _ = self._run_with_inputs(["", "   ", "exit"])
         self.assertEqual(rc, 0)
         self.assertEqual(calls, [])
 
     def test_keyboard_interrupt_does_not_exit(self):
-        rc, calls, _ = self._run_with_inputs([KeyboardInterrupt(), "exit"])
+        rc, calls, _, _ = self._run_with_inputs([KeyboardInterrupt(), "exit"])
         self.assertEqual(rc, 0)
         self.assertEqual(calls, [])
 
     def test_command_is_normalized_and_dispatched(self):
-        rc, calls, _ = self._run_with_inputs(["infinito meta env", "exit"])
+        rc, calls, _, _ = self._run_with_inputs(["cli meta env", "exit"])
         self.assertEqual(rc, 0)
         self.assertEqual(calls, [["meta", "env"]])
 
     def test_help_alias_is_dispatched_as_help_flag(self):
-        rc, calls, _ = self._run_with_inputs(["help", "exit"])
+        rc, calls, _, _ = self._run_with_inputs(["help", "exit"])
         self.assertEqual(rc, 0)
         self.assertEqual(calls, [["--help"]])
 
     def test_shlex_parse_error_is_caught(self):
-        rc, calls, _ = self._run_with_inputs(["echo 'unterminated", "exit"])
+        rc, calls, _, _ = self._run_with_inputs(["echo 'unterminated", "exit"])
         self.assertEqual(rc, 0)
         self.assertEqual(calls, [])
 
+
+class TestBanner(_MainLoopHarness, unittest.TestCase):
     def test_banner_is_printed_once(self):
-        _, _, out = self._run_with_inputs(["exit"])
+        _, _, _, out = self._run_with_inputs(["exit"])
         self.assertEqual(out.count("infinito.nexus console"), 1)
         self.assertIn(repl.WEB_URL, out)
         self.assertIn(repl.DOCS_URL, out)
         self.assertIn(repl.LICENSE_NAME, out)
         self.assertIn(repl.LICENSE_URL, out)
         self.assertIn(repl.AUTHOR, out)
+
+
+class TestNavigation(_MainLoopHarness, unittest.TestCase):
+    def test_bare_category_cds_without_dispatch(self):
+        rc, calls, prompts, _ = self._run_with_inputs(["administration", "exit"])
+        self.assertEqual(rc, 0)
+        self.assertEqual(calls, [])
+        self.assertIn(f"{PROMPT_PREFIX}infinito administration> ", prompts)
+
+    def test_command_inside_category_prefixes_path(self):
+        rc, calls, _, _ = self._run_with_inputs(
+            ["administration", "deploy --help", "exit"]
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(calls, [["administration", "deploy", "--help"]])
+
+    def test_command_falls_back_to_absolute_when_not_in_current(self):
+        rc, calls, _, _ = self._run_with_inputs(["administration", "meta env", "exit"])
+        self.assertEqual(rc, 0)
+        self.assertEqual(calls, [["meta", "env"]])
+
+    def test_slash_jumps_to_root(self):
+        rc, calls, prompts, _ = self._run_with_inputs(["administration", "/", "exit"])
+        self.assertEqual(rc, 0)
+        self.assertEqual(calls, [])
+        self.assertEqual(prompts[-1], f"{PROMPT_PREFIX}infinito> ")
+
+    def test_dotdot_pops_one_level(self):
+        rc, _, prompts, _ = self._run_with_inputs(["administration", DOTDOT, "exit"])
+        self.assertEqual(rc, 0)
+        self.assertEqual(prompts[-1], f"{PROMPT_PREFIX}infinito> ")
+
+    def test_dotdot_chain_pops_multiple_levels(self):
+        rc, _, prompts, _ = self._run_with_inputs(
+            ["/administration/deploy", DOTDOT_DOTDOT, "exit"]
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(prompts[-1], f"{PROMPT_PREFIX}infinito> ")
+
+    def test_absolute_path_navigates(self):
+        rc, _, prompts, _ = self._run_with_inputs(["/administration/deploy", "exit"])
+        self.assertEqual(rc, 0)
+        self.assertIn(f"{PROMPT_PREFIX}infinito administration deploy> ", prompts)
+
+    def test_relative_path_with_slashes(self):
+        rc, _, prompts, _ = self._run_with_inputs(["administration", "../meta", "exit"])
+        self.assertEqual(rc, 0)
+        self.assertIn(f"{PROMPT_PREFIX}infinito meta> ", prompts)
+
+    def test_executable_leaf_runs_instead_of_cd(self):
+        rc, calls, prompts, _ = self._run_with_inputs(["meta", "env", "exit"])
+        self.assertEqual(rc, 0)
+        self.assertEqual(calls, [["meta", "env"]])
+        self.assertNotIn(f"{PROMPT_PREFIX}infinito meta env> ", prompts)
+
+    def test_infinito_alone_jumps_to_root(self):
+        rc, calls, prompts, _ = self._run_with_inputs(
+            ["administration", "infinito", "exit"]
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(calls, [])
+        self.assertEqual(prompts[-1], f"{PROMPT_PREFIX}infinito> ")
+
+    def test_infinito_path_jumps_absolute(self):
+        rc, calls, prompts, _ = self._run_with_inputs(
+            ["meta", "infinito administration deploy", "exit"]
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(calls, [])
+        self.assertIn(
+            f"{PROMPT_PREFIX}infinito administration deploy> ",
+            prompts,
+        )
+
+    def test_infinito_invalid_path_stays_put(self):
+        rc, calls, prompts, _ = self._run_with_inputs(
+            ["administration", "infinito does-not-exist", "exit"]
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(calls, [])
+        self.assertEqual(prompts[-1], f"{PROMPT_PREFIX}infinito administration> ")
+
+    def test_invalid_nav_target_stays_put(self):
+        rc, _, prompts, _ = self._run_with_inputs(["/does-not-exist", "exit"])
+        self.assertEqual(rc, 0)
+        self.assertEqual(prompts[-1], f"{PROMPT_PREFIX}infinito> ")
+
+
+class TestLs(_MainLoopHarness, unittest.TestCase):
+    def test_ls_does_not_dispatch_a_command(self):
+        rc, calls, _, out = self._run_with_inputs(["ls", "exit"])
+        self.assertEqual(rc, 0)
+        self.assertEqual(calls, [])
+        self.assertIn("administration", out)
 
 
 if __name__ == "__main__":
