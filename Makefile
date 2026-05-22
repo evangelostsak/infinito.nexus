@@ -330,6 +330,7 @@ lint: install-lint
 		lint-javascript \
 		lint-makefile \
 		lint-markdown \
+		lint-playwright \
 		lint-python \
 		lint-shellcheck
 
@@ -359,6 +360,12 @@ lint-makefile: install-lint
 # Run Markdown lint checks via markdownlint-cli2.
 lint-markdown: install-lint
 	@bash scripts/lint/wrapper.sh markdown
+
+.PHONY: lint-playwright
+# Verify every role's Playwright spec parses + resolves its helpers.
+# Note: stages the spec like test-e2e-playwright does and runs `npx playwright test --list`.
+lint-playwright: install-lint
+	@bash scripts/lint/wrapper.sh playwright
 
 .PHONY: lint-python
 # Run Python lint checks.

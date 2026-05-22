@@ -112,9 +112,11 @@ jobs:
     uses: ./.github/workflows/lint-makefile.yml
   lint-javascript:
     uses: ./.github/workflows/lint-javascript.yml
+  lint-playwright:
+    uses: ./.github/workflows/lint-playwright.yml
   lint-gate:
     name: 🚦 Gate lint
-    needs: 
+    needs:
       - lint-ansible
       - lint-python
       - lint-docker
@@ -122,6 +124,7 @@ jobs:
       - lint-markdown
       - lint-makefile
       - lint-javascript
+      - lint-playwright
     runs-on: ubuntu-latest
     steps:
       - run: echo "lint gate passed"
