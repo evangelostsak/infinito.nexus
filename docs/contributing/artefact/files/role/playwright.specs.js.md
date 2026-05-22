@@ -173,8 +173,7 @@ The deny-checks live in the provider's own spec (`web-app-prometheus/files/playw
 - Baseline scenarios (reachability, CSP, canonical-domain DOM assertion, logged-out final state) MUST NOT gate on any service.
   A deploy with every shared service disabled MUST still leave a passing baseline suite.
 - When the role enables both `oidc` and `ldap`, each persona's primary login path MUST use OIDC.
-  The LDAP-bind path is exercised by a separate scenario that runs in the LDAP-only matrix variant (where `oidc` is disabled and `ldap` is enabled).
-  Each persona's LDAP scenario gates on `skipUnlessServiceEnabled('ldap')` so it skips cleanly when LDAP is off.
+  Each persona MUST additionally implement a dedicated LDAP scenario gated on `skipUnlessServiceEnabled('ldap')` so the scenario fires whenever LDAP is enabled.
 - Each `test()` runs in its own isolated browser context.
   Specs MUST NOT share session state between tests.
   Running biber and administrator as two separate `test()` blocks already gives that isolation by default.
