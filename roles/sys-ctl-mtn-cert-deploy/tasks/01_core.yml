@@ -1,9 +1,4 @@
 ---
-- name: Include dependency 'sys-ctl-alm-compose'
-  include_role:
-    name: sys-ctl-alm-compose
-  when: run_once_sys_ctl_alm_compose is not defined
-
 - name: "Ensure cert deploy target directory exists"
   file:
     path: "{{ lookup('container', application_id, 'directories.volumes') }}certs"
@@ -26,5 +21,10 @@
       {{ BIN_COMPOSE }}
       --chdir {{ lookup('container', application_id, 'directories.instance') }}
       --project {{ (lookup('container', application_id, 'directories.instance') | regex_replace('/+$', '')) | basename }}
+
+- name: Include dependency 'sys-ctl-alm-compose'
+  include_role:
+    name: sys-ctl-alm-compose
+  when: run_once_sys_ctl_alm_compose is not defined
 
 - include_tasks: utils/once/flag.yml
