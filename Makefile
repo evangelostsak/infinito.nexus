@@ -114,7 +114,7 @@ clean-sudo:
 
 .PHONY: compose-deploy
 # Run the local deploy router.
-# Usage: make compose-deploy [mode=...] [apps=...] [purge=...] [type=...] [bundles=...] [disabled=...] [full_cycle=...] [variant=...]
+# Usage: make compose-deploy [mode=...] [apps=...] [purge=...] [type=...] [bundles=...] [disabled=...] [full_cycle=...] [variant=...] [debug=...]
 # Example: make compose-deploy mode=reinstall apps=web-app-matomo full_cycle=true
 # Note: see scripts/tests/deploy/local/deploy/main.sh for the full routing table.
 # Param mode: initialize | reinstall | update (default: initialize)
@@ -125,6 +125,7 @@ clean-sudo:
 # Param disabled: comma-separated service names to render as disabled
 # Param full_cycle: true | false — when true, also run the async update pass
 # Param variant: matrix round index to pin the redeploy to a specific variant
+# Param debug: true | false (default: from default.env)
 compose-deploy:
 	@$(if $(apps),INFINITO_APPS="$(apps)") \
 	 $(if $(mode),INFINITO_DEPLOY_MODE="$(mode)") \
@@ -134,6 +135,7 @@ compose-deploy:
 	 $(if $(disabled),INFINITO_SERVICES_DISABLED="$(disabled)") \
 	 $(if $(full_cycle),INFINITO_FULL_CYCLE="$(full_cycle)") \
 	 $(if $(variant),INFINITO_VARIANT="$(variant)") \
+	 $(if $(debug),INFINITO_DEBUG="$(debug)") \
 	 bash scripts/tests/deploy/local/deploy/main.sh
 
 .PHONY: compose-down
