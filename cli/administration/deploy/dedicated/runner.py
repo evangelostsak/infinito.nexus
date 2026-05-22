@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -10,6 +11,7 @@ from cli.administration.inventory.provision.services_disabler import (
     ServicesDisabledConflictError,
     assert_services_disabled_inventory_consistency_from_env,
 )
+from cli.meta.roles.services.called import verify as verify_required_system_services
 
 from .proc import run, run_make
 
@@ -116,6 +118,16 @@ def run_ansible_playbook(
     if ansible_args:
         cmd.extend(ansible_args)
 
+    ansible_log_path = (
+        os.environ.get("ANSIBLE_LOG_PATH") or "/tmp/infinito-deploy.log"  # noqa: S108
+    )
+    os.environ["ANSIBLE_LOG_PATH"] = ansible_log_path
+
+    try:
+        log_offset_before = Path(ansible_log_path).stat().st_size
+    except OSError:
+        log_offset_before = 0
+
     print("\n🚀 Launching Ansible Playbook...\n")
     result = subprocess.run(cmd, cwd=repo_root, check=False)
 
@@ -125,6 +137,28 @@ def run_ansible_playbook(
             file=sys.stderr,
         )
         sys.exit(result.returncode)
+
+    if allowed_applications:
+        ok, missing = verify_required_system_services(
+            roles_dir=Path(repo_root) / "roles",
+            log_path=ansible_log_path,
+            log_byte_offset=log_offset_before,
+            deployed_role_ids=allowed_applications,
+        )
+        if not ok:
+            print(
+                f"\n[ERROR] required role(s) did not execute for deploy "
+                f"{allowed_applications}:",
+                file=sys.stderr,
+            )
+            for role in missing:
+                print(f"          - {role}", file=sys.stderr)
+            print(
+                "        See `required_by` declarations in roles/*/meta/services.yml — "
+                "the role(s) above must run on every deploy whose primaries match.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
 
     end_time = datetime.datetime.now(tz=datetime.UTC)
     print(f"\n✅ Script ended at: {end_time.isoformat()}\n")

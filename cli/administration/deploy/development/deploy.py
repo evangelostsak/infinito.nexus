@@ -10,10 +10,6 @@ from cli.administration.inventory.provision.services_disabler import (
     find_provider_roles,
     parse_services_disabled,
 )
-from cli.meta.roles.services.called import (
-    container_log_size,
-    verify as verify_required_system_services,
-)
 
 from . import PROJECT_ROOT
 from .common import (
@@ -105,14 +101,6 @@ def _run_deploy(
     # time: by then the runtime decision is already serialised into the
     # inventory the deploy stage consumes.
 
-    # Snapshot the ansible log size BEFORE the run so the post-run coverage
-    # check only scans the slice this invocation produced (matrix-deploy
-    # plays append to the same log path across rounds + PASS 1/2).
-    log_offset_before = container_log_size(
-        container=container_name, log_path=ansible_log_path
-    )
-
-    # Live stream output for immediate visibility.
     r = compose.exec(
         cmd,
         check=False,
@@ -120,33 +108,7 @@ def _run_deploy(
         extra_env=extra_env,
     )
 
-    rc = int(r.returncode)
-    if rc != 0:
-        return rc
-
-    ok, missing = verify_required_system_services(
-        roles_dir=PROJECT_ROOT / "roles",
-        container=container_name,
-        log_path=ansible_log_path,
-        log_byte_offset=log_offset_before,
-        deployed_role_ids=deploy_ids,
-    )
-    if not ok:
-        print(
-            f">>> ERROR: required role(s) did not emit any TASK event for "
-            f"deploy {deploy_ids}:",
-            flush=True,
-        )
-        for role in missing:
-            print(f"          - {role}", flush=True)
-        print(
-            "        See `required_by` declarations in roles/*/meta/services.yml — "
-            "the role(s) above must run on every deploy whose primaries match.",
-            flush=True,
-        )
-        return 2
-
-    return rc
+    return int(r.returncode)
 
 
 def _purge_app_entities(*, container: str, app_ids: list[str]) -> None:
