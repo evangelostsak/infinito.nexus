@@ -3,4 +3,4 @@ csp:
   lifecycle: beta
 csp-checker:
   image: ghcr.io/kevinveenbirkenbach/csp-checker
-  version: stable
+  version: 2.1.1
