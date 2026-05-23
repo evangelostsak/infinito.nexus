@@ -14,10 +14,10 @@
 # `keycloak`). Exercises the full per-app database seed + dump path
 # against two distinct engines at once.
 - services:
-    gitea:
+    gitea: # nocheck: variants-services-match
       enabled: true
       shared: true
-    keycloak:
+    keycloak: # nocheck: variants-services-match
       enabled: true
       shared: true
 
@@ -26,10 +26,10 @@
 # `04_seed-database-to-backup` entries, so the role must still produce
 # a valid (possibly empty) backup tree.
 - services:
-    postgres:
+    postgres: # nocheck: variants-services-match
       enabled: true
       shared: true
-    mariadb:
+    mariadb: # nocheck: variants-services-match
       enabled: true
       shared: true
 
@@ -39,6 +39,6 @@
 # applicable here, so the run must capture the directory's payload
 # without any SQL handler being involved.
 - services:
-    ldap:
+    ldap: # nocheck: variants-services-match
       enabled: true
       shared: true

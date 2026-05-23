@@ -6,29 +6,3 @@ container-2-local:
   mem_reservation: "256m"
   mem_limit: "512m"
   pids_limit: 256
-
-# Companion service-key stubs. Default off here; meta/variants.yml flips
-# the relevant subset per matrix round so the resolver pulls the
-# associated provider role into that round's include closure. Not
-# consumed by the runtime role; declared here so the variants lint can
-# cross-check each variant key against meta/services.yml.
-# nocheck: playwright-service-flag — variant-only matrix flag, no consumer surface
-gitea:
-  enabled: false
-  shared: false
-# nocheck: playwright-service-flag — variant-only matrix flag, no consumer surface
-keycloak:
-  enabled: false
-  shared: false
-# nocheck: playwright-service-flag — variant-only matrix flag, no consumer surface
-postgres:
-  enabled: false
-  shared: false
-# nocheck: playwright-service-flag — variant-only matrix flag, no consumer surface
-mariadb:
-  enabled: false
-  shared: false
-# nocheck: playwright-service-flag — variant-only matrix flag, no consumer surface
-ldap:
-  enabled: false
-  shared: false
