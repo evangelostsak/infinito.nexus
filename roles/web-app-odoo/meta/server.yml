@@ -19,6 +19,9 @@ csp:
       - "*.{{ DOMAIN_PRIMARY }}"
     font-src:
       - "data:"
+      - https://fonts.gstatic.com
+    style-src-elem:
+      - https://fonts.googleapis.com
 domains:
   canonical:
     - odoo.erp.{{ DOMAIN_PRIMARY }}

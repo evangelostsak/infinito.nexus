@@ -9,8 +9,10 @@ csp:
       unsafe-inline: true
     script-src-elem:
       unsafe-inline: true
+      unsafe-eval: true
     script-src-attr:
       unsafe-inline: true
+      unsafe-eval: true
   whitelist:
     connect-src:
       - "{{ lookup('tls', 'web-app-keycloak', 'url.base') }}"

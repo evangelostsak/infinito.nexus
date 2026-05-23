@@ -1,7 +1,11 @@
 ---
 csp:
   whitelist: {}
-  flags: {}
+  flags:
+    script-src-elem:
+      unsafe-eval: true
+    script-src-attr:
+      unsafe-eval: true
 domains:
   canonical:
     - libretranslate.{{ DOMAIN_PRIMARY }}
