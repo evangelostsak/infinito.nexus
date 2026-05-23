@@ -11,7 +11,11 @@ dashboard:
 matomo:
   enabled: "{{ 'web-app-matomo' in group_names }}"
   shared: "{{ 'web-app-matomo' in group_names }}"
+# nocheck: playwright-service-flag — self-provider
 lam:
+  enabled: true
+  shared: true
+  provides: lam
   image: ghcr.io/ldapaccountmanager/lam
   version: latest
   min_storage: 1GB

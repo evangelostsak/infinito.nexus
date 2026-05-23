@@ -17,6 +17,9 @@
     ldap:
       enabled: true
       shared: true
+    lam: # nocheck: variants-services-match
+      enabled: true
+      shared: true
     logout:
       enabled: true
       shared: true
@@ -35,6 +38,9 @@
 # LDAP-only variant: auth_ldap only, auth_oidc disabled.
 - services:
     ldap:
+      enabled: true
+      shared: true
+    lam: # nocheck: variants-services-match
       enabled: true
       shared: true
     oidc:
