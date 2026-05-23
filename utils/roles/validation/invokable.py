@@ -24,7 +24,7 @@ class DeploymentTypeRule:
 DEFAULT_RULES: tuple[DeploymentTypeRule, ...] = (
     DeploymentTypeRule(
         name="server",
-        include_re=re.compile(r"^(web-app-|web-svc-)"),
+        include_re=re.compile(r"^(web-app-|web-svc-|web-opt-)"),
         exclude_re=re.compile(r"^(web-app-oauth2-proxy)$"),
     ),
     DeploymentTypeRule(
