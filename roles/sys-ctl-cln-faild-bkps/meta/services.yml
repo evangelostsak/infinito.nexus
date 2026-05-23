@@ -2,4 +2,4 @@
 faild-bkps:
   lifecycle: beta
   required_by:
-    categories: [web]
+    categories: [svc-bkp]
