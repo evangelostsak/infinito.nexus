@@ -1,6 +1,7 @@
 """Unit tests for the per-role `meta/variants.yml` matrix-deploy
-loader (`utils.cache.applications.get_variants` and the variant-zero
-default in `get_merged_applications`)."""
+loader (`utils.cache.applications.get_variants`) and the variant-free
+base-config default that `get_merged_applications` falls back on when
+no inventory-level `applications.<app>` override is set."""
 
 import os
 import sys
@@ -158,7 +159,7 @@ class TestApplicationVariants(unittest.TestCase):
             ["bar.example", "shop.bar.example"],
         )
 
-    def test_legacy_get_application_defaults_returns_first_variant(self):
+    def test_get_application_defaults_returns_variant_free_base_config(self):
         _write_role(
             self.roles_dir,
             "web-app-baz",
@@ -175,6 +176,33 @@ class TestApplicationVariants(unittest.TestCase):
         defaults = get_application_defaults(roles_dir=self.roles_dir)
         self.assertEqual(defaults["web-app-baz"]["services"]["baz"]["value"], 1)
 
+    def test_get_application_defaults_omits_variant_zero_only_keys(self):
+        """Defaults MUST come from the variant-free base config, not
+        variant 0. Otherwise a service key that only variant 0 enables
+        (and that variant N intentionally omits) leaks into variant N's
+        runtime view via deep-merge in `get_merged_applications`."""
+        _write_role(
+            self.roles_dir,
+            "web-app-leak",
+            config="alpha:\n  enabled: false\n",
+            meta=textwrap.dedent(
+                """
+                - services:
+                    alpha:
+                      enabled: true
+                      shared: true
+                - services:
+                    beta:
+                      enabled: true
+                      shared: true
+                """
+            ),
+        )
+        defaults = get_application_defaults(roles_dir=self.roles_dir)
+        alpha = defaults["web-app-leak"]["services"]["alpha"]
+        self.assertEqual(alpha.get("enabled"), False)
+        self.assertNotIn("beta", defaults["web-app-leak"]["services"])
+
     def test_get_variants_caches_per_roles_dir(self):
         _write_role(self.roles_dir, "web-app-cache", config="cache:\n  x: 1\n")
         first = get_variants(roles_dir=self.roles_dir)
@@ -190,13 +218,14 @@ class TestApplicationVariants(unittest.TestCase):
         )
 
 
-class TestMergedApplicationsAlwaysVariantZero(unittest.TestCase):
-    """The runtime loader no longer reads any active-variant selector.
-    Variant N data is baked into the inventory by
+class TestMergedApplicationsUsesBaseConfig(unittest.TestCase):
+    """The runtime loader reads no active-variant selector. Variant N
+    data is baked into the inventory by
     `cli.administration.deploy.development.inventory.build_dev_inventory` at init time
     and reaches the merged payload as an `applications.<app>` override.
-    These tests pin that contract: the loader's defaults are ALWAYS
-    variant 0, and inventory-level overrides win as before."""
+    The loader's defaults are the role's variant-free base config so
+    no variant's service flags leak into another variant's runtime view
+    via deep-merge; inventory-level overrides remain authoritative."""
 
     def setUp(self):
         import tempfile
@@ -231,7 +260,7 @@ class TestMergedApplicationsAlwaysVariantZero(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
         _reset_cache_for_tests()
 
-    def test_no_inventory_overrides_yield_variant_zero(self):
+    def test_no_inventory_overrides_yield_base_config(self):
         merged = get_merged_applications(
             variables={},
             roles_dir=str(self.roles_dir),

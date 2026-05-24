@@ -80,6 +80,7 @@
       shared: false
     talk:
       enabled: false
+      shared: false
 - services:
     ldap:
       enabled: true

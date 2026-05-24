@@ -246,13 +246,14 @@ def _build_variants(roles_dir: Path) -> dict[str, list[Any]]:
 
 
 def _build_application_defaults(roles_dir: Path) -> dict[str, Any]:
-    """Backward-compatible shim: every consumer that historically saw
-    one mapping per application now sees the FIRST variant (index 0).
-    The full list is exposed via :func:`get_variants`."""
-    return {
-        application_id: copy.deepcopy(variant_list[0])
-        for application_id, variant_list in _build_variants(roles_dir).items()
-    }
+    """Return ``{application_id: base_config}`` — each role's variant-free
+    ``meta/<topic>.yml`` payload only. Variants stay accessible via
+    :func:`get_variants`. Using variant 0 here would leak its service
+    flags into variant-N consumers' runtime view via deep-merge."""
+    defaults: dict[str, Any] = {}
+    for role_dir in _iter_application_role_dirs(roles_dir):
+        defaults[role_dir.name] = _build_role_base_config(role_dir, roles_dir)
+    return {key: defaults[key] for key in sorted(defaults)}
 
 
 def get_application_defaults(
@@ -307,13 +308,6 @@ def get_merged_applications(
     if cached is not None:
         return cached
 
-    # Defaults always come from variant 0 (= the legacy `meta/services.yml`
-    # payload, deep-merged with the empty `{}` entry). Per-round variant
-    # overrides are baked into the inventory's `applications.<app>` block at
-    # init time (see `cli.administration.deploy.development.inventory.build_dev_inventory`)
-    # and applied below as overrides on top of these defaults, so the deploy
-    # stage needs no runtime variant selector: the inventory itself is
-    # variant-resolved.
     defaults = get_application_defaults(roles_dir=resolved_roles_dir)
 
     overrides = _resolve_override_mapping(variables, "applications", templar=templar)
