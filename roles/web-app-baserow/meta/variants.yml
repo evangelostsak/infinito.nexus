@@ -80,9 +80,6 @@
     matomo:
       enabled: false
       shared: false
-    postgres:
-      enabled: false # nocheck: variants-static-override
-      shared: false
     prometheus:
       enabled: false
       shared: false

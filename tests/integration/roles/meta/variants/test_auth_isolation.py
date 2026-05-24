@@ -50,6 +50,14 @@ variant of this role's ``meta/variants.yml`` AND is not in
 ``{ldap, oidc, oauth2}`` MUST be declared in V as
 ``enabled: false`` AND ``shared: false`` (literal).
 
+Statically-enabled keys are exempt: when the role's
+``meta/services.yml`` declares ``services.<K>.enabled`` as the YAML
+literal ``true`` (i.e. not a Jinja expression), the dependency is
+already a hard "always on" and pinning it ``false`` in V would only
+break the role's own deploy without trimming any closure (the
+resolver pulls the dep in regardless). Such keys MUST NOT be
+declared in V at all — the inherited base value is correct.
+
 Exemption
 ---------
 
@@ -66,7 +74,7 @@ from typing import TYPE_CHECKING
 from utils.annotations.suppress import is_suppressed_at
 from utils.cache.files import read_text
 from utils.cache.yaml import load_yaml_any
-from utils.roles.mapping import ROLE_FILE_META_VARIANTS
+from utils.roles.mapping import ROLE_FILE_META_SERVICES, ROLE_FILE_META_VARIANTS
 
 from . import PROJECT_ROOT
 
@@ -129,6 +137,24 @@ def _entry_pinned_false(entry: object) -> bool:
     )
 
 
+def _statically_enabled_keys(services_file: Path) -> set[str]:
+    try:
+        services_raw = load_yaml_any(str(services_file), default_if_missing={})
+    except Exception:
+        return set()
+    if not isinstance(services_raw, dict):
+        return set()
+    out: set[str] = set()
+    for key, entry in services_raw.items():
+        if (
+            isinstance(key, str)
+            and isinstance(entry, dict)
+            and entry.get("enabled") is True
+        ):
+            out.add(key)
+    return out
+
+
 class TestVariantsAuthIsolation(unittest.TestCase):
     def test_auth_isolated_variants_explicitly_disable_non_auth_services(self):
         offenders: list[str] = []
@@ -147,6 +173,10 @@ class TestVariantsAuthIsolation(unittest.TestCase):
             if not isinstance(variants_raw, list):
                 continue
 
+            static_enabled = _statically_enabled_keys(
+                role_dir / ROLE_FILE_META_SERVICES
+            )
+
             non_auth_union: set[str] = set()
             for variant in variants_raw:
                 if not isinstance(variant, dict):
@@ -155,7 +185,11 @@ class TestVariantsAuthIsolation(unittest.TestCase):
                 if not isinstance(services, dict):
                     continue
                 for key in services:
-                    if isinstance(key, str) and key not in _AUTH:
+                    if (
+                        isinstance(key, str)
+                        and key not in _AUTH
+                        and key not in static_enabled
+                    ):
                         non_auth_union.add(key)
 
             header_lines = _variant_header_line_numbers(variants_file)

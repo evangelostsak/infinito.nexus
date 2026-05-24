@@ -86,9 +86,6 @@
     logout:
       enabled: false
       shared: false
-    mariadb:
-      enabled: false # nocheck: variants-static-override
-      shared: false
     matomo:
       enabled: false
       shared: false
