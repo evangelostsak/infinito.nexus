@@ -32,7 +32,7 @@ test("OIDC: oauth2-proxy redirects unauthenticated visitors through Keycloak (va
   await expect.poll(() => page.url(), { timeout: 60_000 }).toContain(expectedAuth);
   await performKeycloakLoginForm(page, adminUsername, adminPassword);
   await expect.poll(() => page.url(), { timeout: 90_000 }).toContain(expectedBase);
-  await expect(page.locator("body")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible({ timeout: 60_000 });
 });
 
 test("LDAP: FusionDirectory backend points at svc-db-openldap (variant 1)", async ({ page }) => {
