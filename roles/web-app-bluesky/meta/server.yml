@@ -9,6 +9,9 @@ domains:
     api: api.bluesky.{{ DOMAIN_PRIMARY }}
     view: view.bluesky.{{ DOMAIN_PRIMARY }}
 csp:
+  flags:
+    script-src-elem:
+      unsafe-inline: true
   whitelist:
     connect-src:
       - "{{ lookup('config', 'web-app-bluesky', 'server.domains.canonical.api') }}"
@@ -17,6 +20,7 @@ csp:
       - https://api.bsky.app
       - https://public.api.bsky.app
       - https://events.bsky.app
+      - https://*.workers.bsky.app # nocheck: url
       - https://statsigapi.net # nocheck: url
       - https://ip.bsky.app # nocheck: url
       - https://video.bsky.app
