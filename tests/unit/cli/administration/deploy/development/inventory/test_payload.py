@@ -13,16 +13,16 @@ from cli.administration.deploy.development.inventory import (
 
 class TestResolveVariantPayloads(unittest.TestCase):
     @patch(
-        "cli.administration.deploy.development.inventory.payload.get_variants",
+        "cli.administration.deploy.development.inventory.payload.get_variant_overrides_only",
         autospec=True,
     )
     def test_app_without_meta_collapses_to_variant_zero_payload(
-        self, get_variants_mock: MagicMock
+        self, get_overrides_mock: MagicMock
     ) -> None:
         # No `meta/variants.yml` -> loader exposes a single empty variant,
         # i.e. `[{}]`. The 1st entry MUST be picked even though no variant
         # was authored, so the per-app bake stays uniform.
-        get_variants_mock.return_value = {"web-app-foo": [{}]}
+        get_overrides_mock.return_value = {"web-app-foo": [{}]}
 
         resolved = _resolve_variant_payloads(
             roles_dir="/roles",
@@ -32,13 +32,13 @@ class TestResolveVariantPayloads(unittest.TestCase):
         self.assertEqual(resolved, {"web-app-foo": {}})
 
     @patch(
-        "cli.administration.deploy.development.inventory.payload.get_variants",
+        "cli.administration.deploy.development.inventory.payload.get_variant_overrides_only",
         autospec=True,
     )
     def test_active_variants_picks_named_variant(
-        self, get_variants_mock: MagicMock
+        self, get_overrides_mock: MagicMock
     ) -> None:
-        get_variants_mock.return_value = {
+        get_overrides_mock.return_value = {
             "web-app-multi": [{"variant": 0}, {"variant": 1}],
         }
         resolved = _resolve_variant_payloads(
@@ -49,13 +49,13 @@ class TestResolveVariantPayloads(unittest.TestCase):
         self.assertEqual(resolved, {"web-app-multi": {"variant": 1}})
 
     @patch(
-        "cli.administration.deploy.development.inventory.payload.get_variants",
+        "cli.administration.deploy.development.inventory.payload.get_variant_overrides_only",
         autospec=True,
     )
     def test_out_of_range_index_falls_back_to_variant_zero(
-        self, get_variants_mock: MagicMock
+        self, get_overrides_mock: MagicMock
     ) -> None:
-        get_variants_mock.return_value = {
+        get_overrides_mock.return_value = {
             "web-app-multi": [{"variant": 0}, {"variant": 1}],
         }
         resolved = _resolve_variant_payloads(

@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 
 _APPLICATIONS_DEFAULTS_CACHE: dict[str, dict[str, Any]] = {}
 _VARIANTS_CACHE: dict[str, dict[str, list[Any]]] = {}
+_VARIANT_OVERRIDES_ONLY_CACHE: dict[str, dict[str, list[dict[str, Any]]]] = {}
 _MERGED_APPLICATIONS_CACHE: dict[tuple, dict[str, Any]] = {}
 
 # Every role's metadata lives under these `meta/<topic>.yml` files.
@@ -284,6 +285,38 @@ def get_variants(
     return copy.deepcopy(cached)
 
 
+def _build_variant_overrides_only(
+    roles_dir: Path,
+) -> dict[str, list[dict[str, Any]]]:
+    overrides: dict[str, list[dict[str, Any]]] = {}
+    for role_dir in _iter_application_role_dirs(roles_dir):
+        meta_path = role_dir / ROLE_FILE_META_VARIANTS
+        overrides[role_dir.name] = _load_variants_overrides(meta_path)
+    return {key: overrides[key] for key in sorted(overrides)}
+
+
+def get_variant_overrides_only(
+    *, roles_dir: str | os.PathLike[str] | None = None
+) -> dict[str, list[dict[str, Any]]]:
+    """Return ``{application_id: [override_0, ...]}`` — the raw
+    `meta/variants.yml` entries per role WITHOUT deep-merging
+    `meta/services.yml`.
+
+    Used by matrix-deploy's `--vars` bake so the host_vars payload
+    stays sparse: only the variant-specific overrides land there,
+    leaving `meta/services.yml` fields (notably `image`/`version`)
+    blank in host_vars so `apply_mirror_overrides` can populate them
+    from `mirrors.yml`.
+    """
+    resolved_roles_dir = _resolve_roles_dir(roles_dir=roles_dir)
+    key = _cache_key(resolved_roles_dir)
+    cached = _VARIANT_OVERRIDES_ONLY_CACHE.get(key)
+    if cached is None:
+        cached = _build_variant_overrides_only(resolved_roles_dir)
+        _VARIANT_OVERRIDES_ONLY_CACHE[key] = cached
+    return copy.deepcopy(cached)
+
+
 def get_merged_applications(
     *,
     variables: dict[str, Any] | None = None,
@@ -343,4 +376,5 @@ def get_merged_applications(
 def _reset() -> None:
     _APPLICATIONS_DEFAULTS_CACHE.clear()
     _VARIANTS_CACHE.clear()
+    _VARIANT_OVERRIDES_ONLY_CACHE.clear()
     _MERGED_APPLICATIONS_CACHE.clear()

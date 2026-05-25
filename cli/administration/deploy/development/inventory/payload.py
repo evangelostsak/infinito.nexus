@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from utils.cache.applications import get_variants
+from utils.cache.applications import get_variant_overrides_only
 
 
 def _resolve_variant_payloads(
@@ -22,16 +22,21 @@ def _resolve_variant_payloads(
     include: Sequence[str],
     active_variants: Mapping[str, int],
 ) -> dict[str, Any]:
-    """Return ``{app_id: variant_payload}`` for the requested round.
+    """Return ``{app_id: variant_override}`` for the requested round.
 
-    Apps without `meta/variants.yml` collapse to a single empty variant
-    in the loader, so this just picks variant 0 (= `meta/services.yml`
-    unchanged) for them. Out-of-range indices clamp to 0.
+    Each value is the raw `meta/variants.yml` entry — NOT the
+    deep-merge of variants.yml on top of `meta/services.yml`. Baking
+    only the override keeps host_vars sparse so downstream passes
+    (notably `apply_mirror_overrides`) can populate fields like
+    `image`/`version` that the role declares in `meta/services.yml`.
+
+    Apps without `meta/variants.yml` collapse to a single empty
+    override `{}`. Out-of-range indices clamp to 0.
     """
-    variants_per_app = get_variants(roles_dir=roles_dir)
+    overrides_per_app = get_variant_overrides_only(roles_dir=roles_dir)
     resolved: dict[str, Any] = {}
     for app_id in include:
-        variant_list = variants_per_app.get(app_id) or [{}]
+        variant_list = overrides_per_app.get(app_id) or [{}]
         if not variant_list:
             continue
         index = active_variants.get(app_id, 0)

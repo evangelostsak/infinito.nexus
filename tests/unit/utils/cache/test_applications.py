@@ -132,6 +132,47 @@ class TestGetVariants(unittest.TestCase):
             self.assertNotIn("mutated", second["web-app-foo"][0])
 
 
+class TestGetVariantOverridesOnly(unittest.TestCase):
+    def setUp(self) -> None:
+        _reset_cache_for_tests()
+
+    def test_returns_single_empty_override_when_no_meta_variants_yml(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            roles = _seed_minimal_roles(Path(tmp))
+            overrides = cache_apps.get_variant_overrides_only(roles_dir=roles)
+            self.assertEqual(overrides["web-app-foo"], [{}])
+
+    def test_returns_raw_overrides_without_base_merge(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            roles = _seed_minimal_roles(Path(tmp))
+            _write(
+                roles / "web-app-foo" / ROLE_FILE_META_VARIANTS,
+                """
+                - {}
+                - services:
+                    foo:
+                      image: foo-alt
+                """,
+            )
+            overrides = cache_apps.get_variant_overrides_only(roles_dir=roles)
+            # Variant 0 stays empty (no override) — the role's
+            # `meta/services.yml` baseline (image=foo) is NOT mixed in.
+            self.assertEqual(overrides["web-app-foo"][0], {})
+            # Variant 1 carries only the override fields.
+            self.assertEqual(
+                overrides["web-app-foo"][1],
+                {"services": {"foo": {"image": "foo-alt"}}},
+            )
+
+    def test_caches_per_roles_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            roles = _seed_minimal_roles(Path(tmp))
+            first = cache_apps.get_variant_overrides_only(roles_dir=roles)
+            first["web-app-foo"][0]["mutated"] = True
+            second = cache_apps.get_variant_overrides_only(roles_dir=roles)
+            self.assertNotIn("mutated", second["web-app-foo"][0])
+
+
 class TestBuildRoleBaseConfig(unittest.TestCase):
     def setUp(self) -> None:
         _reset_cache_for_tests()

@@ -23,7 +23,7 @@ class TestBuildDevInventory(unittest.TestCase):
         self.compose.repo_root = Path("/tmp/infinito-nexus")
 
     @patch(
-        "cli.administration.deploy.development.inventory.payload.get_variants",
+        "cli.administration.deploy.development.inventory.payload.get_variant_overrides_only",
         autospec=True,
         return_value={
             "web-app-keycloak": [{}],
@@ -58,7 +58,7 @@ class TestBuildDevInventory(unittest.TestCase):
         self.assertEqual(first_cmd[include_index], "web-app-keycloak,web-app-nextcloud")
 
     @patch(
-        "cli.administration.deploy.development.inventory.payload.get_variants",
+        "cli.administration.deploy.development.inventory.payload.get_variant_overrides_only",
         autospec=True,
         return_value={
             "web-app-multi": [
@@ -112,7 +112,7 @@ class TestBuildDevInventory(unittest.TestCase):
         return_value="/etc/mirrors.yml",
     )
     @patch(
-        "cli.administration.deploy.development.inventory.payload.get_variants",
+        "cli.administration.deploy.development.inventory.payload.get_variant_overrides_only",
         autospec=True,
         return_value={"web-app-keycloak": [{}], "web-app-nextcloud": [{}]},
     )
@@ -137,7 +137,7 @@ class TestBuildDevInventory(unittest.TestCase):
         )
 
     @patch(
-        "cli.administration.deploy.development.inventory.payload.get_variants",
+        "cli.administration.deploy.development.inventory.payload.get_variant_overrides_only",
         autospec=True,
         return_value={"web-app-keycloak": [{}], "web-app-nextcloud": [{}]},
     )
@@ -162,7 +162,7 @@ class TestBuildDevInventory(unittest.TestCase):
         )
 
     @patch(
-        "cli.administration.deploy.development.inventory.payload.get_variants",
+        "cli.administration.deploy.development.inventory.payload.get_variant_overrides_only",
         autospec=True,
         return_value={"web-app-keycloak": [{}], "web-app-nextcloud": [{}]},
     )
@@ -182,7 +182,7 @@ class TestBuildDevInventory(unittest.TestCase):
         self.assertIsNone(first_kwargs.get("extra_env"))
 
     @patch(
-        "cli.administration.deploy.development.inventory.payload.get_variants",
+        "cli.administration.deploy.development.inventory.payload.get_variant_overrides_only",
         autospec=True,
         return_value={
             "svc-bkp-container-2-local": [{}, {}, {}],
@@ -213,7 +213,7 @@ class TestBuildDevInventory(unittest.TestCase):
         )
 
     @patch(
-        "cli.administration.deploy.development.inventory.payload.get_variants",
+        "cli.administration.deploy.development.inventory.payload.get_variant_overrides_only",
         autospec=True,
         return_value={"web-app-keycloak": [{}], "web-app-nextcloud": [{}]},
     )
@@ -232,7 +232,7 @@ class TestBuildDevInventory(unittest.TestCase):
         self.assertNotIn("--app-variants", first_cmd)
 
     @patch(
-        "cli.administration.deploy.development.inventory.payload.get_variants",
+        "cli.administration.deploy.development.inventory.payload.get_variant_overrides_only",
         autospec=True,
         return_value={"web-app-keycloak": [{}], "web-app-nextcloud": [{}]},
     )
