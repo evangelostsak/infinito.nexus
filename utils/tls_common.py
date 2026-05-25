@@ -239,6 +239,16 @@ def resolve_term(
             )
 
         app_id = resolve_app_id_for_domain(apps, t)
+        if not app_id and t.lower().startswith("www."):
+            bare = t[4:]
+            try:
+                app_id_legacy = resolve_app_id_from_domain(
+                    domains, bare, err_prefix=err_prefix
+                )
+                return str(app_id_legacy), norm_domain(bare)
+            except AnsibleError:
+                pass
+            app_id = resolve_app_id_for_domain(apps, bare)
         if not app_id:
             raise AnsibleError(
                 f"{err_prefix}: domain '{t}' not found (domains/applications)"
