@@ -24,7 +24,9 @@
     volumes:
       - kix_shared:/mnt/shared
       - kix_backend:/mnt/data
+{% if KIX_LDAP_ENABLED | bool %}
       - "{{ KIX_AUTH_LDAP_HOST_PATH }}:{{ KIX_AUTH_LDAP_CONTAINER_PATH }}:ro"
+{% endif %}
 {% include 'roles/sys-svc-container/templates/networks.yml.j2' %}
 
   {{ KIX_FRONTEND_CONTAINER }}:

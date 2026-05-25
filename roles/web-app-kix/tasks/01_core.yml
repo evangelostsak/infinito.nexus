@@ -13,6 +13,7 @@
     dest: "{{ KIX_AUTH_LDAP_HOST_PATH }}"
     mode: "0644"
   notify: compose up
+  when: KIX_LDAP_ENABLED | bool
 
 - name: "deploy KIX-proxy nginx routing config for '{{ application_id }}'"
   ansible.builtin.template:

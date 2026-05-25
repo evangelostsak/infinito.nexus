@@ -21,6 +21,7 @@ KIX_DB_USER: "kix"
 KIX_DB_PASSWORD: "{{ lookup('config', application_id, 'credentials.kix_db_password') }}"
 KIX_INITIAL_ADMIN_PW: "{{ lookup('config', application_id, 'credentials.kix_initial_admin_pw') }}"
 
+KIX_LDAP_ENABLED: "{{ lookup('config', application_id, 'services.ldap.enabled') | bool }}"
 KIX_LDAP_HOST: "{{ LDAP.SERVER.DOMAIN }}"
 KIX_LDAP_PORT: "{{ LDAP.SERVER.PORT }}"
 KIX_LDAP_BASE_DN: "{{ LDAP.DN.OU.USERS }}"
