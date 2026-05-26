@@ -36,6 +36,8 @@ Contract:
 from ansible.errors import AnsibleError
 from ansible.plugins.lookup import LookupBase
 
+from utils.cache.applications import get_merged_applications
+
 try:
     from ansible.utils.display import Display
 except Exception:  # pragma: no cover
@@ -62,13 +64,13 @@ def _get_rbac_group_name(variables):
     return name.strip("/")
 
 
-def _get_application(variables, application_id):
-    apps = variables.get("applications")
+def _get_application(variables, application_id, templar=None):
+    apps = get_merged_applications(variables=variables, templar=templar)
     if not isinstance(apps, dict):
         raise AnsibleError(
-            "rbac_group_path: 'applications' variable is not available. "
-            "Make sure the lookup runs after the applications dict has been "
-            "merged into host vars."
+            "rbac_group_path: 'applications' could not be merged. "
+            "Make sure the lookup runs after meta/*.yml topics have been "
+            "loaded."
         )
     app = apps.get(application_id)
     if not isinstance(app, dict):
@@ -163,7 +165,11 @@ class LookupModule(LookupBase):
                 "rbac_group_path: 'role' is required and must be a non-empty string."
             )
 
-        app_cfg = _get_application(variables, application_id)
+        app_cfg = _get_application(
+            variables,
+            application_id,
+            templar=getattr(self, "_templar", None),
+        )
         scope, axis = _resolve_role_scope(app_cfg, application_id, role)
         group_root = _get_rbac_group_name(variables)
 
