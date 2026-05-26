@@ -14,3 +14,7 @@ Its scope is user stories and acceptance criteria that define what the project m
 - 007 - WordPress to Discourse post round-trip
 - 015 - KIX Service Management integration
 - 016 - web-app-hugo (Static Site Generator)
+- 012 - Package Cache (Nexus 3 OSS)
+- 013 - Sub-Beta-to-Beta Lifecycle Promotion for `web-*` Roles
+- 015: Self-built Moodle image (replaces `bitnamilegacy/moodle`)
+- 015 - OpenCloud and OpenTalk IAM integration
