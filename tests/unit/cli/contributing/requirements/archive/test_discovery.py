@@ -40,9 +40,7 @@ class TestIterRequirementFiles(unittest.TestCase):
     def test_missing_directory_returns_empty(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(
-                iter_requirement_files(
-                    Path(tmp) / "missing", include_template=False
-                ),
+                iter_requirement_files(Path(tmp) / "missing", include_template=False),
                 [],
             )
 

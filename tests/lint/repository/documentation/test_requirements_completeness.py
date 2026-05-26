@@ -23,7 +23,7 @@ from __future__ import annotations
 import re
 import unittest
 from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from cli.contributing.requirements.archive.discovery import iter_requirement_files
 from cli.contributing.requirements.archive.inspect import count_unchecked_items
@@ -31,6 +31,9 @@ from utils.annotations.message import in_github_actions, warning
 from utils.cache.files import read_text
 
 from . import PROJECT_ROOT
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 REQUIREMENTS_DIR = PROJECT_ROOT / "docs" / "requirements"
 ARCHIVE_CLI = "python -m cli.contributing.requirements.archive"
@@ -113,9 +116,7 @@ class TestRequirementsCompleteness(unittest.TestCase):
     def test_requirement_acceptance_criteria_are_complete(self) -> None:
         """Surface every unchecked acceptance criterion as a warning."""
         findings: list[UncheckedCriterion] = []
-        for path in iter_requirement_files(
-            REQUIREMENTS_DIR, include_template=False
-        ):
+        for path in iter_requirement_files(REQUIREMENTS_DIR, include_template=False):
             findings.extend(scan_unchecked_criteria(path))
 
         findings.sort(key=lambda f: (f.path.as_posix(), f.line))
@@ -141,9 +142,7 @@ class TestRequirementsCompleteness(unittest.TestCase):
         """
         archivable: list[Path] = [
             path
-            for path in iter_requirement_files(
-                REQUIREMENTS_DIR, include_template=False
-            )
+            for path in iter_requirement_files(REQUIREMENTS_DIR, include_template=False)
             if count_unchecked_items(path) == 0
         ]
 

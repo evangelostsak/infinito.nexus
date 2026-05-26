@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ruamel.yaml.comments import CommentedMap
 
-from utils.handler.vault import VaultHandler
-
 from .overrides import override_for
 from .vault import is_vault_encrypted, to_vault_block
+
+if TYPE_CHECKING:
+    from utils.handler.vault import VaultHandler
 
 
 def ensure_map(node: CommentedMap, key: str) -> CommentedMap:

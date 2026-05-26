@@ -31,10 +31,7 @@ class TestCountUncheckedItems(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "001-x.md"
             path.write_text(
-                "# 001 - Done\n\n"
-                "## Acceptance Criteria\n\n"
-                "- [x] A\n"
-                "- [x] B\n"
+                "# 001 - Done\n\n## Acceptance Criteria\n\n- [x] A\n- [x] B\n"
             )
             self.assertEqual(count_unchecked_items(path), 0)
 

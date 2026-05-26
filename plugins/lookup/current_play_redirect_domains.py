@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Mapping
 from typing import Any
 
@@ -149,10 +150,8 @@ class LookupModule(LookupBase):
             return ""
         templar = getattr(self, "_templar", None)
         if templar is not None:
-            try:
+            with contextlib.suppress(Exception):
                 value = templar.template(value)
-            except Exception:
-                pass
         return str(value)
 
     def run(

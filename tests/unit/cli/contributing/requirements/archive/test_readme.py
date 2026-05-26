@@ -38,22 +38,11 @@ class TestMergeArchiveSection(unittest.TestCase):
         merged = merge_archive_section(readme, ["001 - One", "002 - Two"])
         self.assertEqual(
             merged,
-            (
-                "# Requirements 📋\n\n"
-                "Intro.\n\n"
-                "## Archive\n\n"
-                "- 001 - One\n"
-                "- 002 - Two\n"
-            ),
+            ("# Requirements 📋\n\nIntro.\n\n## Archive\n\n- 001 - One\n- 002 - Two\n"),
         )
 
     def test_appends_to_existing_section_preserving_entries(self) -> None:
-        readme = (
-            "# Requirements 📋\n\n"
-            "Intro.\n\n"
-            "## Archive\n\n"
-            "- 001 - One\n"
-        )
+        readme = "# Requirements 📋\n\nIntro.\n\n## Archive\n\n- 001 - One\n"
         merged = merge_archive_section(readme, ["002 - Two", "003 - Three"])
         self.assertEqual(
             merged,
@@ -68,22 +57,11 @@ class TestMergeArchiveSection(unittest.TestCase):
         )
 
     def test_appends_before_trailing_section(self) -> None:
-        readme = (
-            "## Archive\n\n"
-            "- 001 - One\n\n"
-            "## Trailing\n\n"
-            "footer\n"
-        )
+        readme = "## Archive\n\n- 001 - One\n\n## Trailing\n\nfooter\n"
         merged = merge_archive_section(readme, ["002 - Two"])
         self.assertEqual(
             merged,
-            (
-                "## Archive\n\n"
-                "- 001 - One\n"
-                "- 002 - Two\n\n"
-                "## Trailing\n\n"
-                "footer\n"
-            ),
+            ("## Archive\n\n- 001 - One\n- 002 - Two\n\n## Trailing\n\nfooter\n"),
         )
 
     def test_empty_entries_returns_unchanged(self) -> None:

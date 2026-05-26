@@ -52,11 +52,7 @@ def merge_archive_section(readme_text: str, new_entries: list[str]) -> str:
         return "\n".join(merged) + "\n"
 
     section_end = next(
-        (
-            i
-            for i in range(archive_index + 1, len(lines))
-            if lines[i].startswith("## ")
-        ),
+        (i for i in range(archive_index + 1, len(lines)) if lines[i].startswith("## ")),
         len(lines),
     )
 

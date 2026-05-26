@@ -18,9 +18,12 @@ from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from cli import PROJECT_ROOT
+
+if TYPE_CHECKING:
+    from pathlib import Path
 from cli.contributing.requirements.archive.discovery import (
     TEMPLATE_FILENAME,
     iter_requirement_files,
@@ -126,8 +129,7 @@ def _report_skips(
         for path, count in skipped_incomplete:
             suffix = "s" if count != 1 else ""
             print(
-                f"  - {path.relative_to(PROJECT_ROOT)} "
-                f"({count} unchecked item{suffix})"
+                f"  - {path.relative_to(PROJECT_ROOT)} ({count} unchecked item{suffix})"
             )
     if skipped_without_h1:
         print("[archive] WARN: skipped files without an H1 heading:")
@@ -183,7 +185,9 @@ def main(argv: list[str] | None = None) -> int:
         print("[archive] No requirement files to archive.")
         return 0
 
-    readme_text = README_PATH.read_text(encoding="utf-8")
+    readme_text = README_PATH.read_text(
+        encoding="utf-8"
+    )  # nocheck: cache-read — CLI entry; merge_archive_section rewrites README_PATH in the same flow
     already_archived = existing_archive_entries(readme_text)
 
     plan, skipped_incomplete, skipped_without_h1 = _bucket_files(files)
