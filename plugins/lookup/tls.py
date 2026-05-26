@@ -36,7 +36,8 @@ class LookupModule(LookupBase):
                 "tls: one or two terms required: (domain|application_id[, want_path])"
             )
 
-        term = as_str(terms[0])
+        templar = getattr(self, "_templar", None)
+        term = as_str(templar.template(terms[0]) if templar else terms[0])
         if not term:
             raise AnsibleError("tls: term is empty")
 
