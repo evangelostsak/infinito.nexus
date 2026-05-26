@@ -1,0 +1,4 @@
+---
+csp:
+  health:
+    skip: true
