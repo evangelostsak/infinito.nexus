@@ -31,16 +31,7 @@
     force_basic_auth: true
     status_code: [200, 201, 202, 204]
     headers: "{{ xwiki_rest_headers_write }}"
-    body: |
-      <page xmlns="http://www.xwiki.org">
-        <title>InstallExtensions</title>
-        <content><![CDATA[
-        {% raw %}{{groovy}}{% endraw %}
-        {{ _install_code | indent(8, False) }}
-        {% raw %}{{/groovy}}{% endraw %}
-        ]]></content>
-        <syntax>xwiki/2.1</syntax>
-      </page>
+    body: "{{ lookup('template', 'xml/install_extensions_page.xml.j2') }}"
   register: _put_page
 
 - block:

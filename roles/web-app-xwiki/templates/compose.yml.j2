@@ -20,7 +20,7 @@
         -Dxwiki.authentication.authservice=ldap
         -Dxwiki.authentication.ldap=1
         -Dxwiki.authentication.ldap.trylocal={{ (XWIKI_LDAP_TRYLOCAL | bool) | ternary(1, 0) }}
-        -Dxwiki.authentication.ldap.group_mapping=XWiki.XWikiAdminGroup={{ XWIKI_LDAP_ADMIN_GROUP_DN }}
+        -Dxwiki.authentication.ldap.group_mapping=XWiki.{{ XWIKI_ADMIN_GROUP_PAGE }}={{ XWIKI_LDAP_ADMIN_GROUP_DN }}
         -Dxwiki.authentication.ldap.mode_group_sync=always
         -Dxwiki.authentication.ldap.server={{ XWIKI_LDAP_SERVER }}
         -Dxwiki.authentication.ldap.port={{ XWIKI_LDAP_PORT }}
