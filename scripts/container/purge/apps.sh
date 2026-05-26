@@ -60,6 +60,9 @@ done
 echo ">>> Wiping token-store entries for: ${apps[*]}"
 "${python_bin}" -m utils.cleanup.tokens "${apps[@]}" || true
 
+echo ">>> Wiping databases.csv entries for: ${apps[*]}"
+"${python_bin}" -m utils.cleanup.databases_csv "${apps[@]}" || true
+
 if [[ "${#entities[@]}" -lt 1 ]]; then
 	echo "!!! WARNING: no valid entities found: skipping entity purge"
 	exit 0
