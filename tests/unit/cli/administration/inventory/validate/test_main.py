@@ -6,7 +6,11 @@ import unittest
 from pathlib import Path
 
 from utils.cache.yaml import dump_yaml_str
-from utils.roles.mapping import ROLE_FILE_META_SERVICES, ROLE_FILE_META_USERS
+from utils.roles.mapping import (
+    ROLE_FILE_META_SERVICES,
+    ROLE_FILE_META_USERS,
+    ROLE_FILE_META_VARIANTS,
+)
 
 from . import PROJECT_ROOT
 
@@ -146,6 +150,43 @@ class TestValidateInventory(unittest.TestCase):
 
         result = self.run_script(expected_code=1)
         self.assertIn("Missing default for app1: services.extra_setting", result.stdout)
+
+    def test_variants_only_key_is_accepted(self):
+        """Regression for web-opt-rdr-www failure on run 26428083128:
+        variants.yml declares service-keys absent from meta/services.yml,
+        the matrix-deploy bake floats those keys into host_vars, and the
+        validator must treat them as legal because variants.yml is part
+        of the role contract."""
+        (self.roles_dir / "app1" / ROLE_FILE_META_VARIANTS).write_text(
+            dump_yaml_str(
+                [
+                    {"services": {"dashboard": {"enabled": True, "shared": True}}},
+                    {"services": {"dashboard": {"enabled": False, "shared": False}}},
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        (self.inventory_dir / "variants_only.yml").write_text(
+            dump_yaml_str(
+                {
+                    "applications": {
+                        "app1": {
+                            "services": {
+                                "port": 8080,
+                                "enabled": True,
+                                "settings": {"theme": "dark"},
+                                "dashboard": {"enabled": True, "shared": True},
+                            }
+                        }
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        result = self.run_script(expected_code=0)
+        self.assertNotIn("Missing default", result.stdout)
 
 
 if __name__ == "__main__":
