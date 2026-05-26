@@ -6,7 +6,7 @@ As a contributor maintaining the per-role Playwright suite, I want every
 role whose login flow is RBAC-gated (OIDC and/or LDAP) to also exercise
 the canonical non-admin user `biber` end-to-end, so that the RBAC
 plumbing from
-[004 - Generic RBAC role auto-provisioning](004-generic-rbac-ldap-auto-provisioning.md)
+[004 - Generic RBAC role auto-provisioning](README.md#archive)
 is verified per role rather than only on the privileged-admin path.
 
 ## Context
@@ -27,7 +27,7 @@ never read them in the spec; the env file was prepared, the spec was
 never written. The most prominent example is `web-app-joomla`: it
 ships an OIDC variant (`plg_system_keycloak`) and an LDAP variant
 (core LDAP auth plugin) per
-[006 - Service-gated Playwright tests](006-playwright-service-gated-tests.md),
+[006 - Service-gated Playwright tests](README.md#archive),
 but the Playwright spec only exercises the admin login. A non-admin
 biber landing-page assertion is missing and would catch RBAC
 group-mapping drift introduced by 004.
@@ -50,7 +50,7 @@ rather than role by role.
 - [ ] The biber scenario MUST gate on the same service flags that the
   matching admin scenario uses (typically `oidc`, `ldap`, or both),
   via the `skipUnlessServiceEnabled` helper from
-  [006](006-playwright-service-gated-tests.md). Operators running with
+  [006](README.md#archive). Operators running with
   `INFINITO_SERVICES_DISABLED=oidc` MUST see the biber scenario as `skipped`
   with the canonical reason string, never as `failed`.
 - [ ] The biber scenario MUST end on a deterministic post-login
@@ -97,7 +97,7 @@ commit message why the role is exempt and removing it from this list.
 
 - [ ] [web-app-joomla](../../roles/web-app-joomla/): OIDC
   (`plg_system_keycloak`) AND LDAP variants per
-  [006](006-playwright-service-gated-tests.md). Smoking gun for this
+  [006](README.md#archive). Smoking gun for this
   requirement: env keys were declared, never consumed.
 - [ ] [web-app-baserow](../../roles/web-app-baserow/): confirm OIDC/LDAP scope.
 - [ ] [web-app-bookwyrm](../../roles/web-app-bookwyrm/): has both `oidc` and `ldap` gated paths in the spec; biber should ride one of them.
@@ -117,7 +117,7 @@ commit message why the role is exempt and removing it from this list.
   every other role's biber scenario. The role's spec already covers
   the realm-side flow; this requirement does NOT touch it. Audit the
   spec only to confirm no drift from
-  [004](004-generic-rbac-ldap-auto-provisioning.md).
+  [004](README.md#archive).
 - [ ] [web-app-fusiondirectory](../../roles/web-app-fusiondirectory/):
   LDAP admin UI; biber as a *managed* user appears in the directory
   view, but the role's own login is admin-only. Audit and document.
@@ -137,7 +137,7 @@ shows up; in that case remove it.
 - [ ] After every role-local change [test_playwright_env_keys_used.py](../../tests/lint/ansible/roles/web-app/playwright/test_env_keys_used.py) MUST be green.
 - [ ] A run with `INFINITO_SERVICES_DISABLED=oidc,ldap` MUST report every biber
   scenario as `skipped: <FLAG>=false` per
-  [006](006-playwright-service-gated-tests.md), never as `failed`.
+  [006](README.md#archive), never as `failed`.
 - [ ] A grep `process.env\.BIBER_(USERNAME|PASSWORD)` over the role
   tree MUST return at least one hit for every in-scope role above
   once the audit closes its checkbox.

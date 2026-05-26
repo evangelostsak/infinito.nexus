@@ -11,11 +11,11 @@ stack is verified independently from its OIDC counterpart.
 
 ## Context
 
-[006 - Service-gated Playwright tests](006-playwright-service-gated-tests.md)
+[006 - Service-gated Playwright tests](README.md#archive)
 established the `skipUnlessServiceEnabled(<service>)` contract:
 scenarios gate on `<SERVICE>_SERVICE_ENABLED` flags so a deploy with
 `INFINITO_SERVICES_DISABLED=<service>` reports `skipped` instead of `failed`.
-[004 - Generic RBAC auto-provisioning](004-generic-rbac-ldap-auto-provisioning.md)
+[004 - Generic RBAC auto-provisioning](README.md#archive)
 plus [017 - Biber RBAC coverage](017-playwright-biber-rbac-coverage.md)
 extend that contract to RBAC-aware non-admin scenarios.
 
@@ -73,7 +73,7 @@ consistently across the role tree is what this requirement tracks.
 - [ ] If the spec needs to know whether LDAP is enabled at runtime,
   it MUST read the `LDAP_SERVICE_ENABLED` flag exclusively through
   the `service-gating.js` helper from
-  [006](006-playwright-service-gated-tests.md). Direct
+  [006](README.md#archive). Direct
   `process.env.LDAP_SERVICE_ENABLED` reads in the spec are forbidden.
 - [ ] No role MAY ship a role-local `<ROLE>_LDAP_ENABLED` env key as
   a workaround for the helper. The
@@ -95,7 +95,7 @@ reachable login UI).
 #### In-scope: LDAP scenario MUST be added
 
 - [ ] [web-app-opencloud](../../roles/web-app-opencloud/): trigger role for this requirement; variant 1 is LDAP-only by design but the spec gates everything on `oidcEnabled`.
-- [ ] [web-app-joomla](../../roles/web-app-joomla/): Joomla's core LDAP authentication plugin is the LDAP-variant surface per [006 audit row](006-playwright-service-gated-tests.md). Pairs with the missing biber scenario from [017](017-playwright-biber-rbac-coverage.md).
+- [ ] [web-app-joomla](../../roles/web-app-joomla/): Joomla's core LDAP authentication plugin is the LDAP-variant surface per [006 audit row](README.md#archive). Pairs with the missing biber scenario from [017](017-playwright-biber-rbac-coverage.md).
 - [ ] [web-app-jenkins](../../roles/web-app-jenkins/): Jenkins LDAP security realm is a separate auth provider from the OIDC plugin.
 - [ ] [web-app-bookwyrm](../../roles/web-app-bookwyrm/): declares both `oidc` and `ldap` gates.
 - [ ] [web-app-mattermost](../../roles/web-app-mattermost/): AD/LDAP login surface independent of OIDC.
@@ -138,6 +138,6 @@ item is a NOOP unless a stale env key shows up.
 
 ## See Also
 
-- [006 - Service-gated Playwright tests](006-playwright-service-gated-tests.md)
+- [006 - Service-gated Playwright tests](README.md#archive)
 - [017 - Playwright biber RBAC coverage](017-playwright-biber-rbac-coverage.md)
-- [004 - Generic RBAC role auto-provisioning](004-generic-rbac-ldap-auto-provisioning.md)
+- [004 - Generic RBAC role auto-provisioning](README.md#archive)

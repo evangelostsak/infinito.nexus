@@ -484,7 +484,7 @@ existing attributes.
 - [x] The Keycloak realm MUST configure an LDAP user-federation
       provider against the project LDAP server provisioned by the
       RBAC/LDAP roles (per
-      [004-generic-rbac-ldap-auto-provisioning.md](004-generic-rbac-ldap-auto-provisioning.md)).
+      [004-generic-rbac-ldap-auto-provisioning.md](README.md#archive)).
 - [x] An LDAP attribute mapper MUST exist for every row of the
       table above whose "LDAP attribute" column is populated. The
       mapper MUST be created by the role idempotently (e.g. via
@@ -645,7 +645,7 @@ without login (both variants), and direct LDAP-bind login
       `phone1` **without biber logging in again**. This proves
       the LDAP cron-sync path is wired correctly.
 - [x] The spec MUST be gated per
-      [006-playwright-service-gated-tests.md](006-playwright-service-gated-tests.md).
+      [006-playwright-service-gated-tests.md](README.md#archive).
       It MUST skip the variant-0-only cases cleanly (not fail)
       when the OIDC shared service is disabled via
       `INFINITO_SERVICES_DISABLED`, and skip the LDAP cases cleanly when
@@ -708,7 +708,7 @@ without login (both variants), and direct LDAP-bind login
 
 - [x] `roles/web-app-moodle/files/playwright/playwright.spec.js` is created (or
       replaces any existing stub) and follows
-      [006-playwright-service-gated-tests.md](006-playwright-service-gated-tests.md):
+      [006-playwright-service-gated-tests.md](README.md#archive):
       every shared-service-dependent test MUST gate on the matching
       env flag.
 - [ ] The spec MUST cover at minimum:

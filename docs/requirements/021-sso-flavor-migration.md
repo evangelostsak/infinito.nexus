@@ -230,7 +230,7 @@ migration must sweep the tree and absorb every match `grep`-style.
 
 ### Layer 6: docs (~8 files)
 
-- UPDATE [docs/requirements/006-playwright-service-gated-tests.md](006-playwright-service-gated-tests.md)
+- UPDATE [docs/requirements/006-playwright-service-gated-tests.md](README.md#archive)
   — replace OAUTH2 / OIDC examples with SSO.
 - UPDATE [docs/requirements/019-playwright-meta-services-parity.md](019-playwright-meta-services-parity.md)
   — the matrix rows mention `oauth2` / `oidc` in their `notes` columns;
@@ -367,7 +367,7 @@ cherry-picking.
 
 ### Documentation
 
-- [ ] [006](006-playwright-service-gated-tests.md),
+- [ ] [006](README.md#archive),
       [008](008-role-meta-layout.md), and
       [019](019-playwright-meta-services-parity.md) examples and tables are
       updated to the new SSO naming.
