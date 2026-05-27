@@ -1,8 +1,6 @@
 ---
 domains:
   canonical:
-    - helpdesk.{{ DOMAIN_PRIMARY }}
-  aliases:
     - zammad.helpdesk.{{ DOMAIN_PRIMARY }}
 csp:
   flags:

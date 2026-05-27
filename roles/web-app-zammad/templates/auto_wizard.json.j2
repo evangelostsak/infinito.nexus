@@ -20,7 +20,7 @@
     { "name": "developer_mode",           "value": false },
     { "name": "user_create_account",      "value": false },
     { "name": "user_lost_password",       "value": true }
-{% if lookup('config', application_id, 'services.oidc.enabled') | bool %}
+{% if ZAMMAD_OIDC_ENABLED %}
     ,
     { "name": "auth_openid_connect",      "value": true },
     {

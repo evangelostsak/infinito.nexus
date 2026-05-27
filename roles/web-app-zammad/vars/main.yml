@@ -35,3 +35,11 @@ ZAMMAD_SECRET_KEY_BASE:        "{{ lookup('config', application_id, 'credentials
 
 # Hostname (consumed by env.j2 + auto_wizard.json.j2)
 ZAMMAD_HOSTNAME: "{{ lookup('domain', application_id) }}"
+
+# Host-side bind-mount sources
+ZAMMAD_VOLUMES_DIR:              "{{ lookup('container', application_id, 'directories.volumes') }}"
+ZAMMAD_AUTO_WIZARD_HOST_PATH:    "{{ ZAMMAD_VOLUMES_DIR }}auto_wizard.json"
+ZAMMAD_OMNIAUTH_INIT_HOST_PATH:  "{{ ZAMMAD_VOLUMES_DIR }}zz_omniauth_allow_get.rb"
+
+# Service gate (consumed by auto_wizard.json.j2, playwright.env.j2, tasks/)
+ZAMMAD_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.oidc.enabled') | bool }}"
