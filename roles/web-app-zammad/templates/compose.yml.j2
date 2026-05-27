@@ -74,6 +74,12 @@
     image: "{{ ZAMMAD_IMAGE }}:{{ ZAMMAD_VERSION }}"
     container_name: "{{ ZAMMAD_NGINX_CONTAINER }}"
     {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+    # Patch zammad-nginx entrypoint to match only literal `nameserver` lines in
+    # /etc/resolv.conf — Docker writes comment lines like `# Overrides: …` that
+    # the upstream `grep "nameserver"` matches as substrings, yielding an
+    # invalid `resolver … Overrides: …` directive that nginx rejects. The
+    # upstream script is read-only for the zammad user, so we patch a copy in
+    # /tmp and exec that.
     command:
       - sh
       - -c
