@@ -1,6 +1,6 @@
 # debian
-infinito-nexus-core/
+infinito-nexus/
 debhelper-build-stamp
 files
 .debhelper/
-infinito-nexus-core.substvars
+infinito-nexus.substvars
