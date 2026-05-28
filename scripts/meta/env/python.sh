@@ -6,6 +6,10 @@
 
 VENV_NAME=infinito
 
+if [[ -z "${VENV:-}" && -n "${INFINITO_VENV_DIR:-}" ]]; then
+	VENV="${INFINITO_VENV_DIR}"
+fi
+
 if [[ -z "${VENV:-}" ]]; then
 	for _venv_candidate in "/opt/venvs/${VENV_NAME}" "${HOME}/.venvs/${VENV_NAME}"; do
 		if [[ -x "${_venv_candidate}/bin/python" ]]; then

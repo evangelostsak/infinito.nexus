@@ -8,7 +8,8 @@ if [[ "${1:-}" == "/sbin/init" ]]; then
 fi
 
 : "${INFINITO_SRC_DIR:?INFINITO_SRC_DIR must be set by the container environment}"
-export INFINITO_SRC_DIR
+: "${INFINITO_VENV_DIR:?INFINITO_VENV_DIR must be set by the container environment}"
+export INFINITO_SRC_DIR INFINITO_VENV_DIR
 
 run_local_build() {
 	echo "[docker-infinito] Build enabled (--compile)"
@@ -16,7 +17,7 @@ run_local_build() {
 	echo "[docker-infinito] Reinstall via 'make install' in ${INFINITO_SRC_DIR}..."
 	make install
 	echo "[docker-infinito] Installed:"
-	infinito --version
+	"${INFINITO_VENV_DIR}/bin/infinito" --version
 }
 
 while [[ $# -gt 0 ]]; do

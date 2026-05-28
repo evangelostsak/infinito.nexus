@@ -18,9 +18,11 @@ ARG NIX_CONFIG
 # stack forwards default.env's INFINITO_SRC_DIR as a build arg.
 ARG INFINITO_SRC_DIR
 ENV INFINITO_SRC_DIR=${INFINITO_SRC_DIR}
-ENV PYTHON="/opt/venvs/infinito/bin/python"
-ENV PIP="/opt/venvs/infinito/bin/python -m pip"
-ENV PATH="/opt/venvs/infinito/bin:${PATH}"
+ARG INFINITO_VENV_DIR
+ENV INFINITO_VENV_DIR=${INFINITO_VENV_DIR}
+ENV PYTHON="${INFINITO_VENV_DIR}/bin/python"
+ENV PIP="${INFINITO_VENV_DIR}/bin/python -m pip"
+ENV PATH="${INFINITO_VENV_DIR}/bin:${PATH}"
 
 # Make Nix non-interactive for flake config (CI-friendly)
 RUN set -euo pipefail; \

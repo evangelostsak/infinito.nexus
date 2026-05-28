@@ -15,6 +15,7 @@ source "${script_dir}/../meta/env/load.sh"
 : "${USE_NIX_TOKEN:?Missing USE_NIX_TOKEN}"
 : "${INFINITO_PARENT_IMAGE:?Missing INFINITO_PARENT_IMAGE; source scripts/meta/env/load.sh}"
 : "${INFINITO_SRC_DIR:?Missing INFINITO_SRC_DIR; source scripts/meta/env/load.sh}"
+: "${INFINITO_VENV_DIR:?Missing INFINITO_VENV_DIR; source scripts/meta/env/load.sh}"
 ghcr_owner="$(scripts/meta/resolve/repository/owner.sh)"
 repo_name="$("${script_dir}/../meta/resolve/repository/name.sh")"
 
@@ -40,6 +41,7 @@ while true; do
 		--label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
 		--build-arg "INFINITO_PARENT_IMAGE=${INFINITO_PARENT_IMAGE}" \
 		--build-arg "INFINITO_SRC_DIR=${INFINITO_SRC_DIR}" \
+		--build-arg "INFINITO_VENV_DIR=${INFINITO_VENV_DIR}" \
 		"${nix_arg[@]}" \
 		--cache-from "type=gha,scope=${repo_name}-${MATRIX_DISTRO}" \
 		--cache-to "type=gha,mode=max,scope=${repo_name}-${MATRIX_DISTRO}" \

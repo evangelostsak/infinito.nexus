@@ -35,7 +35,7 @@ host)
 docker)
 	# Use bash (not --login) inside the container: --login sources
 	# /etc/profile which resets PATH to the Debian system default and
-	# drops the image's /opt/venvs/infinito/bin entry, leaving tools
+	# drops the image's ${INFINITO_VENV_DIR}/bin entry, leaving tools
 	# like ruff / mbake / ansible-lint undiscoverable. BASH_ENV via -e
 	# still sources load.sh on non-interactive bash startup.
 	echo "============================================================"

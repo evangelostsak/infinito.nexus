@@ -19,7 +19,7 @@ set -euo pipefail
 # This avoids chicken-and-egg failures in CI and on fresh machines.
 # ------------------------------------------------------------
 
-: "${VENV:?VENV not set (e.g. /opt/venvs/infinito)}"
+: "${VENV:?VENV not set; source scripts/meta/env/load.sh}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
