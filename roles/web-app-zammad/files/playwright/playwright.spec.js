@@ -13,6 +13,7 @@ require("./test-csp-headers").register(shared);
 require("./test-alias-domain").register(shared);
 require("./test-login-administrator").register(shared);
 require("./test-login-biber").register(shared);
+require("./test-login-via-ldap").register(shared);
 require("./test-guest-persona").register(shared);
 require("./test-rest-api-ticket-create").register(shared);
 require("./test-ticket-create-as-customer").register(shared);

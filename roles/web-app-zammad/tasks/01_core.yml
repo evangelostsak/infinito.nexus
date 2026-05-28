@@ -21,6 +21,21 @@
     mode: "0644"
   notify: compose up
 
+- name: "stage Telegram-constant boot shim (pre-loaded via RUBYOPT; workaround for upstream Zammad 6.5.0 NameError crash)"
+  ansible.builtin.template:
+    src: "zz_telegram_constant_shim.rb.j2"
+    dest: "{{ ZAMMAD_TELEGRAM_SHIM_HOST_PATH }}"
+    mode: "0644"
+  notify: compose up
+
+- name: "stage Rails initializer that maps Keycloak group claims to Zammad roles on OIDC sign-in"
+  ansible.builtin.template:
+    src: "zz_oidc_group_role_mapping.rb.j2"
+    dest: "{{ ZAMMAD_OIDC_GROUP_ROLE_MAP_HOST_PATH }}"
+    mode: "0644"
+  notify: compose up
+  when: ZAMMAD_OIDC_ENABLED
+
 - name: "grant CREATEDB to the Zammad PostgreSQL role (Zammad's init runs rake db:create even when the DB exists)"
   database_query:
     mask_values: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
@@ -30,9 +45,7 @@
         'name': 'postgres',
         'password': lookup('config', 'svc-db-postgres', 'credentials.POSTGRES_PASSWORD'),
       }) }}
-    query_file: "{{ role_path }}/files/sql/grant_createdb.sql"
-    named_args:
-      role_name: "{{ lookup('database', application_id, 'username') }}"
+    query: "{{ lookup('template', role_path ~ '/templates/sql/grant_createdb.sql.j2') }}"
   # Only needed in shared mode: the per-role postgres in non-shared mode
   # spawns the role's app user as the container's POSTGRES_USER (= superuser
   # of that container), so CREATEDB is already implicit and the SVC-DB-POSTGRES
@@ -54,13 +67,45 @@
   delay: 5
   until: zammad_rails_ready.rc == 0
 
-- name: "apply OIDC settings + ensure API-bot user in Zammad (post-bootstrap; idempotent)"
+- name: "process auto_wizard.json if Zammad's setup wizard hasn't completed yet (idempotent)"
+  # Upstream `zammad-init` does NOT call AutoWizard.setup automatically — even
+  # with /opt/zammad/auto_wizard.json bind-mounted, the system stays in
+  # system_init_done=false until something invokes AutoWizard. Trigger it
+  # explicitly here so V2 (no-auth) and V3 (LDAP-only) don't land on the
+  # setup-wizard SPA page that breaks every authenticated test.
+  ansible.builtin.shell: |
+    set -euo pipefail
+    container exec -i {{ ZAMMAD_RAILS_CONTAINER }} bundle exec rails r '
+      if !Setting.get("system_init_done")
+        raise "AutoWizard data missing (auto_wizard.json not mounted in rails container)" unless AutoWizard.enabled?
+        AutoWizard.setup
+      end
+    '
+  register: zammad_auto_wizard_setup
+  changed_when: false
+
+- name: "ensure API-bot user in Zammad (Basic-auth REST API; runs in EVERY variant including no-auth)"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    container exec -i \
+      -e API_BOT_LOGIN -e API_BOT_EMAIL -e API_BOT_FIRSTNAME -e API_BOT_LASTNAME -e API_BOT_PASSWORD \
+      {{ ZAMMAD_RAILS_CONTAINER }} \
+      bundle exec rails r - < {{ role_path }}/files/scripts/apply_api_bot.rb
+  environment:
+    API_BOT_LOGIN:      "{{ ZAMMAD_API_BOT_USER.username }}"
+    API_BOT_EMAIL:      "{{ ZAMMAD_API_BOT_USER.email }}"
+    API_BOT_FIRSTNAME:  "{{ ZAMMAD_API_BOT_USER.firstname }}"
+    API_BOT_LASTNAME:   "{{ ZAMMAD_API_BOT_USER.lastname }}"
+    API_BOT_PASSWORD:   "{{ ZAMMAD_API_BOT_PASSWORD }}"
+  register: zammad_api_bot_apply
+  changed_when: false
+
+- name: "apply OIDC settings in Zammad (post-bootstrap; idempotent)"
   ansible.builtin.shell: |
     set -euo pipefail
     container exec -i \
       -e ZAMMAD_FQDN -e ZAMMAD_HTTP_TYPE \
       -e OIDC_BUTTON_TEXT -e OIDC_CLIENT_ID -e OIDC_CLIENT_SECRET -e OIDC_ISSUER_URL \
-      -e API_BOT_LOGIN -e API_BOT_EMAIL -e API_BOT_PASSWORD \
       {{ ZAMMAD_RAILS_CONTAINER }} \
       bundle exec rails r - < {{ role_path }}/files/scripts/apply_oidc_settings.rb
   environment:
@@ -70,12 +115,29 @@
     OIDC_CLIENT_ID:     "{{ OIDC.CLIENT.ID }}"
     OIDC_CLIENT_SECRET: "{{ OIDC.CLIENT.SECRET }}"
     OIDC_ISSUER_URL:    "{{ OIDC.CLIENT.ISSUER_URL }}"
-    API_BOT_LOGIN:      "zammad-api-bot"
-    API_BOT_EMAIL:      "zammad-api-bot@{{ DOMAIN_PRIMARY }}"
-    API_BOT_PASSWORD:   "{{ ZAMMAD_API_BOT_PASSWORD }}"
   register: zammad_oidc_apply
   changed_when: false
   when: ZAMMAD_OIDC_ENABLED
+
+- name: "configure Zammad's LdapSource against svc-db-openldap (post-bootstrap; idempotent)"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    container exec -i \
+      -e LDAP_NAME -e LDAP_HOST -e LDAP_PORT -e LDAP_BASE_DN \
+      -e LDAP_BIND_DN -e LDAP_BIND_PW -e LDAP_UID_ATTR \
+      {{ ZAMMAD_RAILS_CONTAINER }} \
+      bundle exec rails r - < {{ role_path }}/files/scripts/apply_ldap_source.rb
+  environment:
+    LDAP_NAME:     "{{ ORGANIZATION }} svc-db-openldap"
+    LDAP_HOST:     "{{ LDAP.SERVER.DOMAIN }}"
+    LDAP_PORT:     "{{ LDAP.SERVER.PORT }}"
+    LDAP_BASE_DN:  "{{ LDAP.DN.OU.USERS }}"
+    LDAP_BIND_DN:  "{{ LDAP.DN.ADMINISTRATOR.DATA }}"
+    LDAP_BIND_PW:  "{{ LDAP.BIND_CREDENTIAL }}"
+    LDAP_UID_ATTR: "{{ LDAP.USER.ATTRIBUTES.ID }}"
+  register: zammad_ldap_apply
+  changed_when: false
+  when: ZAMMAD_LDAP_ENABLED
 
 - name: "configure Zammad's Email channel (inbound IMAP + outbound SMTP) against Mailu"
   ansible.builtin.shell: |

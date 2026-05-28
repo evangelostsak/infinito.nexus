@@ -30,39 +30,40 @@ async function zammadLogout(page) {
 }
 
 async function signInAsApiBot(page) {
-  // Seed Zammad's session cookie via the JSON signin endpoint, then load the
-  // SPA. Sidesteps the OIDC second-login flakiness when the same agent
-  // browser context needs to authenticate after another persona's logout
-  // already ran in the same Playwright file. /api/v1/signin requires a CSRF
-  // token, which we lift from `/api/v1/getting_started` first.
+  // Server-side APIRequestContext (page.context().request) shares the
+  // browser's cookie jar. Replaced an earlier in-page fetch approach that
+  // produced a Keycloak-origin cross-origin error in OIDC variants; the
+  // exact mechanism is not isolated, but this shape is what got
+  // test-websocket-realtime to green.
   await page.context().clearCookies();
-  await page.goto(`${zammadBaseUrl}/`, { waitUntil: "domcontentloaded" });
-  await page.evaluate(async ({ base, user, pass }) => {
-    const seed = await fetch(`${base}/api/v1/getting_started`, {
-      credentials: "include",
-      headers: { Accept: "application/json" },
-    });
-    if (!seed.ok) {
-      throw new Error(`getting_started failed: ${seed.status}`);
-    }
-    const csrfToken = seed.headers.get("csrf-token") || (await seed.json())?.csrf_token;
-    if (!csrfToken) {
-      throw new Error("could not lift csrf_token from getting_started");
-    }
-    const resp = await fetch(`${base}/api/v1/signin`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "X-CSRF-Token": csrfToken,
-      },
-      body: JSON.stringify({ username: user, password: pass, fingerprint: "playwright" }),
-    });
-    if (!resp.ok) {
-      throw new Error(`signin failed: ${resp.status} ${await resp.text()}`);
-    }
-  }, { base: zammadBaseUrl, user: adminApiUsername, pass: adminApiPassword });
+
+  const apiRequest = page.context().request;
+
+  const seed = await apiRequest.get(`${zammadBaseUrl}/api/v1/getting_started`, {
+    headers: { Accept: "application/json" },
+    failOnStatusCode: true,
+  });
+  let csrfToken = seed.headers()["csrf-token"];
+  if (!csrfToken) {
+    const seedJson = await seed.json().catch(() => null);
+    csrfToken = seedJson?.csrf_token;
+  }
+  if (!csrfToken) {
+    throw new Error("could not lift csrf_token from getting_started");
+  }
+
+  const signin = await apiRequest.post(`${zammadBaseUrl}/api/v1/signin`, {
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "X-CSRF-Token": csrfToken,
+    },
+    data: { username: adminApiUsername, password: adminApiPassword, fingerprint: "playwright" },
+  });
+  if (!signin.ok()) {
+    throw new Error(`signin failed: ${signin.status()} ${await signin.text()}`);
+  }
+
   await page.goto(`${zammadBaseUrl}/`, { waitUntil: "domcontentloaded" });
 }
 

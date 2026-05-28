@@ -43,9 +43,6 @@ async function appendArticleViaApi(baseUrl, adminApiUsername, adminApiPassword, 
 
 exports.register = function (shared) {
   test("administrator: zammad-websocket pushes ticket updates to an open session in real time", async ({ page }) => {
-    // TODO: same SPA-OIDC interlock as test-ticket-reply-as-agent.
-    // Tracked in roles/web-app-zammad/TODO.md.
-    test.skip(true, "SPA websocket realtime scenario blocked by SPA-OIDC interlock; see TODO.md");
     expect(shared.env.adminApiUsername, "ADMIN_API_USERNAME must be set").toBeTruthy();
     expect(shared.env.adminApiPassword, "ADMIN_API_PASSWORD must be set").toBeTruthy();
 

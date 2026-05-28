@@ -27,9 +27,12 @@ ZAMMAD_MEMCACHED_VERSION: "{{ lookup('config', 'svc-db-memcached', 'services.mem
 ZAMMAD_RAILS_PORT: 3000
 ZAMMAD_WEBSOCKET_PORT: 6042
 
-# Local-auth password for the role-internal `zammad-api-bot` user (Basic-auth
-# REST API). Also reused as the wizard-bypass admin's local password since
-# both need the same shell-safe alphanumeric form (see schema.yml for why).
+# Bot users: identity comes from meta/users.yml (SPOT); password comes from
+# credentials/ because both bots need a shell-safe alphanumeric form (the
+# default user password carries chars that get mangled through the
+# Ansible→bash→docker-exec→Ruby ENV chain — see schema.yml).
+ZAMMAD_API_BOT_USER:           "{{ lookup('users', 'zammad-api-bot') }}"
+ZAMMAD_WIZARD_BYPASS_USER:     "{{ lookup('users', 'zammad-wizard-bypass-admin') }}"
 ZAMMAD_API_BOT_PASSWORD:       "{{ lookup('config', application_id, 'credentials.api_bot_password') }}"
 ZAMMAD_ADMINISTRATOR_EMAIL:    "{{ lookup('users', 'administrator').email }}"
 ZAMMAD_INITIAL_ADMIN_PASSWORD: "{{ lookup('config', application_id, 'credentials.initial_admin_password') }}"
@@ -49,9 +52,28 @@ ZAMMAD_OMNIAUTH_INIT_HOST_PATH:  "{{ ZAMMAD_VOLUMES_DIR }}zz_omniauth_allow_get.
 # Container-side mount target for the OmniAuth GET-allowed initializer.
 ZAMMAD_OMNIAUTH_INIT_CONTAINER_PATH: "/opt/zammad/config/initializers/zz_omniauth_allow_get.rb"
 
+# Telegram boot-shim (pre-loaded via RUBYOPT to sidestep the upstream
+# Zammad 6.5.0 NameError crash on telegram-bot-ruby 2.4.0). See
+# templates/zz_telegram_constant_shim.rb.j2 for the WHY.
+ZAMMAD_TELEGRAM_SHIM_HOST_PATH:      "{{ ZAMMAD_VOLUMES_DIR }}zz_telegram_constant_shim.rb"
+ZAMMAD_TELEGRAM_SHIM_CONTAINER_PATH: "/opt/zammad/zz_telegram_constant_shim.rb"
+
+# OIDC group-role mapping initializer (rendered + bind-mounted as
+# /opt/zammad/config/initializers/zz_oidc_group_role_mapping.rb)
+ZAMMAD_OIDC_GROUP_ROLE_MAP_HOST_PATH:      "{{ ZAMMAD_VOLUMES_DIR }}zz_oidc_group_role_mapping.rb"
+ZAMMAD_OIDC_GROUP_ROLE_MAP_CONTAINER_PATH: "/opt/zammad/config/initializers/zz_oidc_group_role_mapping.rb"
+# RBAC group-path → Zammad-role mapping. Keycloak's RBAC client scope
+# emits group paths with `full.path: true`, so the keys match the format
+# Keycloak hands out in the `groups` claim.
+ZAMMAD_OIDC_GROUP_ROLE_MAP:
+  "/{{ RBAC.GROUP.NAME | trim('/') }}/{{ application_id }}/administrator": "Admin"
+  "/{{ RBAC.GROUP.NAME | trim('/') }}/{{ application_id }}/agent":         "Agent"
+  "/{{ RBAC.GROUP.NAME | trim('/') }}/{{ application_id }}/customer":      "Customer"
+
 # Service gate (consumed by auto_wizard.json.j2, playwright.env.j2, tasks/)
 ZAMMAD_OIDC_ENABLED:  "{{ lookup('config', application_id, 'services.oidc.enabled')  | bool }}"
 ZAMMAD_EMAIL_ENABLED: "{{ lookup('config', application_id, 'services.email.enabled') | bool }}"
+ZAMMAD_LDAP_ENABLED:  "{{ lookup('config', application_id, 'services.ldap.enabled')  | bool }}"
 
 # Mailu-backed Email channel (consumed by apply_email_channel.sh + playwright.env.j2)
 ZAMMAD_MAIL:           "{{ lookup('email', application_id) if ZAMMAD_EMAIL_ENABLED else {} }}"

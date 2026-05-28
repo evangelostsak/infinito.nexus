@@ -9,6 +9,7 @@
     volumes:
       - zammad_storage:/opt/zammad/storage
       - "{{ ZAMMAD_AUTO_WIZARD_HOST_PATH }}:/opt/zammad/auto_wizard.json:ro"
+      - "{{ ZAMMAD_TELEGRAM_SHIM_HOST_PATH }}:{{ ZAMMAD_TELEGRAM_SHIM_CONTAINER_PATH }}:ro"
 {{ lookup('container_depends_on', application_id) }}
 {% include 'roles/sys-svc-container/templates/networks.yml.j2' %}
 
@@ -22,7 +23,12 @@
         condition: service_completed_successfully
     volumes:
       - zammad_storage:/opt/zammad/storage
+      - "{{ ZAMMAD_AUTO_WIZARD_HOST_PATH }}:/opt/zammad/auto_wizard.json:ro"
       - "{{ ZAMMAD_OMNIAUTH_INIT_HOST_PATH }}:{{ ZAMMAD_OMNIAUTH_INIT_CONTAINER_PATH }}:ro"
+      - "{{ ZAMMAD_TELEGRAM_SHIM_HOST_PATH }}:{{ ZAMMAD_TELEGRAM_SHIM_CONTAINER_PATH }}:ro"
+{% if ZAMMAD_OIDC_ENABLED %}
+      - "{{ ZAMMAD_OIDC_GROUP_ROLE_MAP_HOST_PATH }}:{{ ZAMMAD_OIDC_GROUP_ROLE_MAP_CONTAINER_PATH }}:ro"
+{% endif %}
 {% include 'roles/sys-svc-container/templates/networks.yml.j2' %}
 
   {{ ZAMMAD_WEBSOCKET_CONTAINER }}:
@@ -36,6 +42,10 @@
     volumes:
       - zammad_storage:/opt/zammad/storage
       - "{{ ZAMMAD_OMNIAUTH_INIT_HOST_PATH }}:{{ ZAMMAD_OMNIAUTH_INIT_CONTAINER_PATH }}:ro"
+      - "{{ ZAMMAD_TELEGRAM_SHIM_HOST_PATH }}:{{ ZAMMAD_TELEGRAM_SHIM_CONTAINER_PATH }}:ro"
+{% if ZAMMAD_OIDC_ENABLED %}
+      - "{{ ZAMMAD_OIDC_GROUP_ROLE_MAP_HOST_PATH }}:{{ ZAMMAD_OIDC_GROUP_ROLE_MAP_CONTAINER_PATH }}:ro"
+{% endif %}
 {% include 'roles/sys-svc-container/templates/networks.yml.j2' %}
 
   {{ ZAMMAD_SCHEDULER_CONTAINER }}:
@@ -49,6 +59,10 @@
     volumes:
       - zammad_storage:/opt/zammad/storage
       - "{{ ZAMMAD_OMNIAUTH_INIT_HOST_PATH }}:{{ ZAMMAD_OMNIAUTH_INIT_CONTAINER_PATH }}:ro"
+      - "{{ ZAMMAD_TELEGRAM_SHIM_HOST_PATH }}:{{ ZAMMAD_TELEGRAM_SHIM_CONTAINER_PATH }}:ro"
+{% if ZAMMAD_OIDC_ENABLED %}
+      - "{{ ZAMMAD_OIDC_GROUP_ROLE_MAP_HOST_PATH }}:{{ ZAMMAD_OIDC_GROUP_ROLE_MAP_CONTAINER_PATH }}:ro"
+{% endif %}
 {% include 'roles/sys-svc-container/templates/networks.yml.j2' %}
 
   {{ ZAMMAD_SEARCH_CONTAINER }}:
@@ -97,6 +111,10 @@
     volumes:
       - zammad_storage:/opt/zammad/storage
       - "{{ ZAMMAD_OMNIAUTH_INIT_HOST_PATH }}:{{ ZAMMAD_OMNIAUTH_INIT_CONTAINER_PATH }}:ro"
+      - "{{ ZAMMAD_TELEGRAM_SHIM_HOST_PATH }}:{{ ZAMMAD_TELEGRAM_SHIM_CONTAINER_PATH }}:ro"
+{% if ZAMMAD_OIDC_ENABLED %}
+      - "{{ ZAMMAD_OIDC_GROUP_ROLE_MAP_HOST_PATH }}:{{ ZAMMAD_OIDC_GROUP_ROLE_MAP_CONTAINER_PATH }}:ro"
+{% endif %}
 {% include 'roles/sys-svc-container/templates/networks.yml.j2' %}
 
 {{ lookup('applications') | compose_volumes(

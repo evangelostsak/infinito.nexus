@@ -3,12 +3,11 @@
   "TextModuleLocale": { "Locale": "{{ HOST_LL_CC_TAG }}" },
   "Users": [
     {
-      "login":     "{{ ZAMMAD_ADMINISTRATOR_EMAIL }}",
-      "firstname": "{{ lookup('users', 'administrator').firstname }}",
-      "lastname":  "{{ lookup('users', 'administrator').lastname }}",
-      "email":     "{{ ZAMMAD_ADMINISTRATOR_EMAIL }}",
-      "password":  "{{ ZAMMAD_API_BOT_PASSWORD }}",
-      "organization": "{{ ORGANIZATION }}"
+      "login":     "{{ ZAMMAD_WIZARD_BYPASS_USER.username }}",
+      "firstname": "{{ ZAMMAD_WIZARD_BYPASS_USER.firstname }}",
+      "lastname":  "{{ ZAMMAD_WIZARD_BYPASS_USER.lastname }}",
+      "email":     "{{ ZAMMAD_WIZARD_BYPASS_USER.email }}",
+      "password":  "{{ ZAMMAD_API_BOT_PASSWORD }}"
     }
   ],
   "Settings": [

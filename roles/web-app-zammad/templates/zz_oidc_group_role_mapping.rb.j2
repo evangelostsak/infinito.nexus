@@ -1,0 +1,61 @@
+# Rails initializer mounted into /opt/zammad/config/initializers/.
+#
+# Translates Keycloak `groups` claim entries into Zammad role assignments
+# on every OIDC sign-in. The Keycloak RBAC client scope (see
+# roles/web-app-keycloak/templates/import/scopes/rbac.json.j2) emits group
+# paths like `/{{ RBAC.GROUP.NAME | trim('/') }}/{{ application_id }}/<role>`
+# into the `{{ RBAC.GROUP.CLAIM }}` claim. We map those onto Zammad's
+# built-in roles. Users without any matching group default to the configured
+# fallback (Customer) so unmapped sign-ins still land somewhere coherent.
+#
+# The map is compiled in at template-render time from
+# OIDC_GROUP_ROLE_MAP (JSON, group-path → Zammad role name) and the
+# fallback role name is OIDC_DEFAULT_ROLE.
+
+require "json"
+
+OIDC_GROUP_ROLE_MAP    = JSON.parse({{ ZAMMAD_OIDC_GROUP_ROLE_MAP | to_json | to_json }}).freeze
+OIDC_DEFAULT_ROLE_NAME = "Customer".freeze
+
+Rails.application.config.after_initialize do
+  group_role_map = OIDC_GROUP_ROLE_MAP
+
+  patch = Module.new do
+    define_method(:_zammad_role_names_from_oidc) do |auth_hash|
+      groups = nil
+      groups ||= auth_hash&.dig("info",  "groups")
+      groups ||= auth_hash&.dig(:info,   :groups)
+      groups ||= auth_hash&.dig("extra", "raw_info", "groups")
+      groups ||= auth_hash&.dig(:extra,  :raw_info, :groups)
+      Array(groups)
+    end
+
+    define_method(:_zammad_apply_oidc_roles!) do |user, auth_hash|
+      return unless user
+      paths = _zammad_role_names_from_oidc(auth_hash)
+      mapped = paths.map { |p| group_role_map[p] }.compact.uniq
+      mapped = [OIDC_DEFAULT_ROLE_NAME] if mapped.empty?
+      roles  = Role.where(name: mapped)
+      return if roles.empty?
+      user.roles = roles
+      user.save!
+    end
+  end
+
+  # Patch the two User-side OmniAuth entry points. Zammad's
+  # OmniauthCallbacksController hands the auth hash to one of these. If a
+  # future Zammad release renames either method this initializer becomes a
+  # no-op rather than crashing the boot path.
+  %w[create_from_hash update_from_hash].each do |method_name|
+    next unless User.respond_to?(method_name)
+
+    User.singleton_class.prepend(Module.new {
+      include patch
+      define_method(method_name) do |hash|
+        user = super(hash)
+        _zammad_apply_oidc_roles!(user, hash)
+        user
+      end
+    })
+  end
+end
