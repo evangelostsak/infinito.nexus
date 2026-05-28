@@ -5,7 +5,7 @@ svc-container:
     categories: [web]
 busybox:
   image: busybox
-  version: "1.37"
+  version: "1.38"
 node:
   image: node
   version: "26-alpine"
