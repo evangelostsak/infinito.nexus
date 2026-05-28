@@ -79,8 +79,13 @@ if [[ -n "${DUPLICATE_PR}" ]]; then
 	exit 0
 fi
 
-git config --local --unset-all "http.https://github.com/.extraheader" 2>/dev/null || true # nocheck: url
-git config --local --remove-section "http.https://github.com/" 2>/dev/null || true        # nocheck: url
+echo "--- Stripping every http.*.extraheader from local config ---"
+git config --local --name-only --get-regexp '^http\..*\.extraheader$' 2>/dev/null |
+	tee /dev/stderr |
+	xargs -r -I{} git config --local --unset-all '{}' 2>/dev/null || true
+echo "--- Remaining http.* config after strip: ---"
+git config --local --get-regexp '^http\.' 2>/dev/null || true
+echo "--- Pushing with App-token-embedded URL ---"
 git push --force \
 	"https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" \
 	"HEAD:refs/heads/${BRANCH}"
