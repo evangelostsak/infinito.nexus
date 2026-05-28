@@ -9,11 +9,17 @@ Two checks:
 
 * :meth:`TestRequirementsCompleteness.test_no_requirement_is_ready_for_archive`
   fails when a requirement file has zero ``- [ ]`` markers anywhere.
-  Such files are eligible for archival via
-  ``python -m cli.contributing.requirements.archive`` and must be moved
-  out of ``docs/requirements/`` so the directory stays a short, current
-  list of open work. Keeping completed requirements around bloats the
-  scope AI agents have to process on every run.
+  Such files are eligible for archival via ``pkgmgr archive
+  docs/requirements`` and must be moved out of ``docs/requirements/``
+  so the directory stays a short, current list of open work. Keeping
+  completed requirements around bloats the scope AI agents have to
+  process on every run.
+
+The archive primitives (file discovery + task-list completeness check)
+live in the ``pkgmgr.actions.archive`` package shipped by
+`kpmx <https://pypi.org/project/kpmx/>`_; they used to be vendored
+under ``cli/contributing/requirements/archive/`` and were moved out
+in v8.0.x.
 
 See [requirements.md](../../docs/contributing/requirements.md).
 """
@@ -25,8 +31,9 @@ import unittest
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from cli.contributing.requirements.archive.discovery import iter_requirement_files
-from cli.contributing.requirements.archive.inspect import count_unchecked_items
+from pkgmgr.actions.archive.discovery import iter_archivable_files
+from pkgmgr.actions.archive.inspect import count_unchecked_items
+
 from utils.annotations.message import in_github_actions, warning
 from utils.cache.files import read_text
 
@@ -36,7 +43,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 REQUIREMENTS_DIR = PROJECT_ROOT / "docs" / "requirements"
-ARCHIVE_CLI = "python -m cli.contributing.requirements.archive"
+ARCHIVE_CLI = "pkgmgr archive docs/requirements"
 
 ACCEPTANCE_HEADING_RE = re.compile(r"^##\s+Acceptance Criteria\b", re.IGNORECASE)
 SECTION_END_HEADING_RE = re.compile(r"^#{1,2}\s+\S")
@@ -116,7 +123,7 @@ class TestRequirementsCompleteness(unittest.TestCase):
     def test_requirement_acceptance_criteria_are_complete(self) -> None:
         """Surface every unchecked acceptance criterion as a warning."""
         findings: list[UncheckedCriterion] = []
-        for path in iter_requirement_files(REQUIREMENTS_DIR, include_template=False):
+        for path in iter_archivable_files(REQUIREMENTS_DIR, include_template=False):
             findings.extend(scan_unchecked_criteria(path))
 
         findings.sort(key=lambda f: (f.path.as_posix(), f.line))
@@ -135,14 +142,14 @@ class TestRequirementsCompleteness(unittest.TestCase):
         """Fail when any requirement file is fully checked off.
 
         A file with zero ``- [ ]`` items anywhere is eligible for
-        archival via ``cli.contributing.requirements.archive``. Leaving
-        it in ``docs/requirements/`` inflates the scope that AI agents
-        have to process on every run, so the directory MUST stay a
-        short, current list of open work.
+        archival via ``pkgmgr archive``. Leaving it in
+        ``docs/requirements/`` inflates the scope that AI agents have
+        to process on every run, so the directory MUST stay a short,
+        current list of open work.
         """
         archivable: list[Path] = [
             path
-            for path in iter_requirement_files(REQUIREMENTS_DIR, include_template=False)
+            for path in iter_archivable_files(REQUIREMENTS_DIR, include_template=False)
             if count_unchecked_items(path) == 0
         ]
 
@@ -155,7 +162,8 @@ class TestRequirementsCompleteness(unittest.TestCase):
         self.fail(
             f"{len(archivable)} requirement file(s) have no unchecked "
             "`- [ ]` items and are ready for archival. Run "
-            f"`{ARCHIVE_CLI}` to move their headings into "
+            f"`{ARCHIVE_CLI}` (from kpmx, install via `pip install -e "
+            "'.[dev]'`) to move their headings into "
             "`docs/requirements/README.md` under `## Archive` and delete "
             "the files. Keeping completed requirements in the directory "
             "bloats the scope AI agents have to process on every run.\n"
