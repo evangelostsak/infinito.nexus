@@ -79,6 +79,8 @@ if [[ -n "${DUPLICATE_PR}" ]]; then
 	exit 0
 fi
 
+git config --local --unset-all "http.https://github.com/.extraheader" 2>/dev/null || true
+git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
 git push --force origin "${BRANCH}"
 
 PR_NUMBER="$(
