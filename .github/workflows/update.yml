@@ -115,6 +115,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: lts/*
+          cache: "npm"
 
       - name: Update skills
         run: bash scripts/install/skills/update.sh

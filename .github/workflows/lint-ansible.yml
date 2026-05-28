@@ -31,6 +31,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install ansible-core ansible-lint pyyaml
 
+      - name: Cache Ansible collections
+        uses: actions/cache@v4
+        with:
+          path: ~/.ansible/collections
+          key: ansible-collections-${{ runner.os }}-${{ hashFiles('requirements/requirements.galaxy.yml', 'requirements/requirements.git.yml') }}
+
       - name: Install required Ansible collections
         run: |
           ansible-galaxy collection install \
