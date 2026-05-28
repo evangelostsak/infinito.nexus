@@ -1,5 +1,47 @@
 # Changelog
 
+## [9.0.0] - 2026-05-28
+
+* Collapses the parallel **oauth2** and **oidc** top-level blocks in every role *meta/services.yml* into a single *services.sso* block with a **flavor** discriminator (*oidc* | *oauth2* | *saml*, default *oidc*). Flavor-specific keys live under *sso.<flavor>* (*sso.oauth2.{origin,acl,allowed_groups}*, *sso.oidc.plugin*).
+
+**Removed**
+
+* The dedicated oauth2-proxy provider role (its directory under *roles/*) is deleted; the 5 sidecar templates and the per-consumer render task fold into **web-app-keycloak** (*templates/sso_proxy/*, *tasks/sso_proxy.yml*). **web-app-keycloak** now declares **provides: sso**.
+* The two mutual-exclusion guards (*tests/integration/iam/oauth2_oidc/test_mutual_exclusive.py*, *test_acl_mutual_exclusive.py*) — obsolete under the single-block schema.
+
+**Added**
+
+* *utils/roles/applications/services/sso.py* — central resolver for **is_enabled** / **is_proxy_gated** / **is_oidc_native** plus the oauth2 sub-values (*oauth2_origin_{host,port}*, *oauth2_acl*, *oauth2_allowed_groups*).
+* Three lookup plugins on top of the resolver: **sso** (single-app predicate access), **sso_proxy_consumers** (enumerates oauth2-flavored consumers), **sso_oidc_plugin** (renamed from **oidc_flavor**, Nextcloud selector).
+* *tests/lint/repository/no_legacy_sso_paths/* static guard against the legacy strings re-entering the source tree.
+
+**Renamed**
+
+* *services.<entity>.ports.local.oauth2* → *ports.local.sso*
+* *PORT_BANDS.local.oauth2* → *PORT_BANDS.local.sso*
+* **OAUTH2_PROXY_\*** env / Jinja vars → **SSO_PROXY_\***
+* *oauth2_proxy_cookie_secret* → *sso_proxy_cookie_secret*
+* **OAUTH2_SERVICE_ENABLED** + **OIDC_SERVICE_ENABLED** → single **SSO_SERVICE_ENABLED**
+* Playwright gating helpers (*isServiceEnabled*, *skipUnlessServiceEnabled*, *requireService*, *safeIsEnabled*, *safeSkipUnlessEnabled*) move from service *oidc* / *oauth2* to *sso*
+* *test_oauth2_contract.py* → *test_sso_contract.py*
+
+**Changed**
+
+* **sys-stk-backend**, **sys-svc-compose**, **sys-svc-proxy** and *plugins/filter/compose_volumes.py* now gate on **lookup(sso, …, is_proxy_gated)** instead of hand-combining **enabled** + **flavor**.
+* Dual-block resolution: **web-app-bookwyrm** pinned to **flavor: oauth2**; **web-app-gitea** and **web-app-friendica** keep **flavor: oauth2** with the existing *oauth2.acl.blacklist* (*/user/login*) and *oauth2.acl.whitelist* (federation + discovery endpoints) — operative oauth2-proxy gating preserved.
+
+**Migration**
+
+Every consumer of the legacy oauth2 / oidc service sub-trees, the **OAUTH2_PROXY_\*** env / Jinja vars, **OAUTH2_SERVICE_ENABLED**, **OIDC_SERVICE_ENABLED**, *oauth2_proxy_cookie_secret*, *oauth2_proxy_application_id*, *ports.local.oauth2*, the dedicated oauth2-proxy provider role, or the legacy *oidc* / *oauth2* Playwright gating helper service names must migrate to the unified **sso** shape. Full plan and decisions are archived under req 21.
+
+**Validated**
+
+End-to-end against *web-app-{keycloak,nextcloud,bookwyrm,gitea,friendica,dashboard}* in matrix variants 0 and 1; v2 also passes Playwright for the four target roles (modulo a pre-existing **KC_HOSTNAME**-drift workaround, separate concern).
+
+**Contributors**
+
+* [Kevin Veen-Birkenbach](https://www.veen.world/)
+
 ## [8.0.5] - 2026-05-28
 
 * Adds --version / -V flag to the infinito CLI, drops a dead Compose-CLI reference link, and fixes the dev-deploy router so per-invocation routing knobs (apps, mode, purge, bundles, disable, full_cycle, variant) no longer leak into the persistent .env and the make-alias / env-var surface is unified 1:1.
