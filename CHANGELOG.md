@@ -1,5 +1,9 @@
 # Changelog
 
+## [8.0.2] - 2026-05-28
+
+* Restores CI by dropping pkgmgr from the dev Dockerfile (entry.sh now `make install`s straight from INFINITO_SRC_DIR) and bumping the pkgmgr role pin to v1.15.2, which re-registers the `infinito` alias.
+
 ## [8.0.1] - 2026-05-28
 
 * Restores Debian build viability, satisfies the new eslint rules, moves the requirements archive CLI to kpmx, adds make requirements-archive, pins pkgmgr to v1.14.0, sharpens the agent iteration docs, and rolls up dependabot bumps.
