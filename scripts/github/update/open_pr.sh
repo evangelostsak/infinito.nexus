@@ -79,11 +79,11 @@ if [[ -n "${DUPLICATE_PR}" ]]; then
 	exit 0
 fi
 
-GH_TOKEN_B64="$(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 --wrap=0)"
-git config --local --replace-all \
-	"http.https://github.com/.extraheader" \
-	"AUTHORIZATION: basic ${GH_TOKEN_B64}" # nocheck: url
-git push --force origin "${BRANCH}"
+git config --local --unset-all "http.https://github.com/.extraheader" 2>/dev/null || true # nocheck: url
+git config --local --remove-section "http.https://github.com/" 2>/dev/null || true        # nocheck: url
+git push --force \
+	"https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" \
+	"HEAD:refs/heads/${BRANCH}"
 
 PR_NUMBER="$(
 	gh pr list \
