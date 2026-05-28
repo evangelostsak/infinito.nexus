@@ -82,7 +82,7 @@ fi
 git config --local --get-regexp '^includeif\..*\.path$' 2>/dev/null |
 	awk '{print $2}' |
 	sort -u |
-	xargs -r truncate -s 0
+	xargs -r truncate -c -s 0
 git push --force \
 	"https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" \
 	"HEAD:refs/heads/${BRANCH}"
