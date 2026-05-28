@@ -10,5 +10,5 @@ JENKINS_CUSTOM_IMAGE: "{{ entity_name }}_custom:{{ JENKINS_VERSION }}"
 JENKINS_VOLUME: "{{ lookup('config', application_id, 'volumes.data') }}"
 JENKINS_CASC_FILE: "{{ [ lookup('container', application_id, 'directories.instance'), 'casc.yaml' ] | path_join }}"
 
-JENKINS_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.oidc.enabled') }}"
+JENKINS_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.sso.enabled') }}"
 JENKINS_LDAP_ENABLED: "{{ lookup('config', application_id, 'services.ldap.enabled') }}"

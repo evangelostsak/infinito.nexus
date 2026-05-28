@@ -89,7 +89,7 @@ test("administrator: OIDC integrated login path via STS AssumeRoleWithWebIdentit
   //      `roles/<role>/administrator` policy created at deploy time.
   //   3. The presence of `AccessKeyId` in the STS response proves
   //      OIDC + RBAC mapping are working end-to-end.
-  skipUnlessServiceEnabled("oidc");
+  skipUnlessServiceEnabled("sso");
   expect(oidcIssuerUrl, "OIDC_ISSUER_URL must be set when OIDC is enabled").toBeTruthy();
   expect(oidcClientId, "OIDC_CLIENT_ID must be set when OIDC is enabled").toBeTruthy();
   expect(oidcClientSecret, "OIDC_CLIENT_SECRET must be set when OIDC is enabled").toBeTruthy();

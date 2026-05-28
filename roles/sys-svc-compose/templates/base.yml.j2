@@ -4,12 +4,12 @@ services:
 {% if lookup('database', application_id, 'enabled') %}
 {% include 'roles/sys-svc-rdbms/templates/services/main.yml.j2' %}
 {% endif %}
-{# Load Redis #}
-{% if lookup('applications') | is_docker_service_enabled(application_id, 'redis') or lookup('config',application_id, 'services.oauth2.enabled', False) %}
+{# Load Redis (oauth2-proxy session store for SSO-proxied roles) #}
+{% if lookup('applications') | is_docker_service_enabled(application_id, 'redis') or lookup('sso', application_id, 'is_proxy_gated') %}
 {% include 'roles/svc-db-redis/templates/service.yml.j2' %}
 {% endif %}
-{# Load OAuth2 Proxy #}
-{% if lookup('config',application_id, 'services.oauth2.enabled', False) %}
-{% include 'roles/web-app-oauth2-proxy/templates/container.yml.j2' %}
+{# Load SSO-proxy sidecar (oauth2-proxy flavor only) #}
+{% if lookup('sso', application_id, 'is_proxy_gated') %}
+{% include 'roles/web-app-keycloak/templates/sso_proxy/container.yml.j2' %}
 {% endif %}
 {{ "\n" }}

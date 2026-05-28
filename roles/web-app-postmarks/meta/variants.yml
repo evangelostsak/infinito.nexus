@@ -1,7 +1,7 @@
 ---
 # Matrix-deploy variant overrides for this role. Postmarks has no first-party OIDC or
 # LDAP integration, both auth-flow variants ride the same
-# `web-app-oauth2-proxy` sidecar in front of the Postmarks web UI.
+# the `web-app-keycloak` SSO-proxy sidecar (flavor: oauth2) sidecar in front of the Postmarks web UI.
 # Variant 0 is the canonical OIDC variant (Keycloak with local
 # user storage). Variant 1 flips the LDAP marker so Playwright's
 # `LDAP_SERVICE_ENABLED` gate fires; the underlying user storage
@@ -20,7 +20,7 @@
     matomo:
       enabled: true
       shared: true
-    oauth2:
+    sso:
       enabled: true
       shared: true
     prometheus:
@@ -39,7 +39,7 @@
     matomo:
       enabled: false
       shared: false
-    oauth2:
+    sso:
       enabled: false
       shared: false
     prometheus:

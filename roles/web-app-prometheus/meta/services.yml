@@ -1,15 +1,14 @@
 ---
-# nocheck: dynamic-flag
-oidc:
-  enabled: false
-oauth2:
+sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
-  origin:
-    host: application
-    port: "9090"
-  allowed_groups:
-    - "{{ lookup('rbac_group_path', application_id='web-app-prometheus', role='administrator') }}"
+  flavor: oauth2
+  oauth2:
+    origin:
+      host: application
+      port: "9090"
+    allowed_groups:
+      - "{{ lookup('rbac_group_path', application_id='web-app-prometheus', role='administrator') }}"
 logout:
   enabled: "{{ 'web-svc-logout' in group_names }}"
   shared: "{{ 'web-svc-logout' in group_names }}"
@@ -26,11 +25,11 @@ email:
 css:
   enabled: "{{ 'web-svc-css' in group_names }}"
   shared: "{{ 'web-svc-css' in group_names }}"
-# nocheck: dynamic-flag — gated on services.oauth2.enabled, not on group_names
+# nocheck: dynamic-flag — gated on services.sso.enabled, not on group_names
 # nocheck: playwright-service-flag — runtime DOM patch, no probe-able surface flag
 javascript:
-  enabled: "{{ lookup('config', 'web-app-prometheus', 'services.oauth2.enabled', False) | bool }}"
-  shared: "{{ lookup('config', 'web-app-prometheus', 'services.oauth2.enabled', False) | bool }}"
+  enabled: "{{ lookup('config', 'web-app-prometheus', 'services.sso.enabled', False) | bool }}"
+  shared: "{{ lookup('config', 'web-app-prometheus', 'services.sso.enabled', False) | bool }}"
 # nocheck: playwright-service-flag — self-provider
 prometheus:
   enabled: true
@@ -49,7 +48,7 @@ prometheus:
       chat_id: 0
   ports:
     local:
-      oauth2: 16492
+      sso: 16492
       http: 8066
   run_after:
     - web-app-keycloak

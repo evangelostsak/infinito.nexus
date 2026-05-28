@@ -75,6 +75,16 @@ _ALLOWED_META_FILES: frozenset[Path] = frozenset(
             / "dependencies"
             / "test_no_stale_requirement_refs.py"
         ).resolve(),
+        # The legacy-SSO-paths guard names its single ALLOW_PATHS anchor
+        # by its literal filename — the migration record itself.
+        (
+            PROJECT_ROOT
+            / "tests"
+            / "lint"
+            / "repository"
+            / "no_legacy_sso_paths"
+            / "test_no_legacy_sso_paths.py"
+        ).resolve(),
     }
 )
 

@@ -2,7 +2,7 @@ const { test } = require("@playwright/test");
 
 exports.register = function (shared) {
   test("biber: matrix element OIDC login and logout", async ({ page }) => {
-    shared.skipUnlessServiceEnabled("oidc");
+    shared.skipUnlessServiceEnabled("sso");
     const { biberUsername, biberPassword } = shared.env;
     const diagnostics = shared.attachDiagnostics(page);
     await shared.signInViaElementOidc(page, biberUsername, biberPassword, "biber");

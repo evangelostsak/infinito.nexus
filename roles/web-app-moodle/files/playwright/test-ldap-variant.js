@@ -2,7 +2,7 @@ const { test, expect } = require("@playwright/test");
 
 exports.register = function (shared) {
   test.describe("moodle LDAP-only (variant 1)", () => {
-    test.skip(shared.env.oidcEnabled, "OIDC shared service enabled — variant 1 not active");
+    test.skip(shared.env.ssoEnabled, "SSO shared service enabled — variant 1 not active");
     test.skip(!shared.env.ldapEnabled, "LDAP shared service disabled");
 
     test("biber: direct LDAP-bind login via Moodle form", async ({ page }) => {

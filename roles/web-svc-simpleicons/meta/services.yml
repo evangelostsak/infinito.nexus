@@ -1,7 +1,9 @@
 ---
 # nocheck: dynamic-flag
-oauth2:
+# nocheck: sso
+sso:
   enabled: false
+  shared: false
 # nocheck: dynamic-flag
 dashboard:
   enabled: false

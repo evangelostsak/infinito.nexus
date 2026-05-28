@@ -8,7 +8,7 @@ LISTMONK_VERSION: "{{ lookup('config', application_id, 'services.listmonk.versio
 LISTMONK_IMAGE: "{{ lookup('config', application_id, 'services.listmonk.image') }}"
 LISTMONK_NAME: "{{ lookup('config', application_id, 'services.listmonk.name') }}"
 LISTMONK_CONFIG_HOST: "{{ [ lookup('container', application_id, 'directories.config'),'config.toml' ] | path_join }}"
-LISTMONK_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.oidc.enabled') }}"
+LISTMONK_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.sso.enabled') }}"
 
 LISTMONK_PUBLIC_API_ENABLED: "{{ lookup('config', application_id, 'services.listmonk.public_api_activated') }}"
 

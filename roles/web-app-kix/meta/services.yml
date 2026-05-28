@@ -14,15 +14,17 @@ email:
 ldap:
   enabled: "{{ 'svc-db-openldap' in group_names }}"
   shared: "{{ 'svc-db-openldap' in group_names }}"
-oauth2:
-  origin:
-    host: kix-proxy
-    port: "80"
+sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
-  allowed_groups:
-    - "roles/web-app-kix/administrator"
-    - "roles/web-app-kix/user"
+  flavor: oauth2
+  oauth2:
+    origin:
+      host: kix-proxy
+      port: "80"
+    allowed_groups:
+      - "roles/web-app-kix/administrator"
+      - "roles/web-app-kix/user"
 # nocheck: playwright-service-flag — verified by web-svc-css provider spec
 css:
   enabled: "{{ 'web-svc-css' in group_names }}"
@@ -42,7 +44,7 @@ kix:
   ports:
     local:
       http: 8083
-      oauth2: 16500
+      sso: 16500
   run_after:
     - web-app-keycloak
   lifecycle: beta

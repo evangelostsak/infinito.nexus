@@ -92,7 +92,7 @@ KEYCLOAK_VERSION: "{{ lookup('config', application_id, 'services.keycloak.versio
 KEYCLOAK_SERVER_HOST: "127.0.0.1:{{ lookup('config', application_id, 'services.keycloak.ports.local.http') }}"
 
 ## Update
-KEYCLOAK_REDIRECT_FEATURES: ["services.oauth2.enabled", "services.oidc.enabled"]
+KEYCLOAK_REDIRECT_FEATURES: ["services.sso.enabled", "services.sso.enabled"]
 KEYCLOAK_FRONTCHANNEL_LOGOUT_URL: "{{ lookup('tls', 'web-svc-logout', 'url.base') }}"
 # This will lead to issues later @todo; Optimize:
 KEYCLOAK_REDIRECT_URIS: "{{ lookup('domains') | redirect_uris(lookup('applications'), lookup('tls', application_id, 'protocols.web'), '/*', KEYCLOAK_REDIRECT_FEATURES)

@@ -41,7 +41,7 @@ exports.register = function (shared) {
     expect(documentHtml).toContain(shared.env.dashboardJsBaseUrl);
     expect(documentHtml).toContain('"iframe.js"');
 
-    if (shared.isServiceEnabled("oidc")) {
+    if (shared.isServiceEnabled("sso")) {
       await shared.waitForResourceResponse(diagnostics.responses, `${shared.env.dashboardJsBaseUrl}/oidc.js`, "dashboard oidc script");
       expect(documentHtml).toContain('"oidc.js"');
     }

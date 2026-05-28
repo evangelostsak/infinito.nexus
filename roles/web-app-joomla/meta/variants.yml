@@ -24,7 +24,7 @@
     matomo:
       enabled: true
       shared: true
-    oidc:
+    sso:
       enabled: true
       shared: true
     prometheus:
@@ -34,7 +34,7 @@
       enabled: true
       shared: true
 - services:
-    oidc:
+    sso:
       enabled: false
       shared: false
     dashboard:

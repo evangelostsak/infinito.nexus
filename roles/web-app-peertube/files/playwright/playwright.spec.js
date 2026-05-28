@@ -4,7 +4,7 @@ const { decodeDotenvQuotedValue, normalizeBaseUrl, performKeycloakLoginForm, run
 const { isServiceEnabled } = require("./service-gating");
 test.use({ ignoreHTTPSErrors: true });
 
-const oidcEnabled = isServiceEnabled("oidc");
+const oidcEnabled = isServiceEnabled("sso");
 
 async function peertubeLogout(page, peertubeBaseUrl) {
   await page

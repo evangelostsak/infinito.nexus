@@ -5,9 +5,17 @@ logout:
 ldap:
   enabled: "{{ 'svc-db-openldap' in group_names }}"
   shared: "{{ 'svc-db-openldap' in group_names }}"
-oidc:
+sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
+  flavor: oauth2
+  oauth2:
+    origin:
+      host: application
+      port: "{{ lookup('config', 'web-app-gitea', 'services.gitea.ports.internal.http') }}"
+    acl:
+      blacklist:
+        - /user/login
 dashboard:
   enabled: "{{ 'web-app-dashboard' in group_names }}"
   shared: "{{ 'web-app-dashboard' in group_names }}"
@@ -46,7 +54,7 @@ gitea:
     internal:
       http: 3000
     local:
-      oauth2: 16488
+      sso: 16488
       http: 8002
     public:
       ssh: 2201
@@ -65,15 +73,6 @@ redis:
   mem_reservation: 0.2g
   mem_limit: 0.3g
   pids_limit: 512
-oauth2:
-  origin:
-    host: application
-    port: "{{ lookup('config', 'web-app-gitea', 'services.gitea.ports.internal.http') }}"
-  acl:
-    blacklist:
-      - /user/login
-  enabled: "{{ 'web-app-keycloak' in group_names }}"
-  shared: "{{ 'web-app-keycloak' in group_names }}"
 # nocheck: playwright-service-flag — css consumer, no Playwright surface (provider: web-svc-css)
 css:
   enabled: "{{ 'web-svc-css' in group_names }}"

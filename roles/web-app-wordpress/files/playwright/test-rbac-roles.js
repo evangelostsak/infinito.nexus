@@ -21,7 +21,7 @@ exports.register = function (shared) {
     test(`rbac: membership in ${role} group grants WordPress ${role} role`, async ({
       browser,
     }) => {
-      skipUnlessServiceEnabled("oidc");
+      skipUnlessServiceEnabled("sso");
       skipUnlessServiceEnabled("ldap");
       test.skip(
         shared.env.multisiteEnabled,

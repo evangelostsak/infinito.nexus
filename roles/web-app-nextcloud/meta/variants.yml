@@ -31,7 +31,7 @@
     matomo:
       enabled: true
       shared: true
-    oidc:
+    sso:
       enabled: true
       shared: true
     onlyoffice:
@@ -69,7 +69,7 @@
     matomo:
       enabled: false
       shared: false
-    oidc:
+    sso:
       enabled: false
       shared: false
     onlyoffice:
@@ -85,7 +85,7 @@
     ldap:
       enabled: true
       shared: true
-    oidc:
+    sso:
       enabled: false
       shared: false
     collabora:

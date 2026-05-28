@@ -103,9 +103,10 @@ class TestCombinedRoleIntrospection(unittest.TestCase):
             # `compose.services` envelope).
             _write(
                 root / "roles" / "web-app-wordpress" / ROLE_FILE_META_SERVICES,
-                "oidc:\n"
+                "sso:\n"
                 "  enabled: true\n"
                 "  shared: true\n"
+                "  flavor: oidc\n"
                 "dashboard:\n"
                 "  enabled: true\n"
                 "  shared: true\n",

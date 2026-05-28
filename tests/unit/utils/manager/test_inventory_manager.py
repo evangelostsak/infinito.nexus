@@ -225,7 +225,7 @@ class TestInventoryManager(TestCase):
 
             schema_data = {
                 "credentials": {
-                    "oauth2_proxy_cookie_secret": {
+                    "sso_proxy_cookie_secret": {
                         "description": "Cookie secret",
                         "algorithm": "plain",
                         "validation": {},
@@ -244,7 +244,7 @@ class TestInventoryManager(TestCase):
                 if p == role_path / ROLE_FILE_META_SERVICES:
                     # Per the file root IS the services map
                     # (no `compose.services` envelope).
-                    return {"oauth2": {"enabled": True}}
+                    return {"sso": {"enabled": True}}
                 return {}
 
             with (
@@ -268,9 +268,7 @@ class TestInventoryManager(TestCase):
                 inv = mgr.apply_schema()
 
                 creds = inv["applications"]["app_test"]["credentials"]
-                self.assertEqual(
-                    creds["oauth2_proxy_cookie_secret"], "generated-secret"
-                )
+                self.assertEqual(creds["sso_proxy_cookie_secret"], "generated-secret")
                 mock_vault.encrypt_string.assert_not_called()
 
     def test_oauth2_dynamic_flag_seeds_cookie_secret(self):
@@ -288,7 +286,7 @@ class TestInventoryManager(TestCase):
 
             schema_data = {
                 "credentials": {
-                    "oauth2_proxy_cookie_secret": {
+                    "sso_proxy_cookie_secret": {
                         "description": "Cookie secret",
                         "algorithm": "plain",
                         "validation": {},
@@ -306,7 +304,7 @@ class TestInventoryManager(TestCase):
                     return {"application_id": "app_test"}
                 if p == role_path / ROLE_FILE_META_SERVICES:
                     return {
-                        "oauth2": {
+                        "sso": {
                             "enabled": "{{ 'web-app-keycloak' in group_names }}",
                             "shared": "{{ 'web-app-keycloak' in group_names }}",
                         }
@@ -332,7 +330,7 @@ class TestInventoryManager(TestCase):
                 )
                 inv = mgr.apply_schema()
                 creds = inv["applications"]["app_test"]["credentials"]
-                self.assertEqual(creds["oauth2_proxy_cookie_secret"], "dynamic-secret")
+                self.assertEqual(creds["sso_proxy_cookie_secret"], "dynamic-secret")
 
     def test_oauth2_disabled_skips_cookie_secret(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -356,7 +354,7 @@ class TestInventoryManager(TestCase):
                 if p == role_path / ROLE_FILE_VARS_MAIN:
                     return {"application_id": "app_test"}
                 if p == role_path / ROLE_FILE_META_SERVICES:
-                    return {"oauth2": {"enabled": False}, "oidc": {"enabled": False}}
+                    return {"sso": {"enabled": False}}
                 return {}
 
             with (
@@ -382,7 +380,7 @@ class TestInventoryManager(TestCase):
                     .get("app_test", {})
                     .get("credentials", {})
                 )
-                self.assertNotIn("oauth2_proxy_cookie_secret", creds)
+                self.assertNotIn("sso_proxy_cookie_secret", creds)
 
     def test_non_plain_algorithm_encrypts_and_sets_vaultscalar(self):
         """

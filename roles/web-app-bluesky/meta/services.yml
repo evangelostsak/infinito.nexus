@@ -14,12 +14,14 @@ email:
 ldap:
   enabled: "{{ 'svc-db-openldap' in group_names }}"
   shared: "{{ 'svc-db-openldap' in group_names }}"
-oauth2:
+sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
-  origin:
-    host: bluesky-broker
-    port: 8080
+  flavor: oauth2
+  oauth2:
+    origin:
+      host: bluesky-broker
+      port: 8080
   # ACL — the role serves THREE domains (web/api/view) via the same
   # front-proxy oauth2 stack. Federation traffic to `api.bluesky.<DOMAIN>`
   # MUST stay reachable without an OIDC redirect, otherwise other PDS
@@ -29,13 +31,16 @@ oauth2:
   # gate. The default `/` path is gated and routes through
   # oauth2-proxy → bluesky-broker → social-app (the user-visible web
   # UI lives at `web.bluesky.<DOMAIN>`).
-  acl:
-    whitelist:
-      - /xrpc/
-      - /.well-known/
-      - /robots.txt
-  allowed_groups:
-    - "{{ lookup('rbac_group_path', application_id='web-app-bluesky', role='administrator') }}"
+    allowed_groups:
+      - "{{ lookup('rbac_group_path', application_id='web-app-bluesky', role='administrator') }}"
+# nocheck: shared
+# nocheck: dynamic-flag
+# nocheck: playwright-service-flag — internal sub-component (multi-entity role)
+    acl:
+      whitelist:
+        - /xrpc/
+        - /.well-known/
+        - /robots.txt
 # nocheck: shared
 # nocheck: dynamic-flag
 # nocheck: playwright-service-flag — internal sub-component (multi-entity role)
@@ -44,7 +49,7 @@ web:
   ports:
     local:
       http: 8031
-      oauth2: 16496
+      sso: 16496
   min_storage: 5GB
   cpus: "0.5"
   mem_reservation: 256m
@@ -109,7 +114,7 @@ bluesky:
       # oauth2-proxy listens here; the front-proxy routes the gated
       # default `/` path through this port. Picked so it doesn't
       # collide with the existing api/web/view bindings above.
-      oauth2: 16497
+      sso: 16497
   run_after:
     - web-app-matomo
     - web-app-keycloak

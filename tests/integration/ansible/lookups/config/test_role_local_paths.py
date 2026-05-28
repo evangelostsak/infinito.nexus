@@ -10,7 +10,7 @@ correct lookup context.
 
 The classifier is intentionally narrow: the app argument MUST be the
 literal identifier ``application_id``. Other variables like
-``_BBB_COTURN_ROLE`` or ``oauth2_proxy_application_id`` explicitly
+``_BBB_COTURN_ROLE`` or ``sso_proxy_application_id`` explicitly
 point at a different role at runtime and are out of scope for this
 check (the runtime target is unknown to a static scan). Such calls
 land in :mod:`test_variable_paths` instead, which only requires that
@@ -42,7 +42,7 @@ def _build_role_local_paths(
             continue
         # Only the literal `application_id` variable maps to "this role
         # reads its own config". Anything else (e.g. `_BBB_COTURN_ROLE`,
-        # `oauth2_proxy_application_id`) explicitly targets a different
+        # `sso_proxy_application_id`) explicitly targets a different
         # role at runtime and is intentionally out of scope here.
         if m.app_arg != "application_id":
             continue

@@ -11,7 +11,7 @@ const lamLoginPassword = ldapAdminPassword || lamPassword;
 
 exports.register = function (shared) {
   test.describe("keycloak → ldap write-through, verified via LAM", () => {
-    test.skip(!shared.env.oidcEnabled, "OIDC shared service disabled");
+    test.skip(!shared.env.ssoEnabled, "SSO shared service disabled");
     test.skip(!lamEnabled, "LAM not deployed (LAM_SERVICE_ENABLED=false)");
 
     test("middleName edited in Keycloak appears in LDAP via LAM", async ({ page, context }) => {

@@ -1,6 +1,6 @@
 # Identity and Access Management 🔐
 
-OpenCloud delegates authentication to the central Keycloak realm and consumes user and group data from the central OpenLDAP directory. Local password login is disabled when `services.oidc.enabled` is true (the default), and accounts are auto-provisioned on first OIDC login.
+OpenCloud delegates authentication to the central Keycloak realm and consumes user and group data from the central OpenLDAP directory. Local password login is disabled when `services.sso.enabled` is true (the default), and accounts are auto-provisioned on first OIDC login.
 
 ## OIDC 🪪
 

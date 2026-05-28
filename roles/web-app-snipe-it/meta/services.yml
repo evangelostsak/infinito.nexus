@@ -34,22 +34,24 @@ snipe-it:
   pids_limit: 512
   ports:
     local:
-      oauth2: 16489
+      sso: 16489
       http: 8035
   run_after:
     - web-app-matomo
     - web-app-keycloak
     - web-app-mailu
   lifecycle: beta
-oauth2:
+sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
-  origin:
-    host: snipe-it
-    port: "80"
-  acl:
-    blacklist:
-      - /login
+  flavor: oauth2
+  oauth2:
+    origin:
+      host: snipe-it
+      port: "80"
+    acl:
+      blacklist:
+        - /login
 css:
   enabled: "{{ 'web-svc-css' in group_names }}"
   shared: "{{ 'web-svc-css' in group_names }}"

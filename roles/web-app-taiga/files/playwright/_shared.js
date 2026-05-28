@@ -12,8 +12,10 @@ const loginPassword = decodeDotenvQuotedValue(process.env.LOGIN_PASSWORD);
 const oidcIssuerUrl = decodeDotenvQuotedValue(process.env.OIDC_ISSUER_URL);
 const oidcButtonText = decodeDotenvQuotedValue(process.env.OIDC_BUTTON_TEXT);
 const taigaBaseUrl = decodeDotenvQuotedValue(process.env.TAIGA_BASE_URL);
-const taigaOauth2Enabled = isServiceEnabled("oauth2");
-const taigaOidcEnabled = isServiceEnabled("oidc");
+const ssoEnabled = isServiceEnabled("sso");
+const ssoFlavor = decodeDotenvQuotedValue(process.env.SSO_FLAVOR) || "oidc";
+const taigaOauth2Enabled = ssoEnabled && ssoFlavor === "oauth2";
+const taigaOidcEnabled = ssoEnabled && ssoFlavor === "oidc";
 
 async function findFirstVisible(locators) {
   for (const locator of locators) {

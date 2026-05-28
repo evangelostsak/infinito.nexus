@@ -23,7 +23,7 @@
   when: BLUESKY_WEB_ENABLED | bool
 
 # Bind-mount safety: if a previous role-iteration ran without
-# sys-stk-backend (services.oauth2.enabled was effectively off), the
+# sys-stk-backend (services.sso.enabled was effectively off), the
 # oauth2-proxy container will have created the missing
 # `oauth2-proxy-keycloak.cfg` bind-mount source as an EMPTY DIRECTORY.
 # A subsequent deploy that templates the config would then write the
@@ -33,22 +33,22 @@
 # oauth2-proxy template back in.
 - name: "Heal oauth2-proxy cfg bind-mount corruption (if it became a directory in a prior deploy)"
   ansible.builtin.shell: >-
-    if [ -d "{{ BLUESKY_OAUTH2_PROXY_CFG_PATH }}" ]; then
-      container stop "{{ BLUESKY_OAUTH2_PROXY_CONTAINER }}" 2>/dev/null || true;
-      rm -rf "{{ BLUESKY_OAUTH2_PROXY_CFG_PATH }}";
+    if [ -d "{{ BLUESKY_SSO_PROXY_CFG_PATH }}" ]; then
+      container stop "{{ BLUESKY_SSO_PROXY_CONTAINER }}" 2>/dev/null || true;
+      rm -rf "{{ BLUESKY_SSO_PROXY_CFG_PATH }}";
     fi
   args:
     executable: /bin/bash
   changed_when: false
 
 # Use sys-stk-backend (not sys-svc-compose directly) so that the
-# oauth2-proxy sidecar is auto-included when `services.oauth2.enabled`
-# is true (variant A+ login-broker gate). The
-# sys-stk-backend role internally loads sys-svc-compose for the
-# compose layer and additionally pulls in web-app-oauth2-proxy and
-# its deterministic config template. Without this, oauth2-proxy
-# starts with /oauth2-proxy.cfg as an empty bind-mounted directory
-# and the sidecar restart-loops.
+# SSO-proxy sidecar is auto-included when services.sso.enabled is
+# true AND services.sso.flavor == 'oauth2' (variant A+ login-broker
+# gate). The sys-stk-backend role internally loads sys-svc-compose
+# for the compose layer and additionally renders the per-consumer
+# sidecar config via web-app-keycloak/tasks/sso_proxy.yml. Without
+# this, the sidecar starts with /oauth2-proxy.cfg as an empty
+# bind-mounted directory and restart-loops.
 - name: "include sys-stk-backend role"
   include_role:
     name: sys-stk-backend
@@ -67,7 +67,7 @@
     name: sys-stk-front-proxy
   vars:
     domain: "{{ BLUESKY_WEB_DOMAIN }}"
-    http_port: "{{ BLUESKY_BROKER_PORT if (lookup('config', application_id, 'services.oauth2.enabled') | bool) else BLUESKY_WEB_PORT }}"
+    http_port: "{{ BLUESKY_BROKER_PORT if (lookup('config', application_id, 'services.sso.enabled') | bool) else BLUESKY_WEB_PORT }}"
     webserver_extra_configuration: "{{ BLUESKY_FRONT_PROXY_CONTENT }}"
   when: BLUESKY_WEB_ENABLED | bool
 
@@ -86,7 +86,7 @@
   ansible.builtin.include_tasks: "07_native_admin.yml"
   when:
     - BLUESKY_WEB_ENABLED | bool
-    - not (lookup('config', application_id, 'services.oauth2.enabled') | bool)
+    - not (lookup('config', application_id, 'services.sso.enabled') | bool)
 
 # 03_social_app already ran before sys-svc-compose (above) so that the
 # compose build handler finds the cloned context.

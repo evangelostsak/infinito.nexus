@@ -24,9 +24,7 @@ email:
 keycloak:
   enabled: true
   shared: true
-  provides: oidc
-  covers:
-    - oauth2
+  provides: sso
   image: quay.io/keycloak/keycloak
   version: latest
   name: keycloak
@@ -55,6 +53,26 @@ keycloak:
     - web-app-matomo
     - web-app-mailu
   lifecycle: beta
+# Per-consumer SSO-proxy sidecar. Rendered via tasks/sso_proxy.yml
+# whenever a consumer role's `services.sso.flavor == 'oauth2'`.
+# The image name `oauth2-proxy` and config filename
+# `oauth2-proxy-keycloak.cfg` are upstream artefacts and stay literal;
+# every project-internal identifier uses the `sso_proxy` namespace.
+# nocheck: dynamic-flag — per-consumer fan-out
+# nocheck: playwright-service-flag — sidecar shape, no probe-able surface flag
+sso_proxy:
+  image: quay.io/oauth2-proxy/oauth2-proxy
+  version: latest
+  min_storage: 1GB
+  configuration_file: oauth2-proxy-keycloak.cfg
+  ports:
+    internal:
+      http: 4180
+  lifecycle: pre-alpha
+  cpus: "0.25"
+  mem_reservation: "64m"
+  mem_limit: "128m"
+  pids_limit: 256
 # nocheck: playwright-service-flag — DB engine, covered by role-local integration tests
 postgres:
   enabled: true # nocheck: dynamic-flag

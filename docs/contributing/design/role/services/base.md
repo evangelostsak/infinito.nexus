@@ -138,7 +138,7 @@ Examples:
 
 ```yaml
 lookup('service', 'matomo')
-lookup('service', 'oidc')
+lookup('service', 'sso')
 lookup('service', 'web-svc-cdn')
 ```
 

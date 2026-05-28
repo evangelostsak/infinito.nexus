@@ -25,7 +25,7 @@ test("baseline: Baserow responds on the canonical domain", async ({ page }) => {
 });
 
 test("OIDC: oauth2-proxy redirects unauthenticated visitors through Keycloak (variant 0)", async ({ page }) => {
-  skipUnlessServiceEnabled("oidc");
+  skipUnlessServiceEnabled("sso");
   expect(adminUsername).toBeTruthy(); expect(adminPassword).toBeTruthy(); expect(oidcIssuerUrl).toBeTruthy();
   const expectedAuth = `${oidcIssuerUrl}/protocol/openid-connect/auth`;
   const expectedBase = baseUrl.replace(/\/$/, "");
@@ -38,7 +38,7 @@ test("OIDC: oauth2-proxy redirects unauthenticated visitors through Keycloak (va
 
 test("LDAP: same oauth2-proxy gate when Keycloak federates user storage from LDAP (variant 1)", async ({ page }) => {
   skipUnlessServiceEnabled("ldap");
-  skipUnlessServiceEnabled("oidc");
+  skipUnlessServiceEnabled("sso");
   expect(adminUsername).toBeTruthy(); expect(adminPassword).toBeTruthy();
   const expectedBase = baseUrl.replace(/\/$/, "");
   await page.goto(`${expectedBase}/`);

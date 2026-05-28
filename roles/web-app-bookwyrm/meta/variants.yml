@@ -1,6 +1,6 @@
 ---
 # Matrix-deploy variant overrides. Both auth-flow
-# variants ride the same `web-app-oauth2-proxy` sidecar in front of
+# variants ride the same the `web-app-keycloak` SSO-proxy sidecar (flavor: oauth2) sidecar in front of
 # the BookWyrm web UI.
 
 # variant 0: OIDC variant (canonical default).
@@ -18,7 +18,7 @@
     matomo:
       enabled: true
       shared: true
-    oauth2:
+    sso:
       enabled: true
       shared: true
     postgres:
@@ -27,9 +27,6 @@
       enabled: true
       shared: true
     ldap:
-      enabled: true
-      shared: true
-    oidc:
       enabled: true
       shared: true
     css:
@@ -48,7 +45,7 @@
     matomo:
       enabled: false
       shared: false
-    oauth2:
+    sso:
       enabled: false
       shared: false
     postgres:
@@ -59,9 +56,6 @@
     ldap:
       enabled: false
       shared: false
-    oidc:
-      enabled: false
-      shared: false
     css:
       enabled: false
       shared: false
@@ -69,10 +63,7 @@
     ldap:
       enabled: true
       shared: true
-    oidc:
-      enabled: false
-      shared: false
-    oauth2:
+    sso:
       enabled: false
       shared: false
     css:

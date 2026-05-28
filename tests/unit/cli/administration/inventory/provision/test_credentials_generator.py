@@ -241,7 +241,7 @@ ansible_become_password: !vault |
                 "applications:\n"
                 "  web-app-taiga:\n"
                 "    credentials:\n"
-                '      oauth2_proxy_cookie_secret: ""\n',
+                '      sso_proxy_cookie_secret: ""\n',
                 encoding="utf-8",
             )
             vault_pw_file = tmp / ".password"
@@ -251,7 +251,7 @@ ansible_become_password: !vault |
 applications:
   web-app-taiga:
     credentials:
-      oauth2_proxy_cookie_secret: regenerated-secret
+      sso_proxy_cookie_secret: regenerated-secret
 """
 
             with (
@@ -282,7 +282,7 @@ applications:
 
             self.assertEqual(
                 doc["applications"]["web-app-taiga"]["credentials"][
-                    "oauth2_proxy_cookie_secret"
+                    "sso_proxy_cookie_secret"
                 ],
                 "regenerated-secret",
             )

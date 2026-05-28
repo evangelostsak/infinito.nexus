@@ -7,7 +7,7 @@ As an Infinito.Nexus admin, I want to host multiple Fediwalls under distinct pat
 ## Acceptance Criteria
 
 - [ ] The static Fediwall SPA is served from `https://fediwall.{{ DOMAIN_PRIMARY }}/<slug>/` for every published slug, and each request resolves the slug-specific `wall-config.json` from the same path.
-- [ ] An authenticated `POST /admin/walls` endpoint behind [`web-app-oauth2-proxy`](../../roles/web-app-oauth2-proxy/) accepts a `multipart/form-data` upload with fields `slug` and `file`, persists `wall-config.json` to `<persistent_volume>/walls/<slug>/wall-config.json`, and returns `201`.
+- [ ] An authenticated `POST /admin/walls` endpoint behind the [`web-app-keycloak`](../../roles/web-app-keycloak/) SSO-proxy sidecar accepts a `multipart/form-data` upload with fields `slug` and `file`, persists `wall-config.json` to `<persistent_volume>/walls/<slug>/wall-config.json`, and returns `201`.
 - [ ] Unauthenticated requests to any `/admin/*` endpoint are rejected with `401` (not `200` or `403`).
 - [ ] The `slug` is validated against `^[a-z0-9][a-z0-9-]{0,63}$`; path-traversal payloads (`..`, slashes, control chars) and reserved slugs (e.g. `admin`, `assets`, empty) are rejected with `400`.
 - [ ] The uploaded file is validated as JSON and against the Fediwall `Config` shape (every field from upstream [`src/types.ts`](https://github.com/defnull/fediwall/blob/main/src/types.ts) `Config`); malformed payloads are rejected with `422` and a field-level error list.

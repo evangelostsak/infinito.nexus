@@ -1,13 +1,15 @@
 ---
-oidc:
+sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
-  # per the documented Modus 3 contract: when `fallback_enabled` is true, the
-  # local Joomla form-login at `/administrator?fallback=local` is
-  # available as an emergency hatch (recommended default). Set to
-  # `false` for high-security deployments where the IdP is the only
-  # admin path (Modus 1 effective).
-  fallback_enabled: true
+  flavor: oidc
+  oidc:
+    # per the documented Modus 3 contract: when `fallback_enabled` is true, the
+    # local Joomla form-login at `/administrator?fallback=local` is
+    # available as an emergency hatch (recommended default). Set to
+    # `false` for high-security deployments where the IdP is the only
+    # admin path (Modus 1 effective).
+    fallback_enabled: true
 # nocheck: dynamic-flag
 ldap:
   enabled: false

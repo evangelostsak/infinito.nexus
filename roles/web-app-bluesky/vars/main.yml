@@ -80,7 +80,7 @@ BLUESKY_BROKER_PORT: "{{ lookup('config', application_id, 'services.broker.ports
 ## Credentials
 BLUESKY_BRIDGE_ENCRYPTION_KEY: "{{ lookup('config', application_id, 'credentials.bridge_encryption_key') }}"
 
-## oauth2-proxy bind-mount paths (used by the heal-bind-mount task)
-BLUESKY_OAUTH2_PROXY_CONTAINER: "{{ application_id | get_entity_name }}-oauth2-proxy"
-BLUESKY_OAUTH2_PROXY_CFG_PATH: "{{ [ lookup('container', application_id, 'directories.volumes'), lookup('config', 'web-app-oauth2-proxy', 'services.oauth2-proxy.configuration_file')
+## SSO-proxy bind-mount paths (used by the heal-bind-mount task)
+BLUESKY_SSO_PROXY_CONTAINER: "{{ application_id | get_entity_name }}-sso-proxy"
+BLUESKY_SSO_PROXY_CFG_PATH: "{{ [ lookup('container', application_id, 'directories.volumes'), lookup('config', 'web-app-keycloak', 'services.sso_proxy.configuration_file')
   ] | path_join }}"

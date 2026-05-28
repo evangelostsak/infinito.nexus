@@ -5,7 +5,7 @@ const moodleScopeName = decodeDotenvQuotedValue(process.env.MOODLE_OIDC_SCOPE_NA
 
 exports.register = function (shared) {
   test.describe("moodle keycloak scope wiring (variant 0)", () => {
-    test.skip(!shared.env.oidcEnabled, "OIDC shared service disabled");
+    test.skip(!shared.env.ssoEnabled, "SSO shared service disabled");
 
     test("Keycloak realm discovery advertises the moodle OIDC scope", async ({ request }) => {
       expect(shared.env.oidcIssuerUrl, "OIDC_ISSUER_URL must be set in env").toBeTruthy();

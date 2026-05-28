@@ -23,12 +23,8 @@ email:
   shared: false
 # nocheck: dynamic-flag
 # nocheck: oidc
-oidc:
-  enabled: false
-  shared: false
-# nocheck: dynamic-flag
-# nocheck: oauth2
-oauth2:
+# nocheck: sso
+sso:
   enabled: false
   shared: false
 # nocheck: dynamic-flag

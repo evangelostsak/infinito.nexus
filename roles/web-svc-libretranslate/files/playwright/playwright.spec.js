@@ -20,7 +20,7 @@ test("libretranslate /languages API stays reachable without auth", async ({ requ
   // The /languages endpoint is part of the API surface that
   // LibreTranslate authenticates with API keys; per requirement
   // 013 it MUST stay reachable even when the UI is OIDC-gated by
-  // the oauth2-proxy sidecar. The role's `services.oauth2.acl.whitelist`
+  // the oauth2-proxy sidecar. The role's `services.sso.oauth2.acl.whitelist`
   // includes /languages, /translate, /detect for exactly this reason.
   const response = await request.get(`${baseUrl}/languages`);
   expect(response.status(), "Expected libretranslate /languages status < 400 without auth").toBeLessThan(400);
@@ -32,7 +32,7 @@ test("libretranslate /languages API stays reachable without auth", async ({ requ
 });
 
 test("administrator: oauth2-proxy gates the LibreTranslate UI through Keycloak", async ({ page }) => {
-  skipUnlessServiceEnabled("oidc");
+  skipUnlessServiceEnabled("sso");
   expect(oidcIssuerUrl, "OIDC_ISSUER_URL must be set when OIDC is enabled").toBeTruthy();
   expect(adminUsername, "ADMIN_USERNAME must be set").toBeTruthy();
   expect(adminPassword, "ADMIN_PASSWORD must be set").toBeTruthy();

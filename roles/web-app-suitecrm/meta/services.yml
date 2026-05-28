@@ -1,8 +1,12 @@
 ---
-# nocheck: dynamic-flag
-oidc:
-  enabled: false
-  shared: false
+sso:
+  enabled: "{{ 'web-app-keycloak' in group_names }}"
+  shared: "{{ 'web-app-keycloak' in group_names }}"
+  flavor: oauth2
+  oauth2:
+    origin:
+      host: suitecrm
+      port: "80"
 logout:
   enabled: "{{ 'web-svc-logout' in group_names }}"
   shared: "{{ 'web-svc-logout' in group_names }}"
@@ -38,19 +42,13 @@ suitecrm:
   maintenance_mode: false
   ports:
     local:
-      oauth2: 16490
+      sso: 16490
       http: 8062
   run_after:
     - web-app-keycloak
     - web-app-mailu
     - web-app-matomo
   lifecycle: beta
-oauth2:
-  enabled: "{{ 'web-app-keycloak' in group_names }}"
-  shared: "{{ 'web-app-keycloak' in group_names }}"
-  origin:
-    host: suitecrm
-    port: "80"
 css:
   enabled: "{{ 'web-svc-css' in group_names }}"
   shared: "{{ 'web-svc-css' in group_names }}"

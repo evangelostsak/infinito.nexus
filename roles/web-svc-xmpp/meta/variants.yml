@@ -12,7 +12,7 @@
     ldap:
       shared: true
       enabled: true
-    oidc:
+    sso:
       enabled: true
       shared: true
     prometheus:
@@ -25,7 +25,7 @@
     ldap:
       shared: false
       enabled: false
-    oidc:
+    sso:
       enabled: false
       shared: false
     prometheus:
@@ -38,7 +38,7 @@
     ldap:
       shared: true
       enabled: true
-    oidc:
+    sso:
       enabled: false
       shared: false
     prometheus:

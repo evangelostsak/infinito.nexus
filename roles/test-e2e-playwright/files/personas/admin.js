@@ -49,15 +49,16 @@ async function runAdminFlow(page, opts = {}) {
     return;
   }
 
-  // Test B parity: oauth2-proxy gates the initial redirect chain,
-  // universal-logout rewrites the in-app logout click, and the shared
-  // CSP-injection helper (`assertCspInjections`) gates on `matomo` to
-  // verify every role's CSP allows the matomo tracker host when matomo
-  // is enabled. All three are consumed by the persona surface;
-  // reference them via safeIsEnabled with literal arguments so the
-  // env-gate parity guard recognises them as consumed by the spec via
-  // the shared persona helper.
-  safeIsEnabled("oauth2");
+  // Test B parity: the SSO-proxy sidecar (or in-app OIDC) gates the
+  // initial redirect chain, universal-logout rewrites the in-app
+  // logout click, and the shared CSP-injection helper
+  // (`assertCspInjections`) gates on `matomo` to verify every role's
+  // CSP allows the matomo tracker host when matomo is enabled. All
+  // three are consumed by the persona surface; reference them via
+  // safeIsEnabled with literal arguments so the env-gate parity guard
+  // recognises them as consumed by the spec via the shared persona
+  // helper.
+  safeIsEnabled("sso");
   safeIsEnabled("logout");
   safeIsEnabled("matomo");
 
@@ -79,7 +80,7 @@ async function runAdminFlow(page, opts = {}) {
 
   await page.context().clearCookies();
 
-  const oidcEnabled = safeIsEnabled("oidc");
+  const oidcEnabled = safeIsEnabled("sso");
 
   // Direct-app entry: bookmark-style navigation. The OAuth2-Proxy gate
   // fires on the first request, redirecting unauthenticated requests

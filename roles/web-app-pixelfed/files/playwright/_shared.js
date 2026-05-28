@@ -13,7 +13,7 @@ const { isServiceEnabled } = require("./service-gating");
 const oidcIssuerUrl = decodeDotenvQuotedValue(process.env.OIDC_ISSUER_URL);
 const pixelfedBaseUrl = decodeDotenvQuotedValue(process.env.PIXELFED_BASE_URL);
 
-const oidcEnabled = isServiceEnabled("oidc");
+const oidcEnabled = isServiceEnabled("sso");
 
 const kcBaseUrl   = decodeDotenvQuotedValue(process.env.KEYCLOAK_BASE_URL    || "").replace(/\/$/, "");
 const kcRealm     = decodeDotenvQuotedValue(process.env.KEYCLOAK_REALM       || "");

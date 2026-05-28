@@ -13,7 +13,7 @@
            playbook_dir ~ '/roles/sys-svc-proxy/templates/location/html.conf.j2',
            template_vars={
              'location': '^~ /html5client',
-             'oauth2_proxy_enabled': false,
+             'sso_proxy_enabled': false,
              'proxy_lua_enabled': false
            }
          ) | trim }}

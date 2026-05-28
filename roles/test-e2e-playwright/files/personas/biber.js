@@ -48,16 +48,16 @@ async function runBiberFlow(page, opts = {}) {
     return;
   }
 
-  // Test B parity: every role's env declares OAUTH2/LOGOUT/MATOMO
-  // _SERVICE_ENABLED (the auth chain runs through oauth2-proxy, the
-  // post-flow universal-logout JS rewrites the role's own logout
-  // button, and the shared CSP-injection helper gates on `matomo` to
-  // verify every role's CSP allows the matomo tracker host when matomo
-  // is enabled). All three flags are consumed by the persona surface;
-  // reference them via safeIsEnabled with literal arguments so the
-  // env-gate parity guard recognises them as consumed by the spec via
-  // the shared persona.
-  safeIsEnabled("oauth2");
+  // Test B parity: every role's env declares SSO/LOGOUT/MATOMO
+  // _SERVICE_ENABLED (the auth chain runs through Keycloak — either
+  // direct OIDC or the SSO-proxy sidecar, the post-flow universal-logout
+  // JS rewrites the role's own logout button, and the shared
+  // CSP-injection helper gates on `matomo` to verify every role's CSP
+  // allows the matomo tracker host when matomo is enabled). All three
+  // flags are consumed by the persona surface; reference them via
+  // safeIsEnabled with literal arguments so the env-gate parity guard
+  // recognises them as consumed by the spec via the shared persona.
+  safeIsEnabled("sso");
   safeIsEnabled("logout");
   safeIsEnabled("matomo");
 
@@ -86,7 +86,7 @@ async function runBiberFlow(page, opts = {}) {
   // arrived at the URL.
   await page.goto(`${appBaseUrl}/`, { waitUntil: "domcontentloaded" }).catch(() => {});
 
-  const oidcEnabled = safeIsEnabled("oidc");
+  const oidcEnabled = safeIsEnabled("sso");
 
   // Two auth shapes share a single login step:
   //   * oauth2-proxy gate: the goto is intercepted and the page lands

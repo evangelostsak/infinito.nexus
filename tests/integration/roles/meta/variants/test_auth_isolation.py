@@ -5,8 +5,8 @@ non-auth service-key that any other variant of the same role declares.
 Why
 ---
 
-When a variant pins exactly one auth flavor (LDAP vs. OIDC/OAuth2)
-the round under test exists to exercise that one auth path. Leaving
+When a variant pins exactly one auth flavor (LDAP vs. SSO) the round
+under test exists to exercise that one auth path. Leaving
 unrelated services (matomo, prometheus, dashboard, …) unset means
 their effective value is decided by the deep-merge against
 ``meta/services.yml`` at deploy time — usually a dynamic
@@ -31,8 +31,7 @@ A variant V is **auth-isolated** when:
    V's ``services:`` block:
 
    * LDAP flavor: ``services.ldap.enabled: true``
-   * OIDC/OAuth2 flavor: ``services.oidc.enabled: true`` OR
-     ``services.oauth2.enabled: true``
+   * SSO flavor: ``services.sso.enabled: true``
 
 2. AND no non-auth service-key in V's ``services:`` block has
    ``enabled: true``.
@@ -47,7 +46,7 @@ Obligation
 
 When V is auth-isolated, every service-key K that appears in any
 variant of this role's ``meta/variants.yml`` AND is not in
-``{ldap, oidc, oauth2}`` MUST be declared in V as
+``{ldap, sso}`` MUST be declared in V as
 ``enabled: false`` AND ``shared: false`` (literal).
 
 Statically-enabled keys are exempt: when the role's
@@ -84,8 +83,8 @@ if TYPE_CHECKING:
 ROLES_DIR = PROJECT_ROOT / "roles"
 
 _RULE = "variants-auth-isolation"
-_AUTH = frozenset({"ldap", "oidc", "oauth2"})
-_OIDC_GROUP = frozenset({"oidc", "oauth2"})
+_AUTH = frozenset({"ldap", "sso"})
+_SSO_GROUP = frozenset({"sso"})
 _LDAP_GROUP = frozenset({"ldap"})
 
 
@@ -99,9 +98,9 @@ def _auth_isolated(services: dict) -> bool:
     enabled=true. A variant that enables auth alongside non-auth
     services is a mixed integration test and falls outside this rule.
     """
-    oidc_on = any(_is_enabled_true(services.get(k)) for k in _OIDC_GROUP)
+    sso_on = any(_is_enabled_true(services.get(k)) for k in _SSO_GROUP)
     ldap_on = any(_is_enabled_true(services.get(k)) for k in _LDAP_GROUP)
-    if oidc_on == ldap_on:
+    if sso_on == ldap_on:
         return False
     for key, entry in services.items():
         if key in _AUTH:

@@ -16,9 +16,10 @@
 {% include 'roles/sys-svc-container/templates/networks.yml.j2' %}
 
 {# `compose_volumes` declares the top-level `volumes:` map (redis,
-   application data, etc.). Required when `services.oauth2.enabled`
-   pulls in the redis sidecar; otherwise compose rejects the project
-   with `service "redis" refers to undefined volume redis`. #}
+   application data, etc.). Required when `services.sso.enabled`
+   (flavor: oauth2) pulls in the redis sidecar; otherwise compose
+   rejects the project with `service "redis" refers to undefined
+   volume redis`. #}
 {{ lookup('applications') | compose_volumes(
     application_id,
 ) }}

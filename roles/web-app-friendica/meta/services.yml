@@ -8,13 +8,13 @@ friendica:
   min_storage: 10GB
   addons:
     # SSO is owned by the oauth2-proxy gate in front of the friendica vhost
-    # (services.oauth2.enabled=keycloak below). `ldapauth` stays enabled
+    # (services.sso.enabled=keycloak below). `ldapauth` stays enabled
     # because friendica has no header-trusted autocreate mechanism — the
     # ldap bind is the only path that materialises a friendica.user row.
     ldapauth: {}
   ports:
     local:
-      oauth2: 16501
+      sso: 16501
       http: 8028
   run_after:
     - web-app-matomo
@@ -30,9 +30,56 @@ logout:
 ldap:
   enabled: "{{ 'svc-db-openldap' in group_names }}"
   shared: "{{ 'svc-db-openldap' in group_names }}"
-oidc:
+sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
+  flavor: oauth2
+  oauth2:
+    origin:
+      host: application
+      port: "80"
+    # Whitelist semantics: the catch-all `location /` is gated by
+    # oauth2-proxy so the SSO entry (`/login`, the authenticated home /
+    # network / settings views, the admin panel) all force the Keycloak
+    # round-trip. A blacklist that opens `/` and only gates `/login`
+    # strips the POST body on the 401 redirect and breaks ldapauth.
+    # Everything Friendica considers naturally public — federation API,
+    # ActivityPub / NodeInfo / WebFinger discovery, public profile and
+    # post pages, the community feed, media, search, the theme assets
+    # and the static instance-info pages — is whitelisted here so
+    # anonymous visitors (and the Fediwall SPA, foreign instances, and
+    # crawlers) can reach those surfaces without being bounced through
+    # Keycloak.
+    acl:
+      whitelist:
+        # Federation + discovery
+        - /api/v1/
+        - /api/v2/
+        - /.well-known/host-meta
+        - /.well-known/webfinger
+        - /.well-known/nodeinfo
+        - /nodeinfo/
+        - /poco/
+        - /xrd
+        - /noscrape/
+        # Public user-visible content
+        - /profile/
+        - /display/
+        - /community
+        - /search
+        - /photo/
+        - /attach/
+        # Theme + static assets
+        - /static/
+        - /view/
+        - /robots.txt
+        - /opensearch
+        # Static instance-info pages
+        - /friendica
+        - /help/
+        - /credits
+        - /privacy
+        - /tos
 dashboard:
   enabled: "{{ 'web-app-dashboard' in group_names }}"
   shared: "{{ 'web-app-dashboard' in group_names }}"
@@ -46,54 +93,6 @@ email:
 mariadb:
   enabled: true # nocheck: dynamic-flag
   shared: "{{ 'svc-db-mariadb' in group_names }}"
-oauth2:
-  origin:
-    host: application
-    port: "80"
-  enabled: "{{ 'web-app-keycloak' in group_names }}"
-  shared: "{{ 'web-app-keycloak' in group_names }}"
-  # Whitelist semantics: the catch-all `location /` is gated by
-  # oauth2-proxy so the SSO entry (`/login`, the authenticated home /
-  # network / settings views, the admin panel) all force the Keycloak
-  # round-trip. A blacklist that opens `/` and only gates `/login`
-  # strips the POST body on the 401 redirect and breaks ldapauth.
-  # Everything Friendica considers naturally public — federation API,
-  # ActivityPub / NodeInfo / WebFinger discovery, public profile and
-  # post pages, the community feed, media, search, the theme assets
-  # and the static instance-info pages — is whitelisted here so
-  # anonymous visitors (and the Fediwall SPA, foreign instances, and
-  # crawlers) can reach those surfaces without being bounced through
-  # Keycloak.
-  acl:
-    whitelist:
-      # Federation + discovery
-      - /api/v1/
-      - /api/v2/
-      - /.well-known/host-meta
-      - /.well-known/webfinger
-      - /.well-known/nodeinfo
-      - /nodeinfo/
-      - /poco/
-      - /xrd
-      - /noscrape/
-      # Public user-visible content
-      - /profile/
-      - /display/
-      - /community
-      - /search
-      - /photo/
-      - /attach/
-      # Theme + static assets
-      - /static/
-      - /view/
-      - /robots.txt
-      - /opensearch
-      # Static instance-info pages
-      - /friendica
-      - /help/
-      - /credits
-      - /privacy
-      - /tos
 # nocheck: playwright-service-flag — verified by web-svc-css provider spec
 css:
   enabled: "{{ 'web-svc-css' in group_names }}"

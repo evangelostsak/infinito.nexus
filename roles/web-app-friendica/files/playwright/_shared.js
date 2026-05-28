@@ -7,7 +7,7 @@
 //   v0  oauth2 + ldap + oidc all enabled — double-login pattern below
 //   v1  every dynamic flag disabled      — only guest test runs
 //   v2  ldap enabled, oauth2 + oidc off  — direct in-app login (no Keycloak hop)
-// All three are selected at runtime by inspecting `OAUTH2_SERVICE_ENABLED`
+// All three are selected at runtime by inspecting `SSO_SERVICE_ENABLED`
 // and `LDAP_SERVICE_ENABLED` — the spec stays one file across variants.
 
 const { expect } = require("@playwright/test");
@@ -103,7 +103,7 @@ async function loginViaFriendicaDirect(page, username, password) {
 }
 
 function pickLoginPath() {
-  return isServiceEnabled("oauth2") ? loginViaOauth2ProxyAndFriendica : loginViaFriendicaDirect;
+  return isServiceEnabled("sso") ? loginViaOauth2ProxyAndFriendica : loginViaFriendicaDirect;
 }
 
 async function friendicaLogout(page) {

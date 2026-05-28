@@ -66,7 +66,7 @@ async function ensureUserInGroup(username, groupPath) {
 
 exports.register = function (shared) {
   test("biber (granted web-app-kix-user via Keycloak): full login flow (KIX → OAuth2-proxy → Keycloak → KIX-LDAP login → KIX UI → universal logout)", async ({ page }) => {
-    test.skip(!shared.env.oauth2Enabled, "OAuth2 shared service disabled");
+    test.skip(!shared.env.ssoEnabled,    "SSO shared service disabled");
     test.skip(!shared.env.ldapEnabled,   "LDAP shared service disabled");
     expect(kcBaseUrl,        "KEYCLOAK_BASE_URL must be set").toBeTruthy();
     expect(kcRealm,          "KEYCLOAK_REALM must be set").toBeTruthy();

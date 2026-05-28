@@ -9,7 +9,7 @@ exports.register = function (shared) {
     // by `biber: nextcloud oidc login and logout`.
     test.skip(
       shared.env.nextcloudOidcEnabled || !shared.env.nextcloudLdapEnabled,
-      "biber native login is only meaningful in the native+LDAP variant (services.oidc.enabled=false AND services.ldap.enabled=true); other flavors are covered by the OIDC test.",
+      "biber native login is only meaningful in the native+LDAP variant (services.sso.enabled=false AND services.ldap.enabled=true); other flavors are covered by the OIDC test.",
     );
 
     const biberContext = await browser.newContext({ ignoreHTTPSErrors: true });

@@ -65,17 +65,19 @@ cache:
   mem_limit: 512m
   pids_limit: 256
   min_storage: 1GB
-oauth2:
+sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
-  origin:
-    host: proxy
-    port: "80"
-  acl:
-    whitelist:
-      - /users/me
-      - /api/
-      - /oauth/token
+  flavor: oauth2
+  oauth2:
+    origin:
+      host: proxy
+      port: "80"
+    acl:
+      whitelist:
+        - /users/me
+        - /api/
+        - /oauth/token
 css:
   enabled: "{{ 'web-svc-css' in group_names }}"
   shared: "{{ 'web-svc-css' in group_names }}"
@@ -91,7 +93,7 @@ openproject:
       users: false
   ports:
     local:
-      oauth2: 16483
+      sso: 16483
       http: 8023
   run_after:
     - web-app-keycloak

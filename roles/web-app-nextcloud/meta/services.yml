@@ -1,8 +1,10 @@
 ---
-oidc:
+sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
-  flavor: ""
+  flavor: oidc
+  oidc:
+    plugin: ""
 # nocheck: playwright-service-flag — infrastructural sub-component (TURN/STUN)
 coturn:
   enabled: "{{ 'web-svc-coturn' in group_names }}"
@@ -54,7 +56,7 @@ nextcloud:
   pids_limit: 512
   default_quota: "1000000000"
   legacy_login_mask:
-    enabled: "{{ not (lookup('config', 'web-app-nextcloud', 'services.oidc.enabled') | bool) }}"
+    enabled: "{{ not (lookup('config', 'web-app-nextcloud', 'services.sso.enabled') | bool) }}"
   performance:
     php:
       memory_limit: "{{ ((ansible_facts['memtotal_mb'] | int) / 30) | int }}M"
@@ -119,7 +121,7 @@ nextcloud:
     news:
       enabled: true
     oidc_login:
-      enabled: "{{ lookup('oidc_flavor') == 'oidc_login' }}"
+      enabled: "{{ lookup('sso_oidc_plugin') == 'oidc_login' }}"
       incompatible_plugins:
         - user_oidc
         - sociallogin
@@ -139,7 +141,7 @@ nextcloud:
         - richdocuments
         - fileslibreofficeedit
     sociallogin:
-      enabled: "{{ lookup('oidc_flavor') == 'sociallogin' }}"
+      enabled: "{{ lookup('sso_oidc_plugin') == 'sociallogin' }}"
       incompatible_plugins:
         - user_oidc
         - oidc_login
@@ -150,15 +152,15 @@ nextcloud:
     tasks:
       enabled: true
     twofactor_nextcloud_notification:
-      enabled: "{{ not (lookup('config', 'web-app-nextcloud', 'services.oidc.enabled')) }}"
+      enabled: "{{ not (lookup('config', 'web-app-nextcloud', 'services.sso.enabled')) }}"
     twofactor_totp:
-      enabled: "{{ not (lookup('config', 'web-app-nextcloud', 'services.oidc.enabled')) }}"
+      enabled: "{{ not (lookup('config', 'web-app-nextcloud', 'services.sso.enabled')) }}"
     user_ldap:
       enabled: "{{ lookup('config', 'web-app-nextcloud', 'services.ldap.enabled') }}"
       user_directory:
         enabled: true
     user_oidc:
-      enabled: "{{ lookup('oidc_flavor') == 'user_oidc' }}"
+      enabled: "{{ lookup('sso_oidc_plugin') == 'user_oidc' }}"
       incompatible_plugins:
         - oidc_login
         - sociallogin

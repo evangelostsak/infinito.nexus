@@ -38,7 +38,7 @@ The role follows Infinito.Nexus conventions:
 
 ## Single sign-on
 
-OIDC is wired in via a sidecar `web-app-oauth2-proxy` that fronts the human-facing web UI only.
+OIDC is wired in via a sidecar `web-app-keycloak`'s SSO-proxy sidecar that fronts the human-facing web UI only.
 The programmatic API endpoints (`/translate`, `/detect`, …) MUST stay reachable with API-key auth even when the UI is gated, so the OIDC gate is restricted to the UI subpath; otherwise machine clients break.
 
 LDAP is not feasible: LibreTranslate authenticates programmatic clients with API keys, and LDAP cannot map onto that model.

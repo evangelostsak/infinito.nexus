@@ -1,9 +1,11 @@
 ---
-oidc:
+sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
-  email_by_username: true
-  enable_user_creation: true
+  flavor: oidc
+  oidc:
+    email_by_username: true
+    enable_user_creation: true
 logout:
   enabled: "{{ 'web-svc-logout' in group_names }}"
   shared: "{{ 'web-svc-logout' in group_names }}"

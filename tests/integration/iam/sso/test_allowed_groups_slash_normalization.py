@@ -35,8 +35,9 @@ from . import PROJECT_ROOT
 TEMPLATE_PATH = str(
     PROJECT_ROOT
     / "roles"
-    / "web-app-oauth2-proxy"
+    / "web-app-keycloak"
     / "templates"
+    / "sso_proxy"
     / "oauth2-proxy-keycloak.cfg.j2"
 )
 

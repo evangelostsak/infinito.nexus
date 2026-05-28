@@ -12,7 +12,7 @@ const moodleLdapBackedProfileFields = [
 exports.register = function (shared) {
   test.describe("moodle profile fields are read-only", () => {
     test.skip(!shared.env.ldapEnabled, "LDAP shared service disabled");
-    test.skip(shared.env.oidcEnabled, "covered by variant 1 LDAP-only run");
+    test.skip(shared.env.ssoEnabled, "covered by variant 1 LDAP-only run");
 
     test("biber profile-edit form locks all 19 Moodle profile-mapping fields", async ({ page }) => {
       await page.goto(`${shared.env.moodleBaseUrl}/login/index.php`);

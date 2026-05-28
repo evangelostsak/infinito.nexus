@@ -19,7 +19,7 @@ const adminPassword = decodeDotenvQuotedValue(process.env.ADMIN_PASSWORD);
 const biberUsername = decodeDotenvQuotedValue(process.env.BIBER_USERNAME);
 const biberPassword = decodeDotenvQuotedValue(process.env.BIBER_PASSWORD);
 const canonicalDomain = decodeDotenvQuotedValue(process.env.CANONICAL_DOMAIN);
-const oidcServiceEnabled = isServiceEnabled("oidc");
+const oidcServiceEnabled = isServiceEnabled("sso");
 
 function attachDiagnostics(page) {
   const consoleErrors = [];

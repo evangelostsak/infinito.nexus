@@ -42,10 +42,13 @@ def _apps(*, oidc_enabled=True, ldap_enabled=None, flavor=None, include_app=True
     """
     if not include_app:
         return {}
-    oidc_block: dict = {"enabled": oidc_enabled}
+    # `flavor=` here parameterises the Nextcloud-specific sub-flavor that
+    # is now services.sso.oidc.plugin (was renamed from the legacy path
+    # per the SSO flavor migration).
+    sso_block: dict = {"enabled": oidc_enabled}
     if flavor is not None:
-        oidc_block["flavor"] = flavor
-    services_block: dict = {"oidc": oidc_block}
+        sso_block["oidc"] = {"plugin": flavor}
+    services_block: dict = {"sso": sso_block}
     if ldap_enabled is not None:
         services_block["ldap"] = {"enabled": ldap_enabled}
     # Per the materialised payload moved from
@@ -61,8 +64,8 @@ class OidcFlavorLookupTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.mod = _load_module(
-            "plugins/lookup/oidc_flavor.py",
-            "oidc_flavor",
+            "plugins/lookup/sso_oidc_plugin.py",
+            "sso_oidc_plugin",
         )
 
     def setUp(self):
@@ -103,7 +106,7 @@ class OidcFlavorLookupTests(unittest.TestCase):
         )
 
     def test_missing_application_returns_empty(self):
-        # No nextcloud entry -> services.oidc.enabled defaults False ->
+        # No nextcloud entry -> services.sso.enabled defaults False ->
         # short-circuit to "" (no OIDC plugin should be active).
         self.assertEqual(
             self._run({"some-other-app": {}}),
@@ -111,7 +114,7 @@ class OidcFlavorLookupTests(unittest.TestCase):
         )
 
     def test_oidc_disabled_returns_empty(self):
-        # With services.oidc.enabled=false, no OIDC plugin must be selected,
+        # With services.sso.enabled=false, no OIDC plugin must be selected,
         # otherwise Nextcloud still hands off to Keycloak with a redirect_uri
         # the client no longer whitelists. Regression test for variant-1
         # nextcloud Playwright failures ("Invalid parameter: redirect_uri").

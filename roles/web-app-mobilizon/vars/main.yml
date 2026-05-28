@@ -8,4 +8,4 @@ mobilizon_host_conf_exs_file: "{{ [ lookup('container', application_id, 'directo
 mobilizon_version: "{{ lookup('config', application_id, 'services.mobilizon.version') }}"
 mobilizon_image: "{{ lookup('config', application_id, 'services.mobilizon.image') }}"
 mobilizon_container: "{{ lookup('config', application_id, 'services.mobilizon.name') }}"
-MOBILIZON_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.oidc.enabled') }}"
+MOBILIZON_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.sso.enabled') }}"

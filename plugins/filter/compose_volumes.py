@@ -17,6 +17,7 @@ try:
         get_database_service_config,
         resolve_database_service_key,
     )
+    from utils.roles.applications.services.sso import get_sso_config
 except ModuleNotFoundError:
     from docker_service_enabled import FilterModule as _DockerServiceEnabledFilter
     from get_entity_name import get_entity_name
@@ -26,6 +27,7 @@ except ModuleNotFoundError:
         get_database_service_config,
         resolve_database_service_key,
     )
+    from utils.roles.applications.services.sso import get_sso_config
 
 
 def _to_plain(obj: Any) -> Any:
@@ -96,7 +98,10 @@ def compose_volumes(
 
       - redis volume if:
           is_docker_service_enabled(redis)
-          or services.oauth2.enabled
+          or (services.sso.enabled AND services.sso.flavor == 'oauth2')
+
+        The SSO-proxy sidecar uses redis as its session store; only the
+        oauth2 flavor pulls it in. Pure-OIDC roles do NOT need redis.
 
         name: {{ application_id | get_entity_name }}_redis
 
@@ -150,17 +155,13 @@ def compose_volumes(
             )
         }
 
-    if _DockerServiceEnabledFilter.is_docker_service_enabled(
-        applications, application_id, "redis"
-    ) or bool(
-        get(
-            applications=applications,
-            application_id=application_id,
-            config_path="services.oauth2.enabled",
-            strict=False,
-            default=False,
-            skip_missing_app=True,
+    sso = get_sso_config(applications, application_id)
+
+    if (
+        _DockerServiceEnabledFilter.is_docker_service_enabled(
+            applications, application_id, "redis"
         )
+        or sso["is_proxy_gated"]
     ):
         volumes["redis"] = {"name": f"{get_entity_name(application_id)}_redis"}
 

@@ -2,7 +2,7 @@ const { test, expect } = require("@playwright/test");
 
 exports.register = function (shared) {
   test("taiga public discover hides local login fields when oidc is active", async ({ page }) => {
-    shared.skipUnlessServiceEnabled("oidc");
+    shared.skipUnlessServiceEnabled("sso");
 
     const taigaUrls = shared.getTaigaUrls();
 

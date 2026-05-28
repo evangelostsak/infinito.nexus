@@ -22,7 +22,7 @@
     matomo:
       enabled: true
       shared: true
-    oidc:
+    sso:
       enabled: true
       shared: true
     prometheus:
@@ -49,7 +49,7 @@
     matomo:
       enabled: false
       shared: false
-    oidc:
+    sso:
       enabled: false
       shared: false
     prometheus:
@@ -62,7 +62,7 @@
     ldap:
       enabled: true
       shared: true
-    oidc:
+    sso:
       enabled: false
       shared: false
     css:

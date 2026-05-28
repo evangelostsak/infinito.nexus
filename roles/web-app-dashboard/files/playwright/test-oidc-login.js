@@ -168,7 +168,7 @@ async function confirmLogoutIfNeeded(page) {
 
 exports.register = function (shared) {
   test("dashboard login automatically switches Login to Account and exposes Logout under Account", async ({ page }) => {
-    shared.skipUnlessServiceEnabled("oidc");
+    shared.skipUnlessServiceEnabled("sso");
     const diagnostics = shared.attachDiagnostics(page);
 
     await page.goto("/");

@@ -64,7 +64,7 @@ PORT_BANDS: # nocheck: unused-var  # consumed by the port-allocation plugin outs
     websocket:
       start: 4001
       end: 4099
-    oauth2:
+    sso:
       start: 16480
       end: 16519
     mariadb:

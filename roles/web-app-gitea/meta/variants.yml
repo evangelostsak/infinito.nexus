@@ -22,13 +22,10 @@
     matomo:
       enabled: true
       shared: true
-    oauth2:
+    sso:
       enabled: true
       shared: true
     prometheus:
-      enabled: true
-      shared: true
-    oidc:
       enabled: true
       shared: true
     css:
@@ -52,13 +49,10 @@
     matomo:
       enabled: false
       shared: false
-    oauth2:
+    sso:
       enabled: false
       shared: false
     prometheus:
-      enabled: false
-      shared: false
-    oidc:
       enabled: false
       shared: false
     css:
@@ -68,10 +62,7 @@
     ldap:
       enabled: true
       shared: true
-    oidc:
-      enabled: false
-      shared: false
-    oauth2:
+    sso:
       enabled: false
       shared: false
     css:

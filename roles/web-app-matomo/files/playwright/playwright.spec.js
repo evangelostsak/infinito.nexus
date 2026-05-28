@@ -128,7 +128,7 @@ test("matomo local administrator logs in and logs out", async ({ page }) => {
 // no longer drives this probe.
 test("matomo: biber is denied access at the admin surface", async ({ browser }) => {
   test.skip(
-    !isServiceEnabled("oauth2"),
+    !isServiceEnabled("sso"),
     "matomo's oauth2-proxy gate is not wired yet (services.yml oauth2.enabled=false; see TODO).",
   );
   test.skip(

@@ -49,7 +49,7 @@ Documentation MUST be brought into alignment, not the other way around.
 [ ${APP_BASE_URL}/ ]                    direct goto, bookmark-style entry
         │  oauth2-proxy redirects unauthenticated requests to Keycloak
         ▼
-[ Keycloak auth chain ]                 skipUnlessServiceEnabled('oidc' | 'oauth2' | 'ldap')
+[ Keycloak auth chain ]                 skipUnlessServiceEnabled('sso' | 'ldap')
         │  Keycloak login (biber)
         ▼
 [ authenticated app ]                   assert: user-visible authenticated element
@@ -70,7 +70,7 @@ For the dashboard, the parameterised scenario delegates to `web-app-dashboard/fi
 [ ${APP_BASE_URL}/ ]                    direct goto, bookmark-style entry
         │  oauth2-proxy redirects unauthenticated requests to Keycloak
         ▼
-[ Keycloak auth chain ]                 skipUnlessServiceEnabled('oidc' | 'oauth2' | 'ldap')
+[ Keycloak auth chain ]                 skipUnlessServiceEnabled('sso' | 'ldap')
         │  Keycloak login (administrator)
         ▼
 [ authenticated app ]                   assert: admin-visible element

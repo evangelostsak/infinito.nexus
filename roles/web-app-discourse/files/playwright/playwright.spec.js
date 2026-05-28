@@ -117,7 +117,7 @@ async function signInViaDashboardOidc(page, username, password, personaLabel) {
 }
 
 test("administrator: discourse OIDC login and logout", async ({ page }) => {
-  skipUnlessServiceEnabled("oidc");
+  skipUnlessServiceEnabled("sso");
   const diagnostics = attachDiagnostics(page);
 
   await signInViaDashboardOidc(page, adminUsername, adminPassword, "administrator");
@@ -147,7 +147,7 @@ test("administrator: discourse OIDC login and logout", async ({ page }) => {
 });
 
 test("biber: discourse OIDC login and logout", async ({ page }) => {
-  skipUnlessServiceEnabled("oidc");
+  skipUnlessServiceEnabled("sso");
   const diagnostics = attachDiagnostics(page);
 
   await signInViaDashboardOidc(page, biberUsername, biberPassword, "biber");

@@ -16,7 +16,7 @@
     matomo:
       enabled: true
       shared: true
-    oidc:
+    sso:
       enabled: true
       shared: true
     ollama:
@@ -32,7 +32,7 @@
       enabled: true
       shared: true
 - services:
-    oidc:
+    sso:
       enabled: false
       shared: false
     dashboard:
@@ -60,7 +60,7 @@
     ldap:
       enabled: true
       shared: true
-    oidc:
+    sso:
       enabled: false
       shared: false
     css:

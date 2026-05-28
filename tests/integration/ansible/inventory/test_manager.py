@@ -101,7 +101,7 @@ class TestInventoryManagerIntegration(TestCase):
             )
 
             (role_path / ROLE_FILE_META_SERVICES).write_text(
-                "mariadb:\n  enabled: true\n  shared: true\noidc:\n  enabled: true\n",
+                "mariadb:\n  enabled: true\n  shared: true\nsso:\n  enabled: true\n  flavor: oidc\n",
                 encoding="utf-8",
             )
 
@@ -149,11 +149,9 @@ class TestInventoryManagerIntegration(TestCase):
             self.assertIsInstance(root_creds["database_password"], str)
             self.assertNotIsInstance(root_creds["database_password"], VaultScalar)
 
-            self.assertIn("oauth2_proxy_cookie_secret", root_creds)
-            self.assertIsInstance(root_creds["oauth2_proxy_cookie_secret"], str)
-            self.assertNotIsInstance(
-                root_creds["oauth2_proxy_cookie_secret"], VaultScalar
-            )
+            self.assertIn("sso_proxy_cookie_secret", root_creds)
+            self.assertIsInstance(root_creds["sso_proxy_cookie_secret"], str)
+            self.assertNotIsInstance(root_creds["sso_proxy_cookie_secret"], VaultScalar)
 
             self.assertIn("api_key", root_creds)
             self.assertIsInstance(root_creds["api_key"], VaultScalar)
@@ -190,7 +188,7 @@ class TestInventoryManagerIntegration(TestCase):
             self.assertIn("replication_password", called_keys)
 
             self.assertNotIn("database_password", called_keys)
-            self.assertNotIn("oauth2_proxy_cookie_secret", called_keys)
+            self.assertNotIn("sso_proxy_cookie_secret", called_keys)
 
     def test_apply_schema_skips_schema_less_transitive_provider_role(self):
         """

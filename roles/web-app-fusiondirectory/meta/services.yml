@@ -17,21 +17,23 @@ matomo:
 ldap:
   enabled: true # nocheck: dynamic-flag
   shared: true # nocheck: dynamic-flag — LDAP IS the storage backend, never local
-oauth2:
+sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
-  origin:
-    host: fusiondirectory
-    port: 80
-  allowed_groups:
-    - "{{ lookup('rbac_group_path', application_id='web-app-fusiondirectory', role='administrator') }}"
+  flavor: oauth2
+  oauth2:
+    origin:
+      host: fusiondirectory
+      port: 80
+    allowed_groups:
+      - "{{ lookup('rbac_group_path', application_id='web-app-fusiondirectory', role='administrator') }}"
 fusiondirectory:
   image: nfrastack/fusiondirectory
   version: "1.5"
   name: fusiondirectory
   ports:
     local:
-      oauth2: 16487
+      sso: 16487
       http: 8038
   run_after:
     - web-app-matomo

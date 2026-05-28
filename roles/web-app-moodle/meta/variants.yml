@@ -28,7 +28,7 @@
     matomo:
       enabled: true
       shared: true
-    oidc:
+    sso:
       enabled: true
       shared: true
     prometheus:
@@ -43,7 +43,7 @@
     lam: # nocheck: variants-services-match
       enabled: true
       shared: true
-    oidc:
+    sso:
       enabled: false
       shared: false
     css:
@@ -85,7 +85,7 @@
     matomo:
       enabled: false
       shared: false
-    oidc:
+    sso:
       enabled: false
       shared: false
     prometheus:

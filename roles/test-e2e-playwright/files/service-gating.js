@@ -2,8 +2,8 @@
  * Shared service-gating helper for role-local Playwright specs.
  *
  * Contract:
- *   isServiceEnabled("oidc")         -> boolean
- *   requireService("oidc", testFn)   -> wraps a test, calling test.skip() when
+ *   isServiceEnabled("sso")         -> boolean
+ *   requireService("sso", testFn)   -> wraps a test, calling test.skip() when
  *                                       the service is disabled
  *   isServiceDisabledReason("email") -> "EMAIL_SERVICE_ENABLED=false" style
  *                                       diagnostic string, or null if enabled
@@ -103,7 +103,7 @@ function isServiceDisabledReason(name) {
  * the top of a test body, before Playwright has performed any action:
  *
  *   test("foo", async ({ page }) => {
- *     skipUnlessServiceEnabled("oidc");
+ *     skipUnlessServiceEnabled("sso");
  *     // real assertions below
  *   });
  *

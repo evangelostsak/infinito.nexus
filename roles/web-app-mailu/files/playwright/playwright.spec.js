@@ -81,7 +81,7 @@ test.beforeEach(() => {
 
 // Scenario I: direct mailu → SSO login → webinterface → admin interface → logout
 test("mailu: sso login, open admin interface, logout", async ({ page }) => {
-  safeSkipUnlessEnabled("oidc");
+  safeSkipUnlessEnabled("sso");
   const expectedOidcAuthUrl  = `${oidcIssuerUrl.replace(/\/$/, "")}/protocol/openid-connect/auth`;
   const expectedMailuBaseUrl = mailuBaseUrl.replace(/\/$/, "");
 
@@ -152,7 +152,7 @@ test("mailu: sso login, open admin interface, logout", async ({ page }) => {
 // Using isolated browser contexts models this correctly: no shared cookies, no shared
 // Keycloak SSO session. This avoids any logout/session-cleanup race condition entirely.
 test("mailu: biber sends email to administrator, administrator receives it", async ({ browser }) => {
-  safeSkipUnlessEnabled("oidc");
+  safeSkipUnlessEnabled("sso");
   const expectedOidcAuthUrl = `${oidcIssuerUrl.replace(/\/$/, "")}/protocol/openid-connect/auth`;
   const testSubject         = `Playwright test ${Date.now()}`;
 

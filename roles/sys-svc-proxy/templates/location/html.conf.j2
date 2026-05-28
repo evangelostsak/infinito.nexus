@@ -1,8 +1,8 @@
 {% set location = location | default("/")%}
 location {{location}}
 {
-  {% if oauth2_proxy_enabled | default(false) | bool %}
-    {% include 'roles/web-app-oauth2-proxy/templates/following_directives.conf.j2'%}
+  {% if sso_proxy_enabled | default(false) | bool %}
+    {% include 'roles/web-app-keycloak/templates/sso_proxy/following_directives.conf.j2'%}
   {% endif %}
 
   {% include 'roles/sys-svc-proxy/templates/headers/content_security_policy.conf.j2' %}

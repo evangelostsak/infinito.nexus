@@ -26,7 +26,7 @@
     matomo:
       enabled: true
       shared: true
-    oidc:
+    sso:
       enabled: true
       shared: true
     postgres:
@@ -56,7 +56,7 @@
     matomo:
       enabled: false
       shared: false
-    oidc:
+    sso:
       enabled: false
       shared: false
     postgres:
@@ -68,7 +68,7 @@
     ldap:
       enabled: true
       shared: true
-    oidc:
+    sso:
       enabled: false
       shared: false
     coturn:

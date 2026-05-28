@@ -33,7 +33,7 @@ OPENTALK_CONFIG_VOLUME: "{{ lookup('config', application_id, 'volumes.config') }
 OPENTALK_URL: "{{ lookup('tls', application_id, 'url.base') }}"
 OPENTALK_DOMAIN: "{{ lookup('domain', application_id) }}"
 
-OPENTALK_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.oidc.enabled') }}"
+OPENTALK_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.sso.enabled') }}"
 
 OPENTALK_LIVEKIT_API_KEY: "controller"
 OPENTALK_LIVEKIT_API_SECRET: "{{ lookup('config', application_id, 'credentials.livekit_api_secret') }}"

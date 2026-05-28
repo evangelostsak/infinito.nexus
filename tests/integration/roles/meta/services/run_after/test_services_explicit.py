@@ -14,8 +14,8 @@ Accepted shapes per ``run_after`` entry ``Y``:
 1. The consuming role declares ``services.<key>`` where ``<key>`` is
    either the primary service key for ``Y`` in the project-wide
    service registry, OR a key listed in ``Y``'s primary entity
-   ``covers:`` block (e.g. ``web-app-keycloak`` covers ``oauth2`` so
-   ``services.oauth2`` satisfies ``run_after: [web-app-keycloak]``).
+   ``provides:`` block (e.g. ``web-app-keycloak`` provides ``sso`` so
+   ``services.sso`` satisfies ``run_after: [web-app-keycloak]``).
    The flag MUST be ``enabled: true`` AND ``shared: true``.
 2. Or the same entry, with ``enabled`` / ``shared`` set to a Jinja
    conditional containing ``in group_names`` (e.g.
@@ -58,10 +58,10 @@ def _load_services(role_dir: Path) -> dict:
 class TestRunAfterServicesExplicit(unittest.TestCase):
     def test_run_after_entries_have_matching_service_flag(self):
         registry = build_service_registry_from_roles_dir(ROLES_DIR)
-        # role -> [primary_key, *covers]. Each role's primary service
-        # key plus its declared ``covers:`` (e.g. ``web-app-keycloak``
-        # covers ``oauth2`` so a consumer's ``services.oauth2`` block
-        # also satisfies ``run_after: [web-app-keycloak]``).
+        # role -> [primary_key, *provides]. Each role's primary service
+        # key plus its declared ``provides:`` (e.g. ``web-app-keycloak``
+        # provides ``sso`` so a consumer's ``services.sso`` block also
+        # satisfies ``run_after: [web-app-keycloak]``).
         role_to_candidate_keys = build_role_to_covered_keys(registry)
 
         offenders: list[str] = []

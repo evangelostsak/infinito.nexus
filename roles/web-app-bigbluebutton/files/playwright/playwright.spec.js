@@ -150,7 +150,7 @@ async function assertLoggedOut(page, bbbBaseUrl, personaLabel) {
 }
 
 test("administrator: bigbluebutton OIDC login and logout", async ({ page }) => {
-  skipUnlessServiceEnabled("oidc");
+  skipUnlessServiceEnabled("sso");
   const diagnostics = attachDiagnostics(page);
   await signInViaBbbOidc(page, adminUsername, adminPassword, "administrator");
   await bbbLogout(page, bbbBaseUrl);
@@ -159,7 +159,7 @@ test("administrator: bigbluebutton OIDC login and logout", async ({ page }) => {
 });
 
 test("biber: bigbluebutton OIDC login and logout", async ({ page }) => {
-  skipUnlessServiceEnabled("oidc");
+  skipUnlessServiceEnabled("sso");
   const diagnostics = attachDiagnostics(page);
   await signInViaBbbOidc(page, biberUsername, biberPassword, "biber");
   await bbbLogout(page, bbbBaseUrl);

@@ -38,7 +38,7 @@ SHOPWARE_SCHED_ENTRYPOINT: "{{ lookup('config', application_id, 'services.schedu
 SHOPWARE_WORKER_REPLICAS: "{{ lookup('config', application_id, 'services.worker.replicas') }}"
 
 # Auth integrations
-SHOPWARE_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.oidc.enabled') }}"
+SHOPWARE_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.sso.enabled') }}"
 SHOPWARE_LDAP_ENABLED: "{{ lookup('config', application_id, 'services.ldap.enabled') }}"
 
 # Redis Cache

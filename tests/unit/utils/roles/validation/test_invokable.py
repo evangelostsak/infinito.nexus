@@ -1,6 +1,7 @@
 # tests/unit/utils/test_invokable.py
 from __future__ import annotations
 
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -82,11 +83,24 @@ class TestInvokable(TestCase):
         self.assertEqual(grouped["universal"], ["update"])
 
     def test_list_invokables_by_type_exclude(self) -> None:
-        # Ensure exclude regex is honored
-        rd = self.roles_dir / "web-app-oauth2-proxy"
+        # Exercise the exclude_re path of DeploymentTypeRule via a
+        # synthetic rule. The historical DEFAULT_RULES exclude (the now
+        # dissolved oauth2-proxy helper role) was removed when its
+        # sidecar logic was absorbed into web-app-keycloak.
+        rd = self.roles_dir / "web-app-excluded"
         (rd / "vars").mkdir(parents=True, exist_ok=True)
         dump_yaml(rd / ROLE_FILE_VARS_MAIN, {})
 
+        rules = (
+            inv.DeploymentTypeRule(
+                name="server",
+                include_re=re.compile(r"^(web-app-|web-svc-)"),
+                exclude_re=re.compile(r"^web-app-excluded$"),
+            ),
+            inv.DeploymentTypeRule(
+                name="universal", include_re=re.compile(r".*"), exclude_re=None
+            ),
+        )
         with (
             patch.object(inv, "PROJECT_ROOT", self.tmp),
             patch.object(
@@ -95,9 +109,9 @@ class TestInvokable(TestCase):
                 return_value=["web-app", "update", "util-desk"],
             ),
         ):
-            grouped = inv.list_invokables_by_type()
+            grouped = inv.list_invokables_by_type(rules=rules)
 
-        self.assertNotIn("web-app-oauth2-proxy", grouped["server"])
+        self.assertNotIn("web-app-excluded", grouped["server"])
 
     def test_types_from_group_names(self) -> None:
         with (

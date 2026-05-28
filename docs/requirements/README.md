@@ -18,3 +18,4 @@ Its scope is user stories and acceptance criteria that define what the project m
 - 013 - Sub-Beta-to-Beta Lifecycle Promotion for `web-*` Roles
 - 015: Self-built Moodle image (replaces `bitnamilegacy/moodle`)
 - 015 - OpenCloud and OpenTalk IAM integration
+- 021 - SSO Flavor Migration (oauth2 + oidc → unified `sso` service)

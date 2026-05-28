@@ -21,7 +21,7 @@ test("administrator: oauth2-proxy gates the Postmarks web UI through Keycloak", 
   // not"; the integrated login path is provided by a sidecar
   // oauth2-proxy in front of the entire web UI.
   // The RBAC exception is documented in README.md.
-  skipUnlessServiceEnabled("oidc");
+  skipUnlessServiceEnabled("sso");
   expect(oidcIssuerUrl, "OIDC_ISSUER_URL must be set when OIDC is enabled").toBeTruthy();
   expect(adminUsername, "ADMIN_USERNAME must be set").toBeTruthy();
   expect(adminPassword, "ADMIN_PASSWORD must be set").toBeTruthy();

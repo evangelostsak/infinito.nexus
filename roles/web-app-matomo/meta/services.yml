@@ -1,15 +1,9 @@
 ---
 # nocheck: dynamic-flag
-# nocheck: oidc
-oidc:
+# nocheck: sso
+sso:
   enabled: false
   shared: false
-# nocheck: dynamic-flag
-# nocheck: oauth2
-oauth2:
-  enabled: false
-  shared: false
-  # TODO Enable oauth2 for matomo
 # nocheck: dynamic-flag
 logout:
   enabled: "{{ 'web-svc-logout' in group_names }}"

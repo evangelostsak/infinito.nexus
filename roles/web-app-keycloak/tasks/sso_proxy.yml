@@ -1,0 +1,37 @@
+---
+# Per-consumer SSO-proxy sidecar wiring.
+#
+# This task is invoked from `sys-stk-backend` during a consumer role's
+# deploy (`application_id` is the consumer, e.g. `web-app-postmarks`)
+# whenever the consumer's `services.sso.flavor` resolves to `oauth2`.
+# It renders the oauth2-proxy upstream-config file into the consumer's
+# volume directory; the compose stack picks up the sidecar container
+# via `roles/web-app-keycloak/templates/sso_proxy/container.yml.j2`,
+# included by `sys-svc-compose/templates/base.yml.j2`.
+#
+# `sso_proxy_application_id` is set by the caller to the consumer's
+# `application_id`. The config lookups inside the template resolve
+# against the consumer's `services.sso.*` block, NOT against
+# `web-app-keycloak`'s own config — that is why the static scan cannot
+# see the cross-role config path.
+
+- name: "SSO-proxy | sanity-check consumer is in the resolved list"
+  ansible.builtin.assert:
+    that:
+      - sso_proxy_application_id in (lookup('sso_proxy_consumers') | flatten)
+    fail_msg: >-
+      sys-stk-backend asked web-app-keycloak/tasks/sso_proxy.yml to render
+      the SSO-proxy sidecar for '{{ sso_proxy_application_id }}', but that
+      app does not appear in lookup('sso_proxy_consumers'). Either the
+      consumer's services.sso.flavor is not 'oauth2', or sso.enabled is
+      falsy. Fix the consumer's meta/services.yml.
+  when: MODE_DEBUG | bool
+
+- name: "SSO-proxy | render upstream-config for '{{ sso_proxy_application_id }}'"
+  template:
+    src: "{{ playbook_dir }}/roles/web-app-keycloak/templates/sso_proxy/oauth2-proxy-keycloak.cfg.j2"
+    dest: >-
+      {{ (sso_proxy_application_id | get_docker_paths(DIR_COMPOSITIONS)).directories.volumes
+         }}{{ lookup('config', 'web-app-keycloak', 'services.sso_proxy.configuration_file') }}
+  notify:
+    - compose up

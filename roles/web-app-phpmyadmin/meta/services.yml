@@ -19,7 +19,7 @@ phpmyadmin:
   autologin: false
   ports:
     local:
-      oauth2: 16481
+      sso: 16481
       http: 8034
   run_after:
     - web-app-matomo
@@ -29,14 +29,16 @@ phpmyadmin:
   mem_reservation: 128m
   mem_limit: 256m
   pids_limit: 256
-oauth2:
+sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
-  origin:
-    port: "80"
-    host: application
-  allowed_groups:
-    - "{{ lookup('rbac_group_path', application_id='web-app-phpmyadmin', role='administrator') }}"
+  flavor: oauth2
+  oauth2:
+    origin:
+      port: "80"
+      host: application
+    allowed_groups:
+      - "{{ lookup('rbac_group_path', application_id='web-app-phpmyadmin', role='administrator') }}"
 css:
   enabled: "{{ 'web-svc-css' in group_names }}"
   shared: "{{ 'web-svc-css' in group_names }}"

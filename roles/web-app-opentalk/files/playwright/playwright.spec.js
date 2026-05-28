@@ -75,7 +75,7 @@ async function ssoLoginAndAssertDashboard(page, username, password) {
 }
 
 test("opentalk sso login (administrator) lands on dashboard", async ({ page }) => {
-  skipUnlessServiceEnabled("oidc");
+  skipUnlessServiceEnabled("sso");
   expect(adminUsername, "LOGIN_USERNAME must be set").toBeTruthy();
   expect(adminPassword, "LOGIN_PASSWORD must be set").toBeTruthy();
 
@@ -83,7 +83,7 @@ test("opentalk sso login (administrator) lands on dashboard", async ({ page }) =
 });
 
 test("opentalk sso login (biber) lands on dashboard", async ({ browser }) => {
-  skipUnlessServiceEnabled("oidc");
+  skipUnlessServiceEnabled("sso");
   expect(biberUsername, "BIBER_USERNAME must be set").toBeTruthy();
   expect(biberPassword, "BIBER_PASSWORD must be set").toBeTruthy();
 

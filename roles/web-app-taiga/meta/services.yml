@@ -1,18 +1,15 @@
 ---
-oidc:
+sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
-  repository: https://github.com/infinito-nexus/taiga-oidc.git
-  ref: c623b753047ce9923f3e38614d86e81fc5eb2bb1
+  flavor: oidc
+  oidc:
+    repository: https://github.com/infinito-nexus/taiga-oidc.git
+    ref: c623b753047ce9923f3e38614d86e81fc5eb2bb1
 ldap:
   enabled: "{{ 'svc-db-openldap' in group_names }}"
   shared: "{{ 'svc-db-openldap' in group_names }}"
 # nocheck: dynamic-flag
-oauth2:
-  enabled: false
-  origin:
-    host: gateway
-    port: "80"
 logout:
   enabled: "{{ 'web-svc-logout' in group_names }}"
   shared: "{{ 'web-svc-logout' in group_names }}"
@@ -40,7 +37,7 @@ taiga:
   pids_limit: 512
   ports:
     local:
-      oauth2: 16491
+      sso: 16491
       http: 8027
   run_after:
     - web-app-matomo

@@ -7,23 +7,24 @@ from ansible.plugins.lookup import LookupBase
 
 from utils.cache.applications import get_merged_applications
 from utils.roles.applications.config import get
+from utils.roles.applications.services.sso import get_sso_config
 
 _APPLICATION_ID = "web-app-nextcloud"
 
 
 class LookupModule(LookupBase):
     """
-    lookup('oidc_flavor')
+    lookup('sso_oidc_plugin')
 
     Resolves the effective OIDC plugin flavor for the Nextcloud role.
 
     Resolution order:
-      1. "" if services.oidc.enabled is falsy (no OIDC plugin should be
+      1. "" if services.sso.enabled is falsy (no OIDC plugin should be
          active when the OIDC service itself is disabled — otherwise
          Nextcloud would still hand off to Keycloak using a redirect_uri
          that the client no longer whitelists).
       2. An explicit string value at applications['web-app-nextcloud']
-         .services.oidc.flavor (inventory override).
+         .services.sso.oidc.plugin (inventory override).
       3. "oidc_login" if services.ldap.enabled is truthy
          (pulsejet/nextcloud-oidc-login, proxy-LDAP capable).
       4. "sociallogin" otherwise (nextcloud/sociallogin).
@@ -34,7 +35,7 @@ class LookupModule(LookupBase):
 
     def run(self, terms, variables: dict[str, Any] | None = None, **kwargs):
         if terms:
-            raise AnsibleError("lookup('oidc_flavor') takes no positional terms.")
+            raise AnsibleError("lookup('sso_oidc_plugin') takes no positional terms.")
 
         templar = getattr(self, "_templar", None)
         variables = variables or getattr(self._templar, "available_variables", {}) or {}
@@ -50,23 +51,13 @@ class LookupModule(LookupBase):
             templar=templar,
         )
 
-        oidc_enabled = bool(
-            get(
-                applications=applications,
-                application_id=_APPLICATION_ID,
-                config_path="services.oidc.enabled",
-                strict=False,
-                default=False,
-                skip_missing_app=True,
-            )
-        )
-        if not oidc_enabled:
+        if not get_sso_config(applications, _APPLICATION_ID)["is_enabled"]:
             return [""]
 
         explicit = get(
             applications=applications,
             application_id=_APPLICATION_ID,
-            config_path="services.oidc.flavor",
+            config_path="services.sso.oidc.plugin",
             strict=False,
             default=None,
             skip_missing_app=True,

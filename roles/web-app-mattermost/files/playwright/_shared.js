@@ -3,7 +3,7 @@ const { expect } = require("@playwright/test");
 const { decodeDotenvQuotedValue } = require("./personas");
 const { isServiceEnabled } = require("./service-gating");
 
-const oidcEnabled = isServiceEnabled("oidc");
+const oidcEnabled = isServiceEnabled("sso");
 
 const env = {
   oidcIssuerUrl:     decodeDotenvQuotedValue(process.env.OIDC_ISSUER_URL),

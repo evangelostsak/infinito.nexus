@@ -8,7 +8,7 @@ exports.register = function (shared) {
   test("friendica: administrator native login and logout", async ({ page }) => {
     shared.skipUnlessServiceEnabled("ldap");
 
-    if (shared.isServiceEnabled("oauth2")) {
+    if (shared.isServiceEnabled("sso")) {
       // v0: full double-login via oauth2-proxy + Keycloak round-trip.
       await shared.loginViaOauth2ProxyAndFriendica(page, shared.env.adminUsername, shared.env.adminPassword);
     } else {

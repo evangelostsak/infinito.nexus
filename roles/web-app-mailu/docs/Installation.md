@@ -55,8 +55,9 @@ This role now supports OpenID Connect (OIDC) authentication with [Mailu-OIDC](ht
 To enable OIDC authentication, simply set the following variable:
 
 ```yaml
-oidc:
+sso:
   enabled: true
+  flavor: oidc
 ```
 
 For more details, check out the [Mailu-OIDC repository](https://github.com/heviat/Mailu-OIDC/tree/2024.06).

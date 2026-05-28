@@ -25,7 +25,7 @@ The workaround used here is the **GitLab OAuth2 provider** (`MM_GITLABSETTINGS_*
 
 The login button in the UI will read "SSO with Infinito.Nexus" (renamed via injected JavaScript). The underlying auth flow is standard OAuth2/OIDC against Keycloak.
 
-To enable SSO, set `services.oidc.enabled: true` (the default) in your inventory and ensure `OIDC.CLIENT.SECRET` is configured.
+To enable SSO, set `services.sso.enabled: true` (the default) in your inventory and ensure `OIDC.CLIENT.SECRET` is configured.
 
 ## Configuration
 
@@ -33,7 +33,7 @@ Key settings in `meta/services.yml` and `meta/server.yml`:
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `services.oidc.enabled` | `true` | Enable Keycloak SSO via GitLab OAuth2 |
+| `services.sso.enabled` | `true` | Enable Keycloak SSO via GitLab OAuth2 |
 | `services.postgres.shared` | `true` | Use the shared PostgreSQL service instead of a role-local one |
 | `services.mattermost.version` | `latest` | Docker image tag |
 | `server.domains.canonical` | `mattermost.{{ DOMAIN_PRIMARY }}` | Public domain |

@@ -176,10 +176,8 @@ class InventoryManager:
         cfg = self.load_role_config_by_path(role_path)
 
         services = cfg.get("services") or {}
-        oauth2 = services.get("oauth2") if isinstance(services, dict) else None
-        oauth2 = oauth2 if isinstance(oauth2, dict) else {}
-        oidc = services.get("oidc") if isinstance(services, dict) else None
-        oidc = oidc if isinstance(oidc, dict) else {}
+        sso = services.get("sso") if isinstance(services, dict) else None
+        sso = sso if isinstance(sso, dict) else {}
         if has_single_database_service({app_id: cfg}, app_id):
             apps = self.inventory.setdefault("applications", {})
             target = apps.setdefault(app_id, {})
@@ -187,12 +185,14 @@ class InventoryManager:
                 self.value_generator.generate_value("alphanumeric")
             )
 
-        if is_explicit_truth(oauth2.get("enabled")) or is_explicit_truth(
-            oidc.get("enabled")
-        ):
+        # The oauth2-proxy sidecar (flavor: oauth2) needs a cookie secret
+        # per consumer. Pure-OIDC roles do not, but the original branch
+        # provisioned it for either flavor — keep that behaviour by
+        # provisioning whenever services.sso.enabled is truthy.
+        if is_explicit_truth(sso.get("enabled")):
             apps = self.inventory.setdefault("applications", {})
             target = apps.setdefault(app_id, {})
-            target.setdefault("credentials", {})["oauth2_proxy_cookie_secret"] = (
+            target.setdefault("credentials", {})["sso_proxy_cookie_secret"] = (
                 self.value_generator.generate_value("random_hex_16")
             )
 

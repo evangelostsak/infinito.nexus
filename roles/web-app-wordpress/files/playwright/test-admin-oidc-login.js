@@ -7,7 +7,7 @@ exports.register = function (shared) {
   test("wordpress administrator can complete an OIDC login round-trip", async ({
     page,
   }) => {
-    skipUnlessServiceEnabled("oidc");
+    skipUnlessServiceEnabled("sso");
     const diagnostics = shared.attachDiagnostics(page);
     await shared.wpAdminLoginViaOidc(
       page,

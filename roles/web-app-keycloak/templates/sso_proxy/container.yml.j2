@@ -1,0 +1,18 @@
+{% if lookup('sso', application_id, 'is_proxy_gated') %}
+  sso-proxy:
+    image: {{ lookup('config','web-app-keycloak', 'services.sso_proxy.image') }}:{{ lookup('config','web-app-keycloak', 'services.sso_proxy.version') }}
+    restart: {{ DOCKER_RESTART_POLICY }}
+    command: --config /oauth2-proxy.cfg
+    container_name: {{ application_id | get_entity_name }}-sso-proxy
+    hostname: sso-proxy
+    ports:
+      - {{ DOCKER_BIND_HOST }}:{{ lookup('config', application_id, 'services.' ~ (application_id | get_entity_name) ~ '.ports.local.sso') }}:{{ lookup('config', 'web-app-keycloak', 'services.sso_proxy.ports.internal.http') }}/tcp
+    volumes:
+      - "{{ lookup('container', application_id, 'directories.volumes') }}{{ lookup('config', 'web-app-keycloak', 'services.sso_proxy.configuration_file') }}:/oauth2-proxy.cfg"
+    healthcheck:
+      test: ["CMD", "/bin/oauth2-proxy", "--version"]
+      interval: 30s
+      timeout: 5s
+      retries: 1
+      start_period: 5s
+{% endif %}

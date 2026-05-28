@@ -6,7 +6,7 @@ test.use({
   ignoreHTTPSErrors: true
 });
 
-const oidcEnabled = isServiceEnabled("oidc");
+const oidcEnabled = isServiceEnabled("sso");
 
 // `docker --env-file` preserves the quotes emitted by `dotenv_quote`,
 // so normalize these values before building URLs or typing credentials.

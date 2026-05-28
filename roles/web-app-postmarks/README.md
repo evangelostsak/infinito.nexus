@@ -17,7 +17,7 @@ This role installs and configures the Postmarks client container with basic doma
 
 ## Single sign-on
 
-OIDC is wired in via a sidecar `web-app-oauth2-proxy` in front of the Postmarks web UI; authenticated users are mapped by email or `sub` claim.
+OIDC is wired in via a sidecar `web-app-keycloak`'s SSO-proxy sidecar in front of the Postmarks web UI; authenticated users are mapped by email or `sub` claim.
 LDAP uses the same oauth2-proxy path with an LDAP backend.
 
 RBAC is not feasible: Postmarks has no in-app authorisation tier beyond "logged in or not".

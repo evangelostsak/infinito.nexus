@@ -16,7 +16,7 @@ def _apps(*, db_enabled=False, db_shared=False, redis=False, oauth2=False):
             "services": {
                 "postgres": {"enabled": db_enabled, "shared": db_shared},
                 "redis": {"enabled": redis},
-                "oauth2": {"enabled": oauth2},
+                "sso": {"enabled": oauth2, "flavor": "oauth2"},
             }
         },
         "svc-db-postgres": {"services": {"postgres": {"name": "postgres-central"}}},

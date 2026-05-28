@@ -95,7 +95,7 @@ class TestAffected(unittest.TestCase):
                 root / "roles" / "web-app-consumer" / ROLE_FILE_META_SERVICES,
                 {
                     "consumer": {},
-                    "oidc": {"enabled": True, "shared": True, "flavor": ""},
+                    "sso": {"enabled": True, "shared": True, "flavor": "oidc"},
                 },
             )
 

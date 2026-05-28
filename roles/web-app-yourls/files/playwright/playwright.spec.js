@@ -37,7 +37,7 @@ test.beforeEach(() => {
 test("yourls: admin sso login to admin panel, then logout", async ({
   page,
 }) => {
-  skipUnlessServiceEnabled("oidc");
+  skipUnlessServiceEnabled("sso");
   const base                = yourlsBaseUrl.replace(/\/$/, "");
     const adminUrl            = `${base}/admin/`;
     const expectedOidcAuthUrl = `${oidcIssuerUrl.replace(/\/$/, "")}/protocol/openid-connect/auth`;
@@ -87,7 +87,7 @@ test("yourls: admin sso login to admin panel, then logout", async ({
 test("yourls: biber is denied access to /admin/ after sso login", async ({
   browser,
 }) => {
-  skipUnlessServiceEnabled("oidc");
+  skipUnlessServiceEnabled("sso");
   const base                = yourlsBaseUrl.replace(/\/$/, "");
     const expectedOidcAuthUrl = `${oidcIssuerUrl.replace(/\/$/, "")}/protocol/openid-connect/auth`;
 

@@ -25,16 +25,16 @@ project-wide service registry is ``<role>``::
       enabled: "{{ '<role>' in group_names }}"
       shared:  "{{ '<role>' in group_names }}"
 
-Covered service keys (via the providing role's primary-entity
-``covers:`` list) reference the covering role rather than a primary
-provider role. For example, ``web-app-keycloak``'s primary entity
-declares ``covers: [oauth2]`` because the per-app oauth2-proxy only
-makes sense once Keycloak is on the host. So ``services.oauth2.*`` in
-any consumer MUST reference ``web-app-keycloak``::
+Provided service keys (via the providing role's primary-entity
+``provides:`` list) reference the providing role rather than the
+service key itself. ``web-app-keycloak``'s primary entity declares
+``provides: [sso]`` so ``services.sso.*`` in any consumer MUST
+reference ``web-app-keycloak``::
 
-    oauth2:
+    sso:
       enabled: "{{ 'web-app-keycloak' in group_names }}"
       shared:  "{{ 'web-app-keycloak' in group_names }}"
+      flavor:  oidc   # or oauth2 / saml
 
 Exemptions
 ----------
@@ -155,10 +155,10 @@ class TestServicesDynamicFlags(unittest.TestCase):
         registry = build_service_registry_from_roles_dir(ROLES_DIR)
         role_to_primary_key = build_role_to_primary_service_key(registry)
         primary_key_to_role = {key: role for role, key in role_to_primary_key.items()}
-        # Service keys covered transitively by another role (e.g.
-        # ``oauth2`` -> ``web-app-keycloak`` via that role's primary
-        # entity ``covers: [oauth2]`` declaration). Covered keys take
-        # precedence over the primary mapping for reference-role lookup.
+        # Service keys provided by another role (e.g. ``sso`` ->
+        # ``web-app-keycloak`` via that role's primary entity
+        # ``provides: [sso]`` declaration). Provided keys take precedence
+        # over the primary mapping for reference-role lookup.
         covered_key_to_role = build_covered_key_to_role(registry)
 
         offenders: list[str] = []

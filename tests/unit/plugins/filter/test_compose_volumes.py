@@ -35,7 +35,7 @@ class TestComposeVolumes(unittest.TestCase):
                 "services": {
                     "mariadb": {"enabled": False, "shared": False},
                     "redis": {"enabled": False},
-                    "oauth2": {"enabled": False},
+                    "sso": {"enabled": False, "flavor": "oauth2"},
                 }
             }
         }
@@ -105,10 +105,10 @@ class TestComposeVolumes(unittest.TestCase):
         self.assertIn("redis", data["volumes"])
         self.assertEqual(data["volumes"]["redis"]["name"], "app_redis")
 
-    def test_oauth2_enabled_adds_redis_volume_when_redis_disabled(self):
+    def test_sso_oauth2_flavor_enabled_adds_redis_volume_when_redis_disabled(self):
         apps = self._base_apps()
         apps["app"]["services"]["redis"]["enabled"] = False
-        apps["app"]["services"]["oauth2"]["enabled"] = True
+        apps["app"]["services"]["sso"]["enabled"] = True
 
         rendered = compose_volumes(apps, "app")
         data = self._parse_yaml(rendered)
@@ -116,10 +116,21 @@ class TestComposeVolumes(unittest.TestCase):
         self.assertIn("redis", data["volumes"])
         self.assertEqual(data["volumes"]["redis"]["name"], "app_redis")
 
-    def test_oauth2_null_does_not_add_redis_if_redis_disabled(self):
+    def test_sso_oidc_flavor_does_not_add_redis_if_redis_disabled(self):
         apps = self._base_apps()
         apps["app"]["services"]["redis"]["enabled"] = False
-        apps["app"]["services"]["oauth2"]["enabled"] = None
+        apps["app"]["services"]["sso"]["enabled"] = True
+        apps["app"]["services"]["sso"]["flavor"] = "oidc"
+
+        rendered = compose_volumes(apps, "app")
+        data = self._parse_yaml(rendered)
+
+        self.assertNotIn("redis", data["volumes"])
+
+    def test_sso_null_does_not_add_redis_if_redis_disabled(self):
+        apps = self._base_apps()
+        apps["app"]["services"]["redis"]["enabled"] = False
+        apps["app"]["services"]["sso"]["enabled"] = None
 
         rendered = compose_volumes(apps, "app")
         data = self._parse_yaml(rendered)

@@ -163,7 +163,7 @@ test("biber can access profile after OIDC login", async ({ page }) => {
 
 // Scenario V: SSO button visible when OIDC is enabled
 test("SSO login button is visible when OIDC is enabled", async ({ page }) => {
-  skipUnlessServiceEnabled("oidc");
+  skipUnlessServiceEnabled("sso");
   await page.goto(`${baseUrl}/users/sign_in`);
   await page.waitForLoadState("networkidle");
   const ssoButton = page.locator("a[href*='openid_connect']").first();

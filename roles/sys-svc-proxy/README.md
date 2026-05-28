@@ -20,7 +20,7 @@ The goal of this role is to deliver a **hassle-free, production-ready reverse pr
 - **Flexible vHost templates**: *basic* and *ws_generic* flavours cover standard HTTP and WebSocket applications.  
 - **Security headers**: sensible defaults plus optional X-Frame-Options / CSP based on application settings.  
 - **WebSocket & HTTP/2 aware**: upgrades, keep-alive tuning, and gzip already configured.  
-- **OAuth2 gating**: drop-in support when *web-app-oauth2-proxy* is present.  
+- **OAuth2 gating**: drop-in support when *web-app-keycloak's SSO-proxy sidecar* is present.  
 - **Modular includes**: headers, locations, and global snippets are factored for easy extension.
 
 ## Credits

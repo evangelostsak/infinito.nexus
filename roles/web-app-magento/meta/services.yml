@@ -4,15 +4,14 @@ logout:
   shared: "{{ 'web-svc-logout' in group_names }}"
 # nocheck: dynamic-flag
 # nocheck: oidc
-oidc:
-  enabled: false
-  shared: false
-oauth2:
-  origin:
-    host: nginx
-    port: "8080"
+sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
+  flavor: oauth2
+  oauth2:
+    origin:
+      host: nginx
+      port: "8080"
 dashboard:
   enabled: "{{ 'web-app-dashboard' in group_names }}"
   shared: "{{ 'web-app-dashboard' in group_names }}"
@@ -76,7 +75,7 @@ prometheus:
 magento:
   ports:
     local:
-      oauth2: 16504
+      sso: 16504
       http: 8052
   run_after:
     - web-app-keycloak

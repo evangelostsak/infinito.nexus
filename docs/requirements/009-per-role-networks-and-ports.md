@@ -145,7 +145,7 @@ view:
     local: { http: 8051 }   # was ports.localhost.http.web-app-bluesky_view
 ```
 
-**Role with co-located oauth2-proxy entity (`web-app-prometheus`):**
+**Role with SSO-proxy entity (`web-app-prometheus`, flavor: oauth2):**
 
 ```yaml
 # roles/web-app-prometheus/meta/services.yml
@@ -154,12 +154,17 @@ prometheus:
   ports:
     internal:
       http: 9090            # was compose.services.prometheus's internal port
-    local: { http: 8066 }
-oauth2:
+    local:
+      http: 8066
+      sso:  16492           # was ports.localhost.oauth2.web-app-prometheus
+sso:
   enabled: true
   shared:  true
-  ports:
-    local: { oauth2: 16492 }   # was ports.localhost.oauth2.web-app-prometheus
+  flavor:  oauth2
+  oauth2:
+    origin:
+      host: application
+      port: "9090"
 ```
 
 **Port-range role (`web-svc-coturn`, entity `coturn`):**
@@ -237,7 +242,7 @@ PORT_BANDS:
   local:
     http:           { start: 8001,  end: 8099 }    # Web HTTP listener (fronted by nginx)
     websocket:      { start: 4001,  end: 4099 }    # Websocket listener
-    oauth2:         { start: 16480, end: 16499 }   # oauth2-proxy callback
+    sso:            { start: 16480, end: 16499 }   # SSO-proxy (oauth2 flavor) callback
     database:       { start: 3306,  end: 5432 }    # Today: mariadb 3306, postgres 5432
     ldap:           { start: 389,   end: 389 }     # LDAP canonical (single port)
   public:

@@ -15,7 +15,7 @@ exports.register = function (shared) {
     // point the social-app is reached as an authenticated Bluesky user
     // without ever showing the synthesised app-password to the
     // browser.
-    shared.skipUnlessServiceEnabled("oidc");
+    shared.skipUnlessServiceEnabled("sso");
     const { baseUrl, oidcIssuerUrl, adminUsername, adminPassword } = shared.env;
     expect(adminUsername, "ADMIN_USERNAME must be set when OIDC is enabled").toBeTruthy();
     expect(adminPassword, "ADMIN_PASSWORD must be set when OIDC is enabled").toBeTruthy();

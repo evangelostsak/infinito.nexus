@@ -10,7 +10,7 @@ const { expect } = require("@playwright/test");
 const { decodeDotenvQuotedValue, performKeycloakLoginForm, runBiberFlow, runGuestFlow } = require("./personas");
 const { isServiceEnabled, skipUnlessServiceEnabled } = require("./service-gating");
 
-const oauth2Enabled = isServiceEnabled("oauth2");
+const ssoEnabled    = isServiceEnabled("sso");
 const ldapEnabled   = isServiceEnabled("ldap");
 
 const appBaseUrl      = decodeDotenvQuotedValue(process.env.APP_BASE_URL      || "").replace(/\/$/, "");
@@ -81,7 +81,7 @@ async function beforeEach({ page }) {
 
 module.exports = {
   env: {
-    oauth2Enabled,
+    ssoEnabled,
     ldapEnabled,
     appBaseUrl,
     canonicalDomain,

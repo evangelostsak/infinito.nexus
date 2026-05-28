@@ -15,7 +15,7 @@ exports.register = function (shared) {
     test.describe.configure({ retries: 1 });
 
     test("administrator and biber can exchange a direct message in element", async ({ browser }) => {
-      shared.skipUnlessServiceEnabled("oidc");
+      shared.skipUnlessServiceEnabled("sso");
       const {
         adminUsername,
         adminPassword,

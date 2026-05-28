@@ -11,14 +11,16 @@ matomo:
 email:
   enabled: "{{ 'web-app-mailu' in group_names }}"
   shared: "{{ 'web-app-mailu' in group_names }}"
-oauth2:
+sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
-  origin:
-    host: application
-    port: 80
-  allowed_groups:
-    - "{{ lookup('rbac_group_path', application_id='web-app-baserow', role='administrator') }}"
+  flavor: oauth2
+  oauth2:
+    origin:
+      host: application
+      port: 80
+    allowed_groups:
+      - "{{ lookup('rbac_group_path', application_id='web-app-baserow', role='administrator') }}"
 ldap:
   enabled: "{{ 'svc-db-openldap' in group_names }}"
   shared: "{{ 'svc-db-openldap' in group_names }}"
@@ -47,7 +49,7 @@ baserow:
   ports:
     local:
       http: 8017
-      oauth2: 16495
+      sso: 16495
   run_after:
     - web-app-matomo
     - web-app-keycloak

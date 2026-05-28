@@ -3,7 +3,7 @@
 OIDC to Bluesky-PDS app-password broker (variant A+ per requirement
 013, web-app-bluesky per-role notes).
 
-The broker sits behind `web-app-oauth2-proxy` and in front of the
+The broker sits behind `web-app-keycloak`'s SSO-proxy sidecar and in front of the
 official `@bluesky-social/social-app` web client. On a user's first
 OIDC-authenticated visit, the broker:
 

@@ -3,7 +3,7 @@ const { test, expect } = require("@playwright/test");
 exports.register = function (shared) {
   test("native: broker bypassed and PDS createSession accepts the deployed administrator (no oauth2)", async ({ page, playwright }) => {
     test.skip(
-      process.env.OAUTH2_SERVICE_ENABLED === "true",
+      process.env.SSO_SERVICE_ENABLED === "true",
       "Native login path only exists when oauth2 is disabled — when oauth2 is on, the broker owns provisioning and the OIDC test covers the journey.",
     );
     const { baseUrl, adminHandle, adminPassword, pdsBaseUrl } = shared.env;

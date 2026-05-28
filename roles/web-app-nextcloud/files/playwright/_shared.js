@@ -33,7 +33,7 @@ const nextcloudCredentialSubmitPattern = /^(sign in|log in)$/i;
 //   - OIDC only    -> "sociallogin" (nextcloud/sociallogin shows a
 //                                    "Log in with Keycloak" entry first)
 //   - no OIDC      -> "native"      (no Keycloak handoff; NC credential form)
-const nextcloudOidcEnabled = isServiceEnabled("oidc");
+const nextcloudOidcEnabled = isServiceEnabled("sso");
 const nextcloudLdapEnabled = isServiceEnabled("ldap");
 const nextcloudLoginFlavor = !nextcloudOidcEnabled
   ? "native"

@@ -46,4 +46,4 @@
 
 - name: "Install plg_system_keycloak (native OIDC)"
   include_tasks: 07_oidc_plugin.yml
-  when: lookup('config', application_id, 'services.oidc.enabled') | bool
+  when: lookup('config', application_id, 'services.sso.enabled') | bool

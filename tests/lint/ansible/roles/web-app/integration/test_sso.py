@@ -1,22 +1,17 @@
-"""Integration guard: every ``web-app-*`` role MUST front its login
-flow with one of the two project-wide SSO paths:
+"""Integration guard: every ``web-app-*`` role MUST declare an SSO
+path under the unified block:
 
-* native OIDC — ``services.oidc`` activated (both ``enabled`` and
-  ``shared`` truthy: literal ``true`` or the dynamic
-  ``"{{ 'web-app-keycloak' in group_names }}"`` form), OR
-* an oauth2-proxy in front of Keycloak — ``services.oauth2``
-  activated.
+* ``services.sso`` activated (both ``enabled`` and ``shared`` truthy:
+  literal ``true`` or the dynamic
+  ``"{{ 'web-app-keycloak' in group_names }}"`` form), with an
+  explicit ``flavor`` in ``{oidc, oauth2, saml}``.
 
-If ``services.oidc`` carries an explicit opt-out marker
-(``# nocheck: oidc`` directly above the key,
-paired with ``enabled: false`` and ``shared: false``), then
-``services.oauth2`` MUST be activated to fill the gap. Roles that
-legitimately have no login flow at all (static-content sites, etc.)
-opt out of BOTH by carrying both ``# nocheck: oidc`` AND ``# nocheck: oauth2``
-markers.
+Roles that legitimately have no login flow at all (static-content
+sites, etc.) opt out by carrying ``# nocheck: sso`` directly above
+the ``sso:`` key paired with ``enabled: false`` + ``shared: false``.
 
-The provider roles themselves (``web-app-keycloak``,
-``web-app-oauth2-proxy``) are exempt by definition.
+The provider role itself (``web-app-keycloak``) is exempt by
+definition.
 """
 
 from __future__ import annotations
@@ -38,8 +33,9 @@ _ROLE_PREFIX = "web-app-"
 # the providers).
 _PROVIDER_EXEMPT: set[str] = {
     "web-app-keycloak",
-    "web-app-oauth2-proxy",
 }
+
+_VALID_FLAVORS = {"oidc", "oauth2", "saml"}
 
 
 def _parsed_yaml(text: str) -> dict:
@@ -66,8 +62,8 @@ def _is_explicit_opt_out(text: str, parsed: dict, key: str) -> bool:
 
     1. ``services.<key>.enabled`` is False
     2. ``services.<key>.shared`` is False
-    3. ``# noqa: <key>`` (or ``# nocheck: <key>``) on the line directly
-       above the ``<key>:`` line in the raw YAML source.
+    3. ``# nocheck: <key>`` on the line directly above the ``<key>:``
+       line in the raw YAML source.
     """
     lines = text.splitlines()
     key_line_re = re.compile(rf"^(\s*){re.escape(key)}:\s*(#.*)?$")
@@ -83,10 +79,10 @@ def _is_explicit_opt_out(text: str, parsed: dict, key: str) -> bool:
 
 
 class TestWebAppSsoIntegration(unittest.TestCase):
-    """Every web-app-* role must offer SSO via oidc OR oauth2-proxy,
-    or carry explicit opt-out markers on both."""
+    """Every web-app-* role must offer SSO via the unified `sso:` block,
+    or carry an explicit opt-out marker."""
 
-    def test_oidc_or_oauth2_activated(self):
+    def test_sso_activated_with_explicit_flavor(self):
         root = PROJECT_ROOT
         roles_dir = root / "roles"
         self.assertTrue(roles_dir.is_dir(), f"missing: {roles_dir}")
@@ -117,39 +113,37 @@ class TestWebAppSsoIntegration(unittest.TestCase):
             if not isinstance(parsed, dict):
                 continue
 
-            oidc = _service_conf(parsed, "oidc")
-            oauth2 = _service_conf(parsed, "oauth2")
+            sso = _service_conf(parsed, "sso")
+            if _is_activated(sso):
+                flavor = sso.get("flavor")
+                if flavor not in _VALID_FLAVORS:
+                    rel = config.relative_to(root).as_posix()
+                    errors.append(
+                        f"[{role_path.name}] {rel}: services.sso is activated "
+                        f"but `flavor` is missing or invalid (got {flavor!r}). "
+                        f"Add `flavor: oidc` (default) or one of "
+                        f"{sorted(_VALID_FLAVORS)}."
+                    )
+                continue  # activated with a valid flavor → pass
 
-            oidc_active = _is_activated(oidc)
-            oauth2_active = _is_activated(oauth2)
-
-            if oidc_active or oauth2_active:
-                continue  # at least one SSO path activated → pass
-
-            oidc_opted_out = _is_explicit_opt_out(text, parsed, "oidc")
-            oauth2_opted_out = _is_explicit_opt_out(text, parsed, "oauth2")
-
-            if oidc_opted_out and oauth2_opted_out:
-                continue  # both explicitly opted out → no-login app
+            if _is_explicit_opt_out(text, parsed, "sso"):
+                continue  # explicitly opted out → no-login app
 
             rel = config.relative_to(root).as_posix()
             errors.append(
-                f"[{role_path.name}] {rel}: neither services.oidc nor "
-                f"services.oauth2 is activated. "
-                f"Set one of them to ``enabled: true`` + ``shared: true`` "
-                f"(literal or dynamic ``\"{{{{ '<role>' in group_names }}}}\"``), "
-                f"OR if oidc is intentionally not used, opt it out with a "
-                f"``# nocheck: oidc`` comment directly "
-                f"above ``oidc:`` paired with ``enabled: false`` + "
-                f"``shared: false`` AND activate ``services.oauth2``. "
-                f"For roles with no login flow at all, opt out BOTH "
-                f"``oidc`` and ``oauth2`` the same way."
+                f"[{role_path.name}] {rel}: services.sso is not activated. "
+                f"Set ``enabled: true`` + ``shared: true`` (literal or "
+                f"dynamic ``\"{{{{ 'web-app-keycloak' in group_names }}}}\"``) "
+                f"with an explicit ``flavor`` in {sorted(_VALID_FLAVORS)}, "
+                f"OR opt out with a ``# nocheck: sso`` comment directly "
+                f"above ``sso:`` paired with ``enabled: false`` + "
+                f"``shared: false``."
             )
 
         if errors:
             self.fail(
-                "Web-app roles must declare an SSO path "
-                "(oidc OR oauth2-proxy):\n\n" + "\n".join(errors)
+                "Web-app roles must declare an SSO path under "
+                "``services.sso``:\n\n" + "\n".join(errors)
             )
 
 

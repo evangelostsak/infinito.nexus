@@ -12,11 +12,11 @@ from plugins.filter.docker_service_enabled import (
 )
 from utils.cache.applications import get_merged_applications
 from utils.cache.yaml import dump_yaml_str
-from utils.roles.applications.config import get
 from utils.roles.applications.services.database import (
     get_database_service_config,
     resolve_database_service_key,
 )
+from utils.roles.applications.services.sso import get_sso_config
 
 
 def _resolve_local_database_host(
@@ -73,17 +73,11 @@ class LookupModule(LookupBase):
         if db_host:
             entries[db_host] = {"condition": "service_healthy"}
 
-        redis_enabled = _DockerServiceEnabledFilter.is_docker_service_enabled(
-            applications, application_id, "redis"
-        ) or bool(
-            get(
-                applications=applications,
-                application_id=application_id,
-                config_path="services.oauth2.enabled",
-                strict=False,
-                default=False,
-                skip_missing_app=True,
+        redis_enabled = (
+            _DockerServiceEnabledFilter.is_docker_service_enabled(
+                applications, application_id, "redis"
             )
+            or get_sso_config(applications, application_id)["is_proxy_gated"]
         )
         if redis_enabled:
             entries["redis"] = {"condition": "service_healthy"}

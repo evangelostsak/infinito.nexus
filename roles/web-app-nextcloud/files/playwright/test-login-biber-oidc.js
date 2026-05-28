@@ -4,7 +4,7 @@ exports.register = function (shared) {
   test("biber: nextcloud oidc login and logout", async ({ browser }) => {
     test.skip(
       !shared.env.nextcloudOidcEnabled,
-      "biber OIDC login requires services.oidc.enabled; the LDAP-backed native form covers the OIDC-off variant via `biber: nextcloud ldap login and logout (native form, ldap backing)`.",
+      "biber OIDC login requires services.sso.enabled; the LDAP-backed native form covers the OIDC-off variant via `biber: nextcloud ldap login and logout (native form, ldap backing)`.",
     );
 
     const biberContext = await browser.newContext({ ignoreHTTPSErrors: true });

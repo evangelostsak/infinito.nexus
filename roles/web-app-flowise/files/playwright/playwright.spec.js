@@ -27,7 +27,7 @@ test("baseline: Flowise responds on the canonical domain", async ({ page }) => {
 });
 
 test("OIDC: oauth2-proxy redirects unauthenticated visitors through Keycloak (variant 0)", async ({ page }) => {
-  skipUnlessServiceEnabled("oidc");
+  skipUnlessServiceEnabled("sso");
   expect(adminUsername, "ADMIN_USERNAME must be set when OIDC is enabled").toBeTruthy();
   expect(adminPassword, "ADMIN_PASSWORD must be set when OIDC is enabled").toBeTruthy();
   expect(oidcIssuerUrl, "OIDC_ISSUER_URL must be set when OIDC is enabled").toBeTruthy();

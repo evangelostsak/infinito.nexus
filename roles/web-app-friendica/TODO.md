@@ -30,7 +30,7 @@ SSO with auto-account-creation, which collapses the chain to a single
 4. Provision a SAML client in Keycloak (extend `roles/web-app-keycloak`'s
    client-provisioning logic which currently only handles OIDC clients).
    Attribute mappers, SP-metadata import, signing certificate alignment.
-5. Drop `services.oauth2.enabled` for friendica — SAML handles SSO end-to-
+5. Drop `services.sso.enabled` for friendica — SAML handles SSO end-to-
    end, oauth2-proxy in front would double-gate.
 6. Rewrite `files/playwright/playwright.spec.js` to use the generic admin/biber
    persona flows (remove `PERSONA_*_BLOCKED=true` from

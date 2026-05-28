@@ -102,8 +102,8 @@ class TestServiceGatingHelper(unittest.TestCase):
 
     def test_enabled_when_flag_true(self):
         proc = self._run_in_node(
-            "return helper.isServiceEnabled('oidc');",
-            env={"OIDC_SERVICE_ENABLED": "true"},
+            "return helper.isServiceEnabled('sso');",
+            env={"SSO_SERVICE_ENABLED": "true"},
         )
         self.assertEqual(
             proc.returncode, 0, msg=f"stderr={proc.stderr}\nstdout={proc.stdout}"
@@ -112,9 +112,9 @@ class TestServiceGatingHelper(unittest.TestCase):
 
     def test_disabled_when_flag_false(self):
         proc = self._run_in_node(
-            "return helper.isServiceEnabled('oidc');",
+            "return helper.isServiceEnabled('sso');",
             env={
-                "OIDC_SERVICE_ENABLED": "false",
+                "SSO_SERVICE_ENABLED": "false",
                 "EMAIL_SERVICE_ENABLED": "true",
             },
         )
@@ -125,17 +125,17 @@ class TestServiceGatingHelper(unittest.TestCase):
 
     def test_strict_value_rejected(self):
         proc = self._run_in_node(
-            "return helper.isServiceEnabled('oidc');",
-            env={"OIDC_SERVICE_ENABLED": "yes"},
+            "return helper.isServiceEnabled('sso');",
+            env={"SSO_SERVICE_ENABLED": "yes"},
         )
         self.assertNotEqual(proc.returncode, 0)
-        self.assertIn("OIDC_SERVICE_ENABLED", proc.stdout)
+        self.assertIn("SSO_SERVICE_ENABLED", proc.stdout)
 
     def test_unknown_service_hard_fails(self):
         # With a non-empty registry, an unknown service MUST throw.
         proc = self._run_in_node(
             "return helper.isServiceEnabled('oicd');",
-            env={"OIDC_SERVICE_ENABLED": "true"},
+            env={"SSO_SERVICE_ENABLED": "true"},
         )
         self.assertNotEqual(proc.returncode, 0)
         self.assertIn("Unknown service", proc.stdout)
@@ -144,7 +144,7 @@ class TestServiceGatingHelper(unittest.TestCase):
         # No *_SERVICE_ENABLED in the env at all => legacy staged .env;
         # the helper MUST treat every service as enabled (backwards-compat).
         proc = self._run_in_node(
-            "return helper.isServiceEnabled('oidc');",
+            "return helper.isServiceEnabled('sso');",
             env={},
         )
         self.assertEqual(
@@ -159,7 +159,7 @@ class TestServiceGatingHelper(unittest.TestCase):
             "return helper.isServiceDisabledReason('email');",
             env={
                 "EMAIL_SERVICE_ENABLED": "false",
-                "OIDC_SERVICE_ENABLED": "true",
+                "SSO_SERVICE_ENABLED": "true",
             },
         )
         self.assertEqual(
@@ -181,9 +181,8 @@ class TestServiceGatingHelper(unittest.TestCase):
 
     def test_require_service_runs_testfn_when_enabled(self):
         proc = self._run_in_node(
-            "const fn = helper.requireService('oidc', async () => 'HIT');"
-            "return fn({});",
-            env={"OIDC_SERVICE_ENABLED": "true"},
+            "const fn = helper.requireService('sso', async () => 'HIT');return fn({});",
+            env={"SSO_SERVICE_ENABLED": "true"},
         )
         self.assertEqual(
             proc.returncode, 0, msg=f"stderr={proc.stderr}\nstdout={proc.stdout}"
@@ -192,10 +191,9 @@ class TestServiceGatingHelper(unittest.TestCase):
 
     def test_require_service_skips_when_disabled(self):
         proc = self._run_in_node(
-            "const fn = helper.requireService('oidc', async () => 'HIT');"
-            "return fn({});",
+            "const fn = helper.requireService('sso', async () => 'HIT');return fn({});",
             env={
-                "OIDC_SERVICE_ENABLED": "false",
+                "SSO_SERVICE_ENABLED": "false",
                 "EMAIL_SERVICE_ENABLED": "true",
             },
         )
@@ -203,7 +201,7 @@ class TestServiceGatingHelper(unittest.TestCase):
             proc.returncode, 0, msg=f"stderr={proc.stderr}\nstdout={proc.stdout}"
         )
         self.assertIn("SKIP:", proc.stdout)
-        self.assertIn("OIDC_SERVICE_ENABLED=false", proc.stdout)
+        self.assertIn("SSO_SERVICE_ENABLED=false", proc.stdout)
 
 
 if __name__ == "__main__":

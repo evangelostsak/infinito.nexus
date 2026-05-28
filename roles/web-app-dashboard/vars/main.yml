@@ -46,7 +46,7 @@ DASHBOARD_KEYCLOAK_LOGIN_URL: >-
      ~ '&scope=openid%20profile%20email'
      ~ '&redirect_uri=' ~ (DASHBOARD_APP_BASE_URL | urlencode) }}
 DASHBOARD_KEYCLOAK_IFRAME_ENABLED: "{{ lookup('config','web-app-keycloak', 'services.dashboard.enabled') }}"
-DASHBOARD_OIDC_ENABLED: "{{ lookup('config', DASHBOARD_APPLICATION_ID, 'services.oidc.enabled') }}"
+DASHBOARD_OIDC_ENABLED: "{{ lookup('config', DASHBOARD_APPLICATION_ID, 'services.sso.enabled') }}"
 
 ## Docker
 DASHBOARD_CONTAINER: "{{ lookup('config', DASHBOARD_APPLICATION_ID, 'services.dashboard.name') }}"

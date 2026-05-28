@@ -4,7 +4,7 @@ exports.register = function (shared) {
   test("admin: nextcloud native login and logout (no oidc)", async ({ page }) => {
     test.skip(
       shared.env.nextcloudOidcEnabled,
-      "Admin native login is only exercised when services.oidc.enabled is false — when OIDC is on, the Keycloak handoff owns the journey and is covered by `admin: nextcloud oidc login and logout`.",
+      "Admin native login is only exercised when services.sso.enabled is false — when OIDC is on, the Keycloak handoff owns the journey and is covered by `admin: nextcloud oidc login and logout`.",
     );
 
     // `loginToStandaloneNextcloud` knows the native-flavor password swap

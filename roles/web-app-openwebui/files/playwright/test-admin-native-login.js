@@ -6,8 +6,8 @@ const { isServiceEnabled } = require("./service-gating");
 exports.register = function (shared) {
   test("administrator: openwebui native signup + sign-in", async ({ page }) => {
     test.skip(
-      isServiceEnabled("oidc"),
-      "Native login is only exercised when services.oidc.enabled is false — OIDC mode owns the admin journey and the local password is never set."
+      isServiceEnabled("sso"),
+      "Native login is only exercised when services.sso.enabled is false — SSO mode owns the admin journey and the local password is never set."
     );
     test.skip(
       isServiceEnabled("ldap"),

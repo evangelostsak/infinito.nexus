@@ -27,8 +27,8 @@ against the set of env keys consumed by the spec.
 Why
 ---
 
-Without this guard a role can declare ``OIDC_SERVICE_ENABLED`` in its
-env template, run with ``OIDC_SERVICE_ENABLED=false``, and still have
+Without this guard a role can declare ``SSO_SERVICE_ENABLED`` in its
+env template, run with ``SSO_SERVICE_ENABLED=false``, and still have
 its OIDC scenarios execute and fail — because nothing in the spec
 actually consults the flag. Mandates the gate; this
 test makes "flag declared but never gated" a hard error rather than a

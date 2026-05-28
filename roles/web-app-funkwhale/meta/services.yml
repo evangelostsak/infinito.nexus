@@ -5,7 +5,7 @@ funkwhale:
   min_storage: 20GB
   ports:
     local:
-      oauth2: 16502
+      sso: 16502
       http: 8012
   run_after:
     - web-app-matomo
@@ -56,15 +56,17 @@ redis:
 postgres:
   enabled: true # nocheck: dynamic-flag
   shared: "{{ 'svc-db-postgres' in group_names }}"
-oauth2:
-  origin:
-    host: front
-    port: "80"
-  acl:
-    blacklist:
-      - /login
+sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
+  flavor: oauth2
+  oauth2:
+    origin:
+      host: front
+      port: "80"
+    acl:
+      blacklist:
+        - /login
 css:
   enabled: "{{ 'web-svc-css' in group_names }}"
   shared: "{{ 'web-svc-css' in group_names }}"

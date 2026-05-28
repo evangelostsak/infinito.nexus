@@ -26,7 +26,7 @@ XWIKI_DATA_VOLUME: "{{ lookup('config', application_id, 'volumes.data') }}"
 
 # Feature toggles (must be set in meta/services.yml -> features)
 XWIKI_LDAP_ENABLED: "{{ lookup('config', application_id, 'services.ldap.enabled') }}"
-XWIKI_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.oidc.enabled') }}"
+XWIKI_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.sso.enabled') }}"
 XWIKI_SSO_ENABLED: "{{ (XWIKI_OIDC_ENABLED | bool) or (XWIKI_LDAP_ENABLED | bool) }}"
 
 # Admin credentials (must be provided via inventory/vault)

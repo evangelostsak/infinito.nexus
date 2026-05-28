@@ -40,7 +40,7 @@ MEDIAWIKI_ADMINISTRATOR_PASSWORD: "{{ lookup('config', application_id, 'credenti
 MEDIAWIKI_SECRET_KEY: "{{ lookup('config', application_id, 'credentials.secret_key') }}"
 
 # OIDC
-MEDIAWIKI_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.oidc.enabled') }}"
+MEDIAWIKI_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.sso.enabled') }}"
 MEDIAWIKI_OIDC_CLIENT_ID: "{{ OIDC.CLIENT.ID }}"
 MEDIAWIKI_OIDC_CLIENT_SECRET: "{{ OIDC.CLIENT.SECRET }}"
 MEDIAWIKI_OIDC_ISSUER: "{{ OIDC.CLIENT.ISSUER_URL }}"

@@ -56,7 +56,7 @@ test("OIDC: native plg_system_keycloak redirects unauthenticated visitors to Key
   // local Joomla user with RBAC group memberships derived from the
   // Keycloak `groups` claim, and lands the user back on the original
   // URL.
-  skipUnlessServiceEnabled("oidc");
+  skipUnlessServiceEnabled("sso");
   expect(oidcIssuerUrl, "OIDC_ISSUER_URL must be set when OIDC is enabled").toBeTruthy();
 
   const expectedOidcAuthUrl = `${oidcIssuerUrl}/protocol/openid-connect/auth`;
@@ -92,7 +92,7 @@ test("OIDC: /administrator?fallback=local hatch bypasses Keycloak and accepts th
   // (per the documented Modus 3 contract). It MUST NOT redirect to the IdP,
   // and the local form MUST accept the bootstrap administrator
   // credentials.
-  skipUnlessServiceEnabled("oidc");
+  skipUnlessServiceEnabled("sso");
   const expectedJoomlaBaseUrl = joomlaBaseUrl.replace(/\/$/, "");
 
   await performJoomlaAdminFormLogin(page, expectedJoomlaBaseUrl, adminUsername, adminPassword);

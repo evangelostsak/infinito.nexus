@@ -4,7 +4,7 @@ exports.register = function (shared) {
   test("admin: nextcloud oidc login and logout", async ({ page }) => {
     test.skip(
       !shared.env.nextcloudOidcEnabled,
-      "Admin OIDC login is only exercised when services.oidc.enabled is true — the native form covers the OIDC-off variant.",
+      "Admin OIDC login is only exercised when services.sso.enabled is true — the native form covers the OIDC-off variant.",
     );
 
     await shared.loginToStandaloneNextcloud(page);

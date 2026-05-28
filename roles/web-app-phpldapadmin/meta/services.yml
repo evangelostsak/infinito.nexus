@@ -17,7 +17,7 @@ phpldapadmin:
   min_storage: 1GB
   ports:
     local:
-      oauth2: 16486
+      sso: 16486
       http: 8037
   run_after:
     - web-app-matomo
@@ -27,14 +27,16 @@ phpldapadmin:
   mem_reservation: 128m
   mem_limit: 256m
   pids_limit: 256
-oauth2:
+sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
-  origin:
-    host: application
-    port: 8080
-  allowed_groups:
-    - "{{ lookup('rbac_group_path', application_id='web-app-phpldapadmin', role='administrator') }}"
+  flavor: oauth2
+  oauth2:
+    origin:
+      host: application
+      port: 8080
+    allowed_groups:
+      - "{{ lookup('rbac_group_path', application_id='web-app-phpldapadmin', role='administrator') }}"
 css:
   enabled: "{{ 'web-svc-css' in group_names }}"
   shared: "{{ 'web-svc-css' in group_names }}"

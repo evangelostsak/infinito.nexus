@@ -5,7 +5,7 @@ const { skipUnlessServiceEnabled } = require("./service-gating");
 
 exports.register = function (shared) {
   test("biber: openwebui OIDC login and logout", async ({ page }) => {
-    skipUnlessServiceEnabled("oidc");
+    skipUnlessServiceEnabled("sso");
     const diagnostics = shared.attachDiagnostics(page);
 
     await shared.signInViaDashboardOidc(
