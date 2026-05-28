@@ -1,5 +1,5 @@
 Name:           infinito-nexus
-Version:        8.0.0
+Version:        8.0.1
 Release:        1%{?dist}
 Summary:        Meta package for Infinito.Nexus host dependencies
 
@@ -58,6 +58,35 @@ install -d %{buildroot}%{_docdir}/%{name}
 %doc %{_docdir}/%{name}/DEPENDENCIES
 
 %changelog
+* Thu May 28 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 8.0.1-1
+- Restores Debian build viability, satisfies the new eslint rules, moves the requirements archive CLI to kpmx, adds make requirements-archive, pins pkgmgr to v1.14.0, sharpens the agent iteration docs, and rolls up dependabot bumps.
+
+**Added**
+
+* make requirements-archive installs kpmx and runs pkgmgr archive docs/requirements in one shot
+
+**Fixed**
+
+* debian/changelog source-package name restored to infinito-nexus so dpkg-source builds succeed again
+* eslint preserve-caught-error and no-useless-assignment violations in five Playwright helpers
+
+**Changed**
+
+* Archive CLI for completed requirement files moved out of cli/contributing/requirements/archive into pkgmgr.actions.archive shipped by kpmx; the lint test inlines the discovery and unchecked-counter primitives so the suite no longer pulls kpmx as a dependency
+* pkgmgr dependency pinned to v1.14.0 (was floating stable), bringing in the package_name resolver and pkgmgr release --retry
+
+**Docs**
+
+* docs/agents/action/iteration/role.md sharpens the in-container verify rule and full-matrix flow
+
+**Dependencies**
+
+* eslint, eslint-plugin-playwright, eslint/js, actions/setup-python, actions/create-github-app-token
+
+**Contributors**
+
+* [Kevin Veen-Birkenbach](https://www.veen.world/)
+
 * Wed May 27 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 8.0.0-1
 - This release lands the matrix-deploy hardening pass, an interactive console for the CLI, the bundles workflow, a per-consumer Postgres builder, a shared Playwright persona library across every web role, a SPOT env pipeline under the INFINITO_ namespace, and a new education-suite bundle (openwebui + mailu) alongside the KIX Service Management role.
 
