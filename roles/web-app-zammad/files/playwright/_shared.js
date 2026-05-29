@@ -3,7 +3,7 @@ const { expect } = require("@playwright/test");
 const { decodeDotenvQuotedValue, normalizeBaseUrl, performKeycloakLoginForm, runGuestFlow } = require("./personas");
 const { isServiceEnabled, skipUnlessServiceEnabled } = require("./service-gating");
 
-const oidcEnabled    = isServiceEnabled("oidc");
+const oidcEnabled    = isServiceEnabled("sso");
 const oidcIssuerUrl  = normalizeBaseUrl(process.env.OIDC_ISSUER_URL || "");
 const zammadBaseUrl  = normalizeBaseUrl(process.env.ZAMMAD_BASE_URL || "");
 const adminUsername    = decodeDotenvQuotedValue(process.env.ADMIN_USERNAME);

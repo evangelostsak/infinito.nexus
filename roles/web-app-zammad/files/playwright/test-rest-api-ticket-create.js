@@ -2,7 +2,7 @@ const { test, expect, request } = require("@playwright/test");
 
 exports.register = function (shared) {
   test("administrator: REST API POST /api/v1/tickets creates a ticket", async () => {
-    shared.skipUnlessServiceEnabled("oidc");
+    shared.skipUnlessServiceEnabled("sso");
     expect(shared.env.adminApiUsername, "ADMIN_USERNAME must be set").toBeTruthy();
     expect(shared.env.adminApiPassword, "ADMIN_PASSWORD must be set").toBeTruthy();
 

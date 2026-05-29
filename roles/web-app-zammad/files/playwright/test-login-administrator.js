@@ -2,7 +2,7 @@ const { test, expect } = require("@playwright/test");
 
 exports.register = function (shared) {
   test("administrator: zammad OIDC login lands on authenticated surface", async ({ page }) => {
-    shared.skipUnlessServiceEnabled("oidc");
+    shared.skipUnlessServiceEnabled("sso");
     expect(shared.env.adminUsername, "ADMIN_USERNAME must be set").toBeTruthy();
     expect(shared.env.adminPassword, "ADMIN_PASSWORD must be set").toBeTruthy();
     expect(shared.env.oidcIssuerUrl, "OIDC_ISSUER_URL must be set").toBeTruthy();

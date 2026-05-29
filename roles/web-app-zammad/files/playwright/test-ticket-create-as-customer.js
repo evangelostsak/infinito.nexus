@@ -2,7 +2,7 @@ const { test, expect } = require("@playwright/test");
 
 exports.register = function (shared) {
   test("biber (customer): creates a ticket via the SPA after OIDC login", async ({ page }) => {
-    shared.skipUnlessServiceEnabled("oidc");
+    shared.skipUnlessServiceEnabled("sso");
     expect(shared.env.biberUsername, "BIBER_USERNAME must be set").toBeTruthy();
     expect(shared.env.biberPassword, "BIBER_PASSWORD must be set").toBeTruthy();
 

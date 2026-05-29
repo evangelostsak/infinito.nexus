@@ -24,7 +24,7 @@
       shared: true
     memcached:
       shared: true
-    oidc:
+    sso:
       enabled: true
       shared: true
     postgres:
@@ -57,7 +57,7 @@
       shared: false
     memcached:
       shared: false
-    oidc:
+    sso:
       enabled: false
       shared: false
     postgres:
@@ -90,7 +90,7 @@
       shared: false
     memcached:
       shared: false
-    oidc:
+    sso:
       enabled: false
       shared: false
     postgres:
