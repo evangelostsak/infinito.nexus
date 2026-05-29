@@ -1,9 +1,3 @@
-// Shared Zammad Playwright spec state: env vars consumed by more than one
-// scenario, the OIDC sign-in helper that drives the SPA → Keycloak round-trip,
-// the Zammad logout flow, and the beforeEach env-presence guard. Per-test env
-// (admin credentials, biber credentials) is asserted inside the matching
-// `test-*.js` file.
-
 const { expect } = require("@playwright/test");
 
 const { decodeDotenvQuotedValue, normalizeBaseUrl, performKeycloakLoginForm, runGuestFlow } = require("./personas");
@@ -30,11 +24,7 @@ async function zammadLogout(page) {
 }
 
 async function signInAsApiBot(page) {
-  // Server-side APIRequestContext (page.context().request) shares the
-  // browser's cookie jar. Replaced an earlier in-page fetch approach that
-  // produced a Keycloak-origin cross-origin error in OIDC variants; the
-  // exact mechanism is not isolated, but this shape is what got
-  // test-websocket-realtime to green.
+  // page.context().request shares the browser cookie jar; in-page fetch hits Keycloak cross-origin in OIDC variants.
   await page.context().clearCookies();
 
   const apiRequest = page.context().request;

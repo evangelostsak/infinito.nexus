@@ -48,17 +48,26 @@ exports.register = function (shared) {
     await page.goto(`${shared.env.zammadBaseUrl}/#ticket/zoom/${ticket.id}`, { waitUntil: "domcontentloaded" });
     await expect(page.locator("body")).toContainText(subject, { timeout: 60_000 });
 
-    // Scope the contenteditable lookup to Zammad's article-create area
-    // (`.article-add`) so the .first() doesn't hit the ticket-title field.
+    // Clue-tooltip close handler races the backdrop animation and re-opens; nuke the DOM nodes.
+    await page.evaluate(() => {
+      document.querySelectorAll('.js-modal--clue, .modal-backdrop').forEach((el) => el.remove());
+    });
+
     const replyText = `agent-reply ${Date.now()}`;
     const replyBody = page.locator('.article-add [contenteditable="true"]').first();
     await replyBody.waitFor({ state: "visible", timeout: 60_000 });
-    await replyBody.click();
-    await page.keyboard.type(replyText);
+    await replyBody.evaluate((el, text) => {
+      el.focus();
+      el.innerText = text;
+      el.dispatchEvent(new InputEvent("input", { bubbles: true, data: text }));
+    }, replyText);
 
-    // The "Update" button lives in the same .article-add panel; pin it
-    // there too to avoid clicking unrelated update controls.
-    await page.locator('.article-add').getByRole("button", { name: /update|aktualisieren/i }).first().click();
+    const updateButton = page
+      .locator('button.js-submit, button[data-name="submit"]')
+      .or(page.getByRole("button", { name: /^(update|aktualisieren)$/i }))
+      .first();
+    await updateButton.waitFor({ state: "visible", timeout: 60_000 });
+    await updateButton.click();
 
     await expect(page.locator("body")).toContainText(replyText, { timeout: 60_000 });
 

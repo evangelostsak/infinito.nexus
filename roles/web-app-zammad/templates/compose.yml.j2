@@ -9,7 +9,7 @@
     volumes:
       - zammad_storage:/opt/zammad/storage
       - "{{ ZAMMAD_AUTO_WIZARD_HOST_PATH }}:/opt/zammad/auto_wizard.json:ro"
-      - "{{ ZAMMAD_TELEGRAM_SHIM_HOST_PATH }}:{{ ZAMMAD_TELEGRAM_SHIM_CONTAINER_PATH }}:ro"
+      - "{{ ZAMMAD_TELEGRAM_HELPER_HOST_PATH }}:{{ ZAMMAD_TELEGRAM_HELPER_CONTAINER_PATH }}:ro"
 {{ lookup('container_depends_on', application_id) }}
 {% include 'roles/sys-svc-container/templates/networks.yml.j2' %}
 
@@ -25,7 +25,7 @@
       - zammad_storage:/opt/zammad/storage
       - "{{ ZAMMAD_AUTO_WIZARD_HOST_PATH }}:/opt/zammad/auto_wizard.json:ro"
       - "{{ ZAMMAD_OMNIAUTH_INIT_HOST_PATH }}:{{ ZAMMAD_OMNIAUTH_INIT_CONTAINER_PATH }}:ro"
-      - "{{ ZAMMAD_TELEGRAM_SHIM_HOST_PATH }}:{{ ZAMMAD_TELEGRAM_SHIM_CONTAINER_PATH }}:ro"
+      - "{{ ZAMMAD_TELEGRAM_HELPER_HOST_PATH }}:{{ ZAMMAD_TELEGRAM_HELPER_CONTAINER_PATH }}:ro"
 {% if ZAMMAD_OIDC_ENABLED %}
       - "{{ ZAMMAD_OIDC_GROUP_ROLE_MAP_HOST_PATH }}:{{ ZAMMAD_OIDC_GROUP_ROLE_MAP_CONTAINER_PATH }}:ro"
 {% endif %}
@@ -42,7 +42,7 @@
     volumes:
       - zammad_storage:/opt/zammad/storage
       - "{{ ZAMMAD_OMNIAUTH_INIT_HOST_PATH }}:{{ ZAMMAD_OMNIAUTH_INIT_CONTAINER_PATH }}:ro"
-      - "{{ ZAMMAD_TELEGRAM_SHIM_HOST_PATH }}:{{ ZAMMAD_TELEGRAM_SHIM_CONTAINER_PATH }}:ro"
+      - "{{ ZAMMAD_TELEGRAM_HELPER_HOST_PATH }}:{{ ZAMMAD_TELEGRAM_HELPER_CONTAINER_PATH }}:ro"
 {% if ZAMMAD_OIDC_ENABLED %}
       - "{{ ZAMMAD_OIDC_GROUP_ROLE_MAP_HOST_PATH }}:{{ ZAMMAD_OIDC_GROUP_ROLE_MAP_CONTAINER_PATH }}:ro"
 {% endif %}
@@ -59,7 +59,7 @@
     volumes:
       - zammad_storage:/opt/zammad/storage
       - "{{ ZAMMAD_OMNIAUTH_INIT_HOST_PATH }}:{{ ZAMMAD_OMNIAUTH_INIT_CONTAINER_PATH }}:ro"
-      - "{{ ZAMMAD_TELEGRAM_SHIM_HOST_PATH }}:{{ ZAMMAD_TELEGRAM_SHIM_CONTAINER_PATH }}:ro"
+      - "{{ ZAMMAD_TELEGRAM_HELPER_HOST_PATH }}:{{ ZAMMAD_TELEGRAM_HELPER_CONTAINER_PATH }}:ro"
 {% if ZAMMAD_OIDC_ENABLED %}
       - "{{ ZAMMAD_OIDC_GROUP_ROLE_MAP_HOST_PATH }}:{{ ZAMMAD_OIDC_GROUP_ROLE_MAP_CONTAINER_PATH }}:ro"
 {% endif %}
@@ -88,12 +88,7 @@
     image: "{{ ZAMMAD_IMAGE }}:{{ ZAMMAD_VERSION }}"
     container_name: "{{ ZAMMAD_NGINX_CONTAINER }}"
     {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
-    # Patch zammad-nginx entrypoint to match only literal `nameserver` lines in
-    # /etc/resolv.conf — Docker writes comment lines like `# Overrides: …` that
-    # the upstream `grep "nameserver"` matches as substrings, yielding an
-    # invalid `resolver … Overrides: …` directive that nginx rejects. The
-    # upstream script is read-only for the zammad user, so we patch a copy in
-    # /tmp and exec that.
+    # Upstream `grep "nameserver"` substring-matches Docker's `# Overrides:` comment lines, breaking the resolver directive.
     command:
       - sh
       - -c
@@ -111,7 +106,7 @@
     volumes:
       - zammad_storage:/opt/zammad/storage
       - "{{ ZAMMAD_OMNIAUTH_INIT_HOST_PATH }}:{{ ZAMMAD_OMNIAUTH_INIT_CONTAINER_PATH }}:ro"
-      - "{{ ZAMMAD_TELEGRAM_SHIM_HOST_PATH }}:{{ ZAMMAD_TELEGRAM_SHIM_CONTAINER_PATH }}:ro"
+      - "{{ ZAMMAD_TELEGRAM_HELPER_HOST_PATH }}:{{ ZAMMAD_TELEGRAM_HELPER_CONTAINER_PATH }}:ro"
 {% if ZAMMAD_OIDC_ENABLED %}
       - "{{ ZAMMAD_OIDC_GROUP_ROLE_MAP_HOST_PATH }}:{{ ZAMMAD_OIDC_GROUP_ROLE_MAP_CONTAINER_PATH }}:ro"
 {% endif %}

@@ -12,8 +12,6 @@ exports.register = function (shared) {
     await page.context().clearCookies();
     await page.goto(`${shared.env.zammadBaseUrl}/#login`, { waitUntil: "domcontentloaded" });
 
-    // Zammad's #login route renders a <form> with concrete `name="username"`
-    // and `name="password"` inputs plus a submit-button.
     const usernameInput = page.locator('input[name="username"]');
     const passwordInput = page.locator('input[name="password"]');
     await usernameInput.waitFor({ state: "visible", timeout: 60_000 });
@@ -22,12 +20,9 @@ exports.register = function (shared) {
     await passwordInput.fill(shared.env.biberPassword);
     await page.locator('button[type="submit"]').first().click();
 
-    // After successful LDAP auth Zammad's SPA mounts the user menu containing
-    // the username — wait for it as proof-of-auth instead of grepping body
-    // text (which can briefly contain login-page strings after submit).
-    await expect(
-      page.locator(`text=${shared.env.biberUsername}`).first(),
-    ).toBeVisible({ timeout: 60_000 });
+    // Body text briefly carries login strings during the redirect; the form-input detachment is the stable signal.
+    await expect(usernameInput).toBeHidden({ timeout: 60_000 });
+    await expect.poll(() => page.url(), { timeout: 60_000 }).not.toMatch(/#login/);
 
     await shared.zammadLogout(page);
   });

@@ -2,15 +2,12 @@
 application_id: "web-app-zammad"
 entity_name: "{{ application_id | get_entity_name }}"
 
-# Zammad upstream image (one image, multiple commands)
 ZAMMAD_IMAGE: "{{ lookup('config', application_id, 'services.zammad.image') }}"
 ZAMMAD_VERSION: "{{ lookup('config', application_id, 'services.zammad.version') }}"
 
-# Bundled Elasticsearch (no central svc-db-elasticsearch exists)
 ZAMMAD_SEARCH_IMAGE: "{{ lookup('config', application_id, 'services.search.image') }}"
 ZAMMAD_SEARCH_VERSION: "{{ lookup('config', application_id, 'services.search.version') }}"
 
-# Container names
 ZAMMAD_INIT_CONTAINER:      "zammad-init"
 ZAMMAD_RAILS_CONTAINER:     "zammad-railsserver"
 ZAMMAD_WEBSOCKET_CONTAINER: "zammad-websocket"
@@ -19,64 +16,44 @@ ZAMMAD_NGINX_CONTAINER:     "zammad-nginx"
 ZAMMAD_SEARCH_CONTAINER:    "zammad-elasticsearch"
 ZAMMAD_MEMCACHED_CONTAINER: "zammad-memcached"
 
-# Memcached image pinned via the central svc-db-memcached role (per Decision #7)
 ZAMMAD_MEMCACHED_IMAGE:   "{{ lookup('config', 'svc-db-memcached', 'services.memcached.image') }}"
 ZAMMAD_MEMCACHED_VERSION: "{{ lookup('config', 'svc-db-memcached', 'services.memcached.version') }}"
 
-# Internal Zammad layout (matches upstream Zammad image)
 ZAMMAD_RAILS_PORT: 3000
 ZAMMAD_WEBSOCKET_PORT: 6042
 
-# Bot users: identity comes from meta/users.yml (SPOT); password comes from
-# credentials/ because both bots need a shell-safe alphanumeric form (the
-# default user password carries chars that get mangled through the
-# Ansible→bash→docker-exec→Ruby ENV chain — see schema.yml).
+# Both bots need a shell-safe alphanumeric password — the default users-SPOT
+# password carries chars that get mangled through Ansible→bash→docker-exec→Ruby ENV.
 ZAMMAD_API_BOT_USER:           "{{ lookup('users', 'zammad-api-bot') }}"
 ZAMMAD_WIZARD_BYPASS_USER:     "{{ lookup('users', 'zammad-wizard-bypass-admin') }}"
 ZAMMAD_API_BOT_PASSWORD:       "{{ lookup('config', application_id, 'credentials.api_bot_password') }}"
-ZAMMAD_ADMINISTRATOR_EMAIL:    "{{ lookup('users', 'administrator').email }}"
 ZAMMAD_INITIAL_ADMIN_PASSWORD: "{{ lookup('config', application_id, 'credentials.initial_admin_password') }}"
 ZAMMAD_SECRET_KEY_BASE:        "{{ lookup('config', application_id, 'credentials.secret_key_base') }}"
 
-# Hostname + scheme (consumed by env.j2 + auto_wizard.json.j2 + tasks)
 ZAMMAD_HOSTNAME:     "{{ lookup('domain', application_id) }}"
 ZAMMAD_WEB_PROTOCOL: "{{ lookup('tls', application_id, 'protocols.web') }}"
 
-# Reverse-proxy upstreams Rails should trust for `X-Forwarded-*` headers.
-# SPOT lives in `group_vars/all/08_networks.yml#NETWORK_TRUSTED_PROXY_CIDRS`.
-
-# Host-side bind-mount sources
-ZAMMAD_VOLUMES_DIR:              "{{ lookup('container', application_id, 'directories.volumes') }}"
-ZAMMAD_AUTO_WIZARD_HOST_PATH:    "{{ ZAMMAD_VOLUMES_DIR }}auto_wizard.json"
-ZAMMAD_OMNIAUTH_INIT_HOST_PATH:  "{{ ZAMMAD_VOLUMES_DIR }}zz_omniauth_allow_get.rb"
-# Container-side mount target for the OmniAuth GET-allowed initializer.
+ZAMMAD_VOLUMES_DIR:                  "{{ lookup('container', application_id, 'directories.volumes') }}"
+ZAMMAD_AUTO_WIZARD_HOST_PATH:        "{{ ZAMMAD_VOLUMES_DIR }}auto_wizard.json"
+ZAMMAD_OMNIAUTH_INIT_HOST_PATH:      "{{ ZAMMAD_VOLUMES_DIR }}zz_omniauth_allow_get.rb"
 ZAMMAD_OMNIAUTH_INIT_CONTAINER_PATH: "/opt/zammad/config/initializers/zz_omniauth_allow_get.rb"
 
-# Telegram boot-shim (pre-loaded via RUBYOPT to sidestep the upstream
-# Zammad 6.5.0 NameError crash on telegram-bot-ruby 2.4.0). See
-# templates/zz_telegram_constant_shim.rb.j2 for the WHY.
-ZAMMAD_TELEGRAM_SHIM_HOST_PATH:      "{{ ZAMMAD_VOLUMES_DIR }}zz_telegram_constant_shim.rb"
-ZAMMAD_TELEGRAM_SHIM_CONTAINER_PATH: "/opt/zammad/zz_telegram_constant_shim.rb"
+ZAMMAD_TELEGRAM_HELPER_HOST_PATH:      "{{ ZAMMAD_VOLUMES_DIR }}telegram_helper.rb"
+ZAMMAD_TELEGRAM_HELPER_CONTAINER_PATH: "/opt/zammad/lib/telegram_helper.rb"
 
-# OIDC group-role mapping initializer (rendered + bind-mounted as
-# /opt/zammad/config/initializers/zz_oidc_group_role_mapping.rb)
 ZAMMAD_OIDC_GROUP_ROLE_MAP_HOST_PATH:      "{{ ZAMMAD_VOLUMES_DIR }}zz_oidc_group_role_mapping.rb"
 ZAMMAD_OIDC_GROUP_ROLE_MAP_CONTAINER_PATH: "/opt/zammad/config/initializers/zz_oidc_group_role_mapping.rb"
-# RBAC group-path → Zammad-role mapping. Keycloak's RBAC client scope
-# emits group paths with `full.path: true`, so the keys match the format
-# Keycloak hands out in the `groups` claim.
 ZAMMAD_OIDC_GROUP_ROLE_MAP:
   "/{{ RBAC.GROUP.NAME | trim('/') }}/{{ application_id }}/administrator": "Admin"
   "/{{ RBAC.GROUP.NAME | trim('/') }}/{{ application_id }}/agent":         "Agent"
   "/{{ RBAC.GROUP.NAME | trim('/') }}/{{ application_id }}/customer":      "Customer"
 
-# Service gate (consumed by auto_wizard.json.j2, playwright.env.j2, tasks/)
 ZAMMAD_OIDC_ENABLED:  "{{ lookup('config', application_id, 'services.oidc.enabled')  | bool }}"
 ZAMMAD_EMAIL_ENABLED: "{{ lookup('config', application_id, 'services.email.enabled') | bool }}"
 ZAMMAD_LDAP_ENABLED:  "{{ lookup('config', application_id, 'services.ldap.enabled')  | bool }}"
 
-# Mailu-backed Email channel (consumed by apply_email_channel.sh + playwright.env.j2)
 ZAMMAD_MAIL:           "{{ lookup('email', application_id) if ZAMMAD_EMAIL_ENABLED else {} }}"
 ZAMMAD_HELPDESK_USER:  "{{ lookup('users', 'helpdesk') if ZAMMAD_EMAIL_ENABLED else {} }}"
 ZAMMAD_HELPDESK_EMAIL: "{{ ZAMMAD_HELPDESK_USER.email | default('') }}"
-ZAMMAD_HELPDESK_PASS:  "{{ ZAMMAD_HELPDESK_USER.password | default('') }}"
+# Mailu enforces change_pw_next_login → user password rejects SMTP AUTH (535); per-app token is required.
+ZAMMAD_HELPDESK_PASS:  "{{ (ZAMMAD_HELPDESK_USER.tokens | default({})).get('web-app-mailu', '') }}"

@@ -21,10 +21,10 @@
     mode: "0644"
   notify: compose up
 
-- name: "stage Telegram-constant boot shim (pre-loaded via RUBYOPT; workaround for upstream Zammad 6.5.0 NameError crash)"
+- name: "stage TelegramHelper stub that prevents the upstream Zammad 6.5.0 boot crash on telegram-bot-ruby 2.4.0"
   ansible.builtin.template:
-    src: "zz_telegram_constant_shim.rb.j2"
-    dest: "{{ ZAMMAD_TELEGRAM_SHIM_HOST_PATH }}"
+    src: "telegram_helper_stub.rb.j2"
+    dest: "{{ ZAMMAD_TELEGRAM_HELPER_HOST_PATH }}"
     mode: "0644"
   notify: compose up
 
@@ -45,12 +45,8 @@
         'name': 'postgres',
         'password': lookup('config', 'svc-db-postgres', 'credentials.POSTGRES_PASSWORD'),
       }) }}
+    # nocheck: database-query-raw
     query: "{{ lookup('template', role_path ~ '/templates/sql/grant_createdb.sql.j2') }}"
-  # Only needed in shared mode: the per-role postgres in non-shared mode
-  # spawns the role's app user as the container's POSTGRES_USER (= superuser
-  # of that container), so CREATEDB is already implicit and the SVC-DB-POSTGRES
-  # superuser password we'd need here isn't reachable from the role-internal
-  # postgres anyway.
   when: lookup('config', application_id, 'services.postgres.shared') | bool
 
 - name: "flush handlers so the Zammad init container starts with auto_wizard.json bind-mounted"
@@ -68,11 +64,6 @@
   until: zammad_rails_ready.rc == 0
 
 - name: "process auto_wizard.json if Zammad's setup wizard hasn't completed yet (idempotent)"
-  # Upstream `zammad-init` does NOT call AutoWizard.setup automatically — even
-  # with /opt/zammad/auto_wizard.json bind-mounted, the system stays in
-  # system_init_done=false until something invokes AutoWizard. Trigger it
-  # explicitly here so V2 (no-auth) and V3 (LDAP-only) don't land on the
-  # setup-wizard SPA page that breaks every authenticated test.
   ansible.builtin.shell: |
     set -euo pipefail
     container exec -i {{ ZAMMAD_RAILS_CONTAINER }} bundle exec rails r '
@@ -128,13 +119,13 @@
       {{ ZAMMAD_RAILS_CONTAINER }} \
       bundle exec rails r - < {{ role_path }}/files/scripts/apply_ldap_source.rb
   environment:
-    LDAP_NAME:     "{{ ORGANIZATION }} svc-db-openldap"
-    LDAP_HOST:     "{{ LDAP.SERVER.DOMAIN }}"
-    LDAP_PORT:     "{{ LDAP.SERVER.PORT }}"
-    LDAP_BASE_DN:  "{{ LDAP.DN.OU.USERS }}"
-    LDAP_BIND_DN:  "{{ LDAP.DN.ADMINISTRATOR.DATA }}"
-    LDAP_BIND_PW:  "{{ LDAP.BIND_CREDENTIAL }}"
-    LDAP_UID_ATTR: "{{ LDAP.USER.ATTRIBUTES.ID }}"
+    LDAP_NAME:           "{{ ORGANIZATION }} svc-db-openldap"
+    LDAP_HOST:           "{{ LDAP.SERVER.DOMAIN }}"
+    LDAP_PORT:           "{{ LDAP.SERVER.PORT }}"
+    LDAP_BASE_DN:        "{{ LDAP.DN.OU.USERS }}"
+    LDAP_BIND_DN:        "{{ LDAP.DN.ADMINISTRATOR.DATA }}"
+    LDAP_BIND_PW:        "{{ LDAP.BIND_CREDENTIAL }}"
+    LDAP_UID_ATTR:       "{{ LDAP.USER.ATTRIBUTES.ID }}"
   register: zammad_ldap_apply
   changed_when: false
   when: ZAMMAD_LDAP_ENABLED

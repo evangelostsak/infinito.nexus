@@ -1,14 +1,3 @@
-# Idempotently configure Zammad's inbound IMAP + outbound SMTP Email channel
-# against Mailu. Expects the following ENV vars (set by the calling shell):
-#
-#   MAIL_GROUP_NAME    - Zammad group to which inbound tickets are assigned
-#   MAIL_FROM_NAME     - "Realname" for the EmailAddress record
-#   MAIL_FROM_ADDRESS  - helpdesk@<DOMAIN_PRIMARY>
-#   IMAP_HOST / IMAP_PORT / IMAP_USER / IMAP_PASS  - Mailu IMAP
-#   SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS  - Mailu SMTP submission
-
-# Zammad records require audit fields (created_by_id / updated_by_id).
-# Bind the rails-runner session to the seed admin (system user id 1).
 UserInfo.current_user_id = 1
 
 group = Group.find_or_create_by!(name: ENV.fetch("MAIL_GROUP_NAME")) do |g|

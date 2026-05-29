@@ -1,17 +1,3 @@
-# Rails initializer mounted into /opt/zammad/config/initializers/.
-#
-# Translates Keycloak `groups` claim entries into Zammad role assignments
-# on every OIDC sign-in. The Keycloak RBAC client scope (see
-# roles/web-app-keycloak/templates/import/scopes/rbac.json.j2) emits group
-# paths like `/{{ RBAC.GROUP.NAME | trim('/') }}/{{ application_id }}/<role>`
-# into the `{{ RBAC.GROUP.CLAIM }}` claim. We map those onto Zammad's
-# built-in roles. Users without any matching group default to the configured
-# fallback (Customer) so unmapped sign-ins still land somewhere coherent.
-#
-# The map is compiled in at template-render time from
-# OIDC_GROUP_ROLE_MAP (JSON, group-path → Zammad role name) and the
-# fallback role name is OIDC_DEFAULT_ROLE.
-
 require "json"
 
 OIDC_GROUP_ROLE_MAP    = JSON.parse({{ ZAMMAD_OIDC_GROUP_ROLE_MAP | to_json | to_json }}).freeze
@@ -42,10 +28,7 @@ Rails.application.config.after_initialize do
     end
   end
 
-  # Patch the two User-side OmniAuth entry points. Zammad's
-  # OmniauthCallbacksController hands the auth hash to one of these. If a
-  # future Zammad release renames either method this initializer becomes a
-  # no-op rather than crashing the boot path.
+  # If upstream renames either entry point, the initializer becomes a no-op instead of crashing boot.
   %w[create_from_hash update_from_hash].each do |method_name|
     next unless User.respond_to?(method_name)
 
