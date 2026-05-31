@@ -83,11 +83,11 @@
       {{ ZAMMAD_RAILS_CONTAINER }} \
       bundle exec rails r - < {{ role_path }}/files/scripts/apply_api_bot.rb
   environment:
-    API_BOT_LOGIN:      "{{ ZAMMAD_API_BOT_USER.username }}"
-    API_BOT_EMAIL:      "{{ ZAMMAD_API_BOT_USER.email }}"
-    API_BOT_FIRSTNAME:  "{{ ZAMMAD_API_BOT_USER.firstname }}"
-    API_BOT_LASTNAME:   "{{ ZAMMAD_API_BOT_USER.lastname }}"
-    API_BOT_PASSWORD:   "{{ ZAMMAD_API_BOT_PASSWORD }}"
+    API_BOT_LOGIN: "{{ ZAMMAD_API_BOT_USER.username }}"
+    API_BOT_EMAIL: "{{ ZAMMAD_API_BOT_USER.email }}"
+    API_BOT_FIRSTNAME: "{{ ZAMMAD_API_BOT_USER.firstname }}"
+    API_BOT_LASTNAME: "{{ ZAMMAD_API_BOT_USER.lastname }}"
+    API_BOT_PASSWORD: "{{ ZAMMAD_API_BOT_PASSWORD }}"
   register: zammad_api_bot_apply
   changed_when: false
 
@@ -100,12 +100,12 @@
       {{ ZAMMAD_RAILS_CONTAINER }} \
       bundle exec rails r - < {{ role_path }}/files/scripts/apply_oidc_settings.rb
   environment:
-    ZAMMAD_FQDN:        "{{ ZAMMAD_HOSTNAME }}"
-    ZAMMAD_HTTP_TYPE:   "{{ ZAMMAD_WEB_PROTOCOL }}"
-    OIDC_BUTTON_TEXT:   "{{ OIDC.BUTTON_TEXT }}"
-    OIDC_CLIENT_ID:     "{{ OIDC.CLIENT.ID }}"
+    ZAMMAD_FQDN: "{{ ZAMMAD_HOSTNAME }}"
+    ZAMMAD_HTTP_TYPE: "{{ ZAMMAD_WEB_PROTOCOL }}"
+    OIDC_BUTTON_TEXT: "{{ OIDC.BUTTON_TEXT }}"
+    OIDC_CLIENT_ID: "{{ OIDC.CLIENT.ID }}"
     OIDC_CLIENT_SECRET: "{{ OIDC.CLIENT.SECRET }}"
-    OIDC_ISSUER_URL:    "{{ OIDC.CLIENT.ISSUER_URL }}"
+    OIDC_ISSUER_URL: "{{ OIDC.CLIENT.ISSUER_URL }}"
   register: zammad_oidc_apply
   changed_when: false
   when: ZAMMAD_OIDC_ENABLED
@@ -119,13 +119,13 @@
       {{ ZAMMAD_RAILS_CONTAINER }} \
       bundle exec rails r - < {{ role_path }}/files/scripts/apply_ldap_source.rb
   environment:
-    LDAP_NAME:           "{{ ORGANIZATION }} svc-db-openldap"
-    LDAP_HOST:           "{{ LDAP.SERVER.DOMAIN }}"
-    LDAP_PORT:           "{{ LDAP.SERVER.PORT }}"
-    LDAP_BASE_DN:        "{{ LDAP.DN.OU.USERS }}"
-    LDAP_BIND_DN:        "{{ LDAP.DN.ADMINISTRATOR.DATA }}"
-    LDAP_BIND_PW:        "{{ LDAP.BIND_CREDENTIAL }}"
-    LDAP_UID_ATTR:       "{{ LDAP.USER.ATTRIBUTES.ID }}"
+    LDAP_NAME: "{{ ORGANIZATION }} svc-db-openldap"
+    LDAP_HOST: "{{ LDAP.SERVER.DOMAIN }}"
+    LDAP_PORT: "{{ LDAP.SERVER.PORT }}"
+    LDAP_BASE_DN: "{{ LDAP.DN.OU.USERS }}"
+    LDAP_BIND_DN: "{{ LDAP.DN.ADMINISTRATOR.DATA }}"
+    LDAP_BIND_PW: "{{ LDAP.BIND_CREDENTIAL }}"
+    LDAP_UID_ATTR: "{{ LDAP.USER.ATTRIBUTES.ID }}"
   register: zammad_ldap_apply
   changed_when: false
   when: ZAMMAD_LDAP_ENABLED
@@ -140,17 +140,17 @@
       {{ ZAMMAD_RAILS_CONTAINER }} \
       bundle exec rails r - < {{ role_path }}/files/scripts/apply_email_channel.rb
   environment:
-    MAIL_GROUP_NAME:   "Users"
-    MAIL_FROM_NAME:    "{{ ORGANIZATION }} Helpdesk"
+    MAIL_GROUP_NAME: "Users"
+    MAIL_FROM_NAME: "{{ ORGANIZATION }} Helpdesk"
     MAIL_FROM_ADDRESS: "{{ ZAMMAD_HELPDESK_EMAIL }}"
-    IMAP_HOST:         "{{ ZAMMAD_MAIL.host }}"
-    IMAP_PORT:         "143"
-    IMAP_USER:         "{{ ZAMMAD_HELPDESK_EMAIL }}"
-    IMAP_PASS:         "{{ ZAMMAD_HELPDESK_PASS }}"
-    SMTP_HOST:         "{{ ZAMMAD_MAIL.host }}"
-    SMTP_PORT:         "{{ ZAMMAD_MAIL.port }}"
-    SMTP_USER:         "{{ ZAMMAD_HELPDESK_EMAIL }}"
-    SMTP_PASS:         "{{ ZAMMAD_HELPDESK_PASS }}"
+    IMAP_HOST: "{{ ZAMMAD_MAIL.host }}"
+    IMAP_PORT: "143"
+    IMAP_USER: "{{ ZAMMAD_HELPDESK_EMAIL }}"
+    IMAP_PASS: "{{ ZAMMAD_HELPDESK_PASS }}"
+    SMTP_HOST: "{{ ZAMMAD_MAIL.host }}"
+    SMTP_PORT: "{{ ZAMMAD_MAIL.port }}"
+    SMTP_USER: "{{ ZAMMAD_HELPDESK_EMAIL }}"
+    SMTP_PASS: "{{ ZAMMAD_HELPDESK_PASS }}"
   register: zammad_email_apply
   changed_when: false
   when: ZAMMAD_EMAIL_ENABLED and (ZAMMAD_HELPDESK_EMAIL | length > 0)
