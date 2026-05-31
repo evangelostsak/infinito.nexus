@@ -23,9 +23,12 @@
 - name: Set build group override for Nix installer when nixbld exists
   ansible.builtin.set_fact:
     dev_nix_installer_build_group_id: "{{ ansible_facts.getent_group.nixbld[1] }}"
+  # `getent ... fail_key: false` inserts the key with a `None` value when the
+  # entry is missing, so the membership test is True but `.nixbld[1]` would
+  # crash on None — explicitly skip when the value is None.
   when:
     - ansible_facts.getent_group is defined
-    - "'nixbld' in ansible_facts.getent_group"
+    - ansible_facts.getent_group.nixbld is not none
 
 - name: Read existing nixbld1 user entry before installer run
   ansible.builtin.getent:
@@ -36,9 +39,10 @@
 - name: Set first build uid override for Nix installer when nixbld1 exists
   ansible.builtin.set_fact:
     dev_nix_installer_first_build_uid: "{{ ansible_facts.getent_passwd.nixbld1[1] }}"
+  # Same None-vs-missing trap as for the group entry above.
   when:
     - ansible_facts.getent_passwd is defined
-    - "'nixbld1' in ansible_facts.getent_passwd"
+    - ansible_facts.getent_passwd.nixbld1 is not none
 
 - name: Run Nix installer in daemon (multi-user) mode if Nix is not installed
   ansible.builtin.shell: >
