@@ -1,0 +1,32 @@
+---
+credentials:
+  jicofo_component_secret:
+    description: "Prosody component secret for jicofo's auth connection (`focus.<XMPP_DOMAIN>`)."
+    algorithm: alphanumeric
+    validation: "^[A-Za-z0-9]{32,}$"
+    length: 48
+  jicofo_auth_password:
+    description: "XMPP password for jicofo's authenticated user account."
+    algorithm: alphanumeric
+    validation: "^[A-Za-z0-9]{32,}$"
+    length: 48
+  jvb_auth_password:
+    description: "XMPP password for jvb's authenticated user account in the brewery MUC."
+    algorithm: alphanumeric
+    validation: "^[A-Za-z0-9]{32,}$"
+    length: 48
+  jigasi_xmpp_password:
+    description: "XMPP password for jigasi (SIP gateway) — reserved even when jigasi is disabled."
+    algorithm: alphanumeric
+    validation: "^[A-Za-z0-9]{32,}$"
+    length: 48
+  jibri_recorder_password:
+    description: "XMPP password for jibri (recorder) — reserved even when jibri is disabled."
+    algorithm: alphanumeric
+    validation: "^[A-Za-z0-9]{32,}$"
+    length: 48
+  jibri_xmpp_password:
+    description: "Secondary jibri XMPP password — reserved even when jibri is disabled."
+    algorithm: alphanumeric
+    validation: "^[A-Za-z0-9]{32,}$"
+    length: 48

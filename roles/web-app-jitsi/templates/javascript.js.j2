@@ -1,0 +1,67 @@
+(function () {
+  const LOGOUT_URL =
+    "{{ OIDC.CLIENT.LOGOUT_URL }}?redirect_uri=" +
+    encodeURIComponent("{{ lookup('tls', application_id, 'protocols.web') }}://{{ DOMAIN_PRIMARY }}");
+  const INJECTED_ATTR = "data-injected-logout";
+  const LOGOUT_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+      '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>' +
+      '<polyline points="10 17 15 12 10 7"/>' +
+      '<line x1="15" y1="12" x2="3" y2="12"/>' +
+    "</svg>";
+
+  function ensureLogoutIcon() {
+    if (document.querySelector("[" + INJECTED_ATTR + "]")) return;
+    if (!document.body) return;
+
+    const btn = document.createElement("button");
+    btn.setAttribute(INJECTED_ATTR, "true");
+    btn.setAttribute("type", "button");
+    btn.setAttribute("title", "Logout");
+    btn.setAttribute("aria-label", "Logout");
+    btn.style.cssText = [
+      "position:fixed",
+      "top:12px",
+      "right:12px",
+      "z-index:2147483647",
+      "display:inline-flex",
+      "align-items:center",
+      "justify-content:center",
+      "width:36px",
+      "height:36px",
+      "padding:6px",
+      "background:rgba(0,0,0,0.55)",
+      "color:#ffffff",
+      "border:1px solid rgba(255,255,255,0.25)",
+      "border-radius:6px",
+      "cursor:pointer",
+    ].join(";");
+    btn.innerHTML = LOGOUT_SVG;
+    btn.addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+        window.location.href = LOGOUT_URL;
+      },
+      { capture: true },
+    );
+    document.body.appendChild(btn);
+  }
+
+  function start() {
+    ensureLogoutIcon();
+    if (!("MutationObserver" in window)) return;
+    new MutationObserver(() => ensureLogoutIcon()).observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+    setTimeout(ensureLogoutIcon, 750);
+    setTimeout(ensureLogoutIcon, 2500);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start, { once: true });
+  } else {
+    start();
+  }
+})();

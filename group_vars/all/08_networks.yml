@@ -91,6 +91,9 @@ PORT_BANDS: # nocheck: unused-var  # consumed by the port-allocation plugin outs
     ssh:
       start: 2201
       end: 2299
+    media:
+      start: 10000
+      end: 10099
     stun_turn:
       start: 3478
       end: 3499
