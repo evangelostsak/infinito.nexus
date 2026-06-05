@@ -10,41 +10,15 @@ matrix_homeserver_generic_secret_key: "{{ lookup('config', application_id, 'cred
 traefik_enabled: false
 matrix_playbook_reverse_proxy_type: none
 
-postgres_enabled: false
-postgres_connection_hostname: "{{ MATRIX_MDAD_POSTGRES_HOST }}"
-postgres_connection_port: {{ MATRIX_MDAD_POSTGRES_PORT }}
-postgres_connection_username: "{{ MATRIX_MDAD_POSTGRES_USER }}"
-postgres_connection_password: "{{ MATRIX_MDAD_POSTGRES_PASSWORD }}"
+postgres_enabled: true
 
-matrix_synapse_database_host: "{{ MATRIX_MDAD_POSTGRES_HOST }}"
-matrix_synapse_database_port: {{ MATRIX_MDAD_POSTGRES_PORT }}
-matrix_synapse_database_user: "{{ MATRIX_MDAD_POSTGRES_USER }}"
-matrix_synapse_database_password: "{{ MATRIX_MDAD_POSTGRES_PASSWORD }}"
-matrix_synapse_database_database: "{{ lookup('database', application_id, 'name') }}"
-
-matrix_synapse_container_additional_networks_custom: {{ ((['keycloak'] if MATRIX_OIDC_ENABLED else []) + (['openldap'] if MATRIX_LDAP_ENABLED else [])) | to_json }}
-
-matrix_synapse_container_extra_arguments:
-  - "--mount type=bind,src=/etc/infinito.nexus/ca/root-ca.crt,dst=/etc/ssl/certs/infinito-ca.pem,ro"
-  - "-e SSL_CERT_FILE=/etc/ssl/certs/infinito-ca.pem"
-  - "-e REQUESTS_CA_BUNDLE=/etc/ssl/certs/infinito-ca.pem"
-
-matrix_synapse_container_client_api_host_bind_port: "127.0.0.1:{{ MATRIX_SYNAPSE_PORT }}"
+matrix_synapse_container_client_api_host_bind_port: "0.0.0.0:{{ MATRIX_SYNAPSE_PORT }}"
 matrix_synapse_container_federation_api_plain_host_bind_port: "0.0.0.0:{{ MATRIX_FEDERATION_PORT }}"
-matrix_client_element_container_http_host_bind_port: "127.0.0.1:{{ MATRIX_ELEMENT_PORT }}"
+matrix_client_element_container_http_host_bind_port: "0.0.0.0:{{ MATRIX_ELEMENT_PORT }}"
 
-coturn_container_additional_volumes:
-  - type: volume
-    src: matrix-coturn-lib
-    dst: /var/lib/coturn
+valkey_enabled: true
 
-valkey_enabled: {{ MATRIX_MDAD_REDIS_ENABLED | string | lower }}
-{% if MATRIX_MDAD_REDIS_ENABLED %}
-valkey_connection_hostname: "{{ MATRIX_REDIS_HOST }}"
-valkey_connection_port: {{ MATRIX_REDIS_PORT }}
-{% endif %}
-
-exim_relay_enabled: false
+exim_relay_enabled: {{ (not MATRIX_OUTBOUND_MAIL_ENABLED) | string | lower }}
 matrix_synapse_email_enabled: {{ MATRIX_OUTBOUND_MAIL_ENABLED | string | lower }}
 {% if MATRIX_OUTBOUND_MAIL_ENABLED %}
 matrix_synapse_email_smtp_host: "{{ MATRIX_OUTBOUND_MAIL_HOST }}"

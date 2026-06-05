@@ -1,7 +1,4 @@
 ---
-- name: "compose-flavor: tear down any prior MDAD systemd services + containers"
-  include_tasks: 00_cleanup_mdad_residue.yml
-
 - name: Load bridges configuration
   include_vars:
     file: "bridges.yml"

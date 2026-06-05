@@ -19,10 +19,13 @@
   delay: 2
   until: matrix_element_loopback_probe.status == 200
 
-- name: "ansible-flavor: create native admin in Synapse (idempotent via shared-secret)"
+- name: "ansible-flavor: create native admin in Synapse (DiD, idempotent via shared-secret)"
   ansible.builtin.command:
     argv:
       - container
+      - exec
+      - matrix-mdad
+      - docker
       - exec
       - matrix-synapse
       - register_new_matrix_user

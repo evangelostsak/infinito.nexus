@@ -1,5 +1,5 @@
-  mdad-runner:
-    container_name: matrix-mdad-runner
+  matrix-mdad:
+    container_name: matrix-mdad
     build:
       context: {{ application_id | abs_role_path_by_application_id }}/files/flavor/ansible/runner
       args:
@@ -8,22 +8,23 @@
         MATRIX_MDAD_RUNNER_DOCKER_CLI_IMAGE: {{ MATRIX_MDAD_RUNNER_DOCKER_CLI_IMAGE }}
         MATRIX_MDAD_RUNNER_DOCKER_CLI_VERSION: {{ MATRIX_MDAD_RUNNER_DOCKER_CLI_VERSION }}
     image: {{ MATRIX_MDAD_RUNNER_IMAGE }}
-    restart: "no"
+    restart: {{ DOCKER_RESTART_POLICY }}
     privileged: true
-    network_mode: host
-    pid: host
+    cgroup: host
+    stop_signal: SIGRTMIN+3
     environment:
-      SYSTEMD_IGNORE_CHROOT: "1"
+      MATRIX_MDAD_PLAYBOOK_TAGS: "{{ MATRIX_MDAD_PLAYBOOK_TAGS }}"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /etc/systemd/system:/etc/systemd/system
-      - /matrix:/matrix
-      - /run/systemd:/run/systemd
       - {{ MATRIX_MDAD_DIR }}:/mdad
-    working_dir: /mdad
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        set -e
-        ansible-galaxy install -r requirements.yml -p roles/galaxy/ --force
-        ansible-playbook -i inventory/hosts setup.yml --tags={{ MATRIX_MDAD_PLAYBOOK_TAGS }}
+      - matrix_mdad_docker:/var/lib/docker
+      - matrix_mdad_systemd:/etc/systemd/system
+      - matrix_mdad_matrix:/matrix
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:
+      - /run
+      - /run/lock
+      - /tmp
+    ports:
+      - "{{ DOCKER_BIND_HOST }}:{{ MATRIX_SYNAPSE_PORT }}:{{ MATRIX_SYNAPSE_PORT }}"
+      - "{{ DOCKER_BIND_HOST }}:{{ MATRIX_ELEMENT_PORT }}:{{ MATRIX_ELEMENT_PORT }}"
+      - "0.0.0.0:{{ MATRIX_FEDERATION_PORT }}:{{ MATRIX_FEDERATION_PORT }}"

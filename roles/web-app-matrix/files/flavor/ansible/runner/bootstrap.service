@@ -1,0 +1,18 @@
+[Unit]
+Description=Bootstrap matrix-docker-ansible-deploy on first boot
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+ConditionPathExists=!/var/lib/matrix-mdad/bootstrap.done
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/matrix-mdad/bootstrap.env
+ExecStart=/usr/local/bin/matrix-mdad-bootstrap
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console
+TimeoutSec=0
+
+[Install]
+WantedBy=multi-user.target

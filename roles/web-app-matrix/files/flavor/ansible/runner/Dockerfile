@@ -10,7 +10,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
     VIRTUAL_ENV=/opt/ansible \
-    PATH=/opt/ansible/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    PATH=/opt/ansible/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    container=docker
 
 COPY --from=docker-cli /usr/local/bin/docker /usr/bin/docker
 
@@ -19,11 +20,23 @@ RUN rm -rf /var/lib/apt/lists/* \
  && apt-get install -y --no-install-recommends \
       ca-certificates \
       dbus \
+      docker.io \
       git \
+      iptables \
       openssh-client \
       python3-venv \
       systemd \
+      systemd-sysv \
  && rm -rf /var/lib/apt/lists/*
+
+RUN systemctl mask \
+      sys-kernel-debug.mount \
+      sys-fs-fuse-connections.mount \
+      sys-kernel-config.mount \
+      systemd-logind.service \
+      console-getty.service \
+      getty.target \
+      getty@.service
 
 RUN python3 -m venv "$VIRTUAL_ENV" \
  && "$VIRTUAL_ENV/bin/pip" install --no-cache-dir \
@@ -40,4 +53,11 @@ RUN ansible-galaxy collection install \
       community.general \
       ansible.posix
 
+COPY bootstrap.sh /usr/local/bin/matrix-mdad-bootstrap
+COPY bootstrap.service /etc/systemd/system/matrix-mdad-bootstrap.service
+RUN chmod 0755 /usr/local/bin/matrix-mdad-bootstrap \
+ && systemctl enable docker.service matrix-mdad-bootstrap.service
+
 WORKDIR /mdad
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]
