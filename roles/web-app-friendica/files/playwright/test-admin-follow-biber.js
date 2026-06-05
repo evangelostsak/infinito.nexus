@@ -38,32 +38,45 @@ exports.register = function (shared) {
       const followEntryUrl = `${baseUrl}/contact/follow?url=${encodeURIComponent(`${baseUrl}/profile/${shared.env.biberUsername}`)}`;
       await adminPage.goto(followEntryUrl, { waitUntil: "domcontentloaded" });
 
+      const expectedHandle = `${shared.env.biberUsername}@${new URL(baseUrl).host}`;
+
       // Friendica's confirmation form has a unique submit element
       // (id="dfrn-request-submit-button", value="Submit request"). The
       // navbar search form appears earlier in the document so a generic
       // form.first() selector would hit the wrong target.
+      //
+      // The suite runs twice against one persistent instance (sync + async
+      // deploy passes). On the second pass biber is already a contact, so
+      // /contact/follow short-circuits to an "already added this contact"
+      // page that carries no submit button but still renders biber's
+      // identity address. Wait for either surface and only POST the form
+      // when it is the fresh-follow confirmation.
       const submitButton = adminPage.locator("#dfrn-request-submit-button");
-      await submitButton.waitFor({ state: "visible", timeout: 60_000 });
-      await Promise.all([
-        adminPage.waitForLoadState("domcontentloaded"),
-        submitButton.click(),
-      ]);
+      const biberHandle = adminPage.getByText(expectedHandle, { exact: false });
+      await expect(submitButton.or(biberHandle).first()).toBeVisible({ timeout: 60_000 });
 
-      // A successful follow 302-redirects to /contact/<numeric-id> — the
-      // detail page of the freshly-persisted local contact row.
-      await expect
-        .poll(() => adminPage.url(), {
-          timeout: 60_000,
-          message: "Expected /contact/follow POST to land on /contact/<id> after persisting biber as a contact",
-        })
-        .toMatch(/\/contact\/\d+(?:[/?#]|$)/);
+      if (await submitButton.isVisible()) {
+        await Promise.all([
+          adminPage.waitForLoadState("domcontentloaded"),
+          submitButton.click(),
+        ]);
 
-      // The contact detail page renders biber's identity address (nick@host)
-      // somewhere on the page; assert it as the canonical post-follow proof.
-      const expectedHandle = `${shared.env.biberUsername}@${new URL(baseUrl).host}`;
+        // A successful follow 302-redirects to /contact/<numeric-id> — the
+        // detail page of the freshly-persisted local contact row.
+        await expect
+          .poll(() => adminPage.url(), {
+            timeout: 60_000,
+            message: "Expected /contact/follow POST to land on /contact/<id> after persisting biber as a contact",
+          })
+          .toMatch(/\/contact\/\d+(?:[/?#]|$)/);
+      }
+
+      // Both the fresh /contact/<id> detail page and the idempotent "already
+      // added" page render biber's identity address (nick@host); assert it as
+      // the canonical post-follow proof.
       await expect(
         adminPage.locator("body"),
-        `Expected biber's handle "${expectedHandle}" on /contact/<id> after follow`
+        `Expected biber's handle "${expectedHandle}" after follow`
       ).toContainText(expectedHandle, { timeout: 30_000 });
     } finally {
       await adminContext.close().catch(() => {});
