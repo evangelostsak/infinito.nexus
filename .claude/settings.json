@@ -299,6 +299,7 @@
       "WebFetch(domain:youtu.be)",
       "WebFetch(domain:zoom.us)",
       "WebSearch",
+      "Workflow",
       "Write"
     ],
     "deny": [

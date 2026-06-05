@@ -7,7 +7,7 @@
 
 - name: create {{ MATRIX_WELL_KNOWN_FILE }}
   ansible.builtin.template:
-    src: "well-known.j2"
+    src: "flavor/compose/well-known.j2"
     dest: "{{ MATRIX_WELL_KNOWN_FILE }}"
 
 - name: "include role sys-stk-front-proxy for {{ MATRIX_ELEMENT_DOMAIN }}"
@@ -26,7 +26,7 @@
 
 - name: create {{ MATRIX_SYNAPSE_DOMAIN }}.conf
   ansible.builtin.template:
-    src: "templates/synapse.conf.j2"
+    src: "flavor/compose/synapse.conf.j2"
     dest: "{{ lookup('nginx', 'files.domain', MATRIX_SYNAPSE_DOMAIN) }}"
   vars:
     domain: "{{ MATRIX_SYNAPSE_DOMAIN }}"

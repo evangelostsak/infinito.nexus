@@ -1,0 +1,29 @@
+  mdad-runner:
+    container_name: matrix-mdad-runner
+    build:
+      context: {{ application_id | abs_role_path_by_application_id }}/files/flavor/ansible/runner
+      args:
+        MATRIX_MDAD_RUNNER_BASE_IMAGE: {{ MATRIX_MDAD_RUNNER_BASE_IMAGE }}
+        MATRIX_MDAD_RUNNER_BASE_VERSION: {{ MATRIX_MDAD_RUNNER_BASE_VERSION }}
+        MATRIX_MDAD_RUNNER_DOCKER_CLI_IMAGE: {{ MATRIX_MDAD_RUNNER_DOCKER_CLI_IMAGE }}
+        MATRIX_MDAD_RUNNER_DOCKER_CLI_VERSION: {{ MATRIX_MDAD_RUNNER_DOCKER_CLI_VERSION }}
+    image: {{ MATRIX_MDAD_RUNNER_IMAGE }}
+    restart: "no"
+    privileged: true
+    network_mode: host
+    pid: host
+    environment:
+      SYSTEMD_IGNORE_CHROOT: "1"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/systemd/system:/etc/systemd/system
+      - /matrix:/matrix
+      - /run/systemd:/run/systemd
+      - {{ MATRIX_MDAD_DIR }}:/mdad
+    working_dir: /mdad
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        ansible-galaxy install -r requirements.yml -p roles/galaxy/ --force
+        ansible-playbook -i inventory/hosts setup.yml --tags={{ MATRIX_MDAD_PLAYBOOK_TAGS }}

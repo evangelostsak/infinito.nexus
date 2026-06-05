@@ -1,17 +1,19 @@
 ---
-- name: Load bridges configuration
-  include_vars:
-    file: "bridges.yml"
-
-- name: Filter enabled bridges and register as fact
-  set_fact:
-    MATRIX_BRIDGES: "{{ bridges_configuration | filter_enabled_bridges(lookup('config', application_id, 'services.matrix.plugins')) }}"
+- name: "set matrix flavor"
+  ansible.builtin.set_fact:
+    matrix_flavor: "{{ lookup('config', application_id, 'services.matrix.flavor', 'ansible') }}"
   changed_when: false
 
-# Order of the following tasks is important otherwise handlers are flushed wrongly
+- name: "assert matrix flavor is one of: ansible | compose"
+  ansible.builtin.assert:
+    that:
+      - matrix_flavor in ['ansible', 'compose']
+    fail_msg: "services.matrix.flavor must be 'ansible' or 'compose' (got '{{ matrix_flavor }}')"
 
-- name: "Include Docker Tasks for '{{ application_id }}'"
-  include_tasks: 01_docker.yml
+- name: "dispatch to ansible flavor (matrix-docker-ansible-deploy upstream)"
+  include_tasks: flavor/ansible/main.yml
+  when: matrix_flavor == 'ansible'
 
-- name: "Include Webserver Tasks for '{{ application_id }}'"
-  include_tasks: 03_webserver.yml
+- name: "dispatch to compose flavor (deprecated; in-repo compose stack)"
+  include_tasks: flavor/compose/main.yml
+  when: matrix_flavor == 'compose'

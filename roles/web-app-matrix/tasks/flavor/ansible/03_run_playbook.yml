@@ -1,0 +1,22 @@
+---
+- name: "ansible-flavor: ensure rshared mount propagation on / (MDAD bind-propagation=slave requirement)"
+  ansible.builtin.command:
+    cmd: mount --make-rshared /
+  changed_when: false
+
+- name: "ansible-flavor: render compose.yml + start matrix-mdad-runner via sys-stk-backend"
+  ansible.builtin.include_role:
+    name: sys-stk-backend
+  vars:
+    compose_handlers_flush: true
+
+- name: "ansible-flavor: wait synchronously for MDAD runner to complete"
+  ansible.builtin.command:
+    argv:
+      - container
+      - wait
+      - matrix-mdad-runner
+  register: matrix_mdad_runner_wait
+  changed_when: true
+  failed_when: matrix_mdad_runner_wait.stdout | int != 0
+  timeout: 3600

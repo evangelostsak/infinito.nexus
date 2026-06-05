@@ -1,0 +1,85 @@
+  synapse:
+{% set container_port = MATRIX_SYNAPSE_CONTAINER_PORT %}
+    image: "{{ MATRIX_SYNAPSE_IMAGE }}:{{ MATRIX_SYNAPSE_VERSION }}"
+    container_name: {{ MATRIX_SYNAPSE_NAME }}
+    restart: {{ DOCKER_RESTART_POLICY }}
+    logging:
+      driver: journald
+    volumes:
+      - synapse_data:/data
+      - {{ MATRIX_SYNAPSE_CONFIG_PATH_HOST }}:{{ MATRIX_SYNAPSE_CONFIG_PATH_CONTAINER }}:ro
+      - {{ MATRIX_SYNAPSE_LOG_PATH_HOST }}:{{ MATRIX_SYNAPSE_LOG_PATH_CONTAINER }}:ro
+{% for item in MATRIX_BRIDGES %}
+      - {{ lookup('container', application_id, 'directories.instance') }}mautrix/{{ item.bridge_name }}/registration.yaml:{{ MATRIX_REGISTRATION_FILE_FOLDER }}{{ item.bridge_name }}.registration.yaml:ro
+{% endfor %}
+    environment:
+      - SYNAPSE_SERVER_NAME={{ MATRIX_SYNAPSE_DOMAIN }}
+      - SYNAPSE_REPORT_STATS=no
+    ports:
+      - "{{ DOCKER_BIND_HOST }}:{{lookup('config', 'web-app-matrix', 'services.synapse.ports.local.http')}}:{{ container_port }}"
+{% include 'roles/sys-svc-container/templates/healthcheck/curl.yml.j2' %}
+{% if MATRIX_BRIDGES | length > 0 %}
+{% for item in MATRIX_BRIDGES %}
+      mautrix-{{ item.bridge_name }}:
+        condition: service_healthy
+{% endfor %}
+{% else %}
+{% endif %}
+{{ lookup('container_depends_on', application_id) }}
+{% include 'roles/sys-svc-container/templates/networks.yml.j2' %}
+  element:
+{% set container_port = 80 %}
+    image: "{{ MATRIX_ELEMENT_IMAGE }}:{{ MATRIX_ELEMENT_VERSION }}"
+    container_name: {{ MATRIX_ELEMENT_NAME }}
+    restart: {{ DOCKER_RESTART_POLICY }}
+    volumes:
+      - {{ MATRIX_ELEMENT_CONFIG_PATH_HOST }}:/app/config.json
+    ports:
+      - "{{ DOCKER_BIND_HOST }}:{{ MATRIX_ELEMENT_PORT }}:{{ container_port }}"
+{% include 'roles/sys-svc-container/templates/healthcheck/wget.yml.j2' %}
+{% include 'roles/sys-svc-container/templates/networks.yml.j2' %}
+
+{% for item in MATRIX_BRIDGES %}
+  mautrix-{{ item.bridge_name }}:
+    container_name: matrix-{{ item.bridge_name }}
+    image: dock.mau.dev/mautrix/{{ item.bridge_name }}:latest
+    restart: {{ DOCKER_RESTART_POLICY }}
+    volumes:
+      - ./mautrix/{{ item.bridge_name }}:/data
+    healthcheck:
+      test: ["CMD-SHELL", "test -f {{ MATRIX_REGISTRATION_FILE_FOLDER }}registration.yaml || exit 1"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+{% include 'roles/sys-svc-container/templates/networks.yml.j2' %}
+{% endfor %}
+{% if lookup('config', application_id, 'services.matrix.plugins.chatgpt') | bool %}
+  matrix-chatgpt-bot:
+    restart: {{ DOCKER_RESTART_POLICY }}
+    container_name: matrix-chatgpt
+    image: "{{ MATRIX_CHATGPT_BOT_IMAGE }}:{{ MATRIX_CHATGPT_BOT_VERSION }}"
+    volumes:
+      - chatgpt_data:/storage
+    environment:
+      OPENAI_API_KEY: "{{ lookup('config', application_id, 'credentials.chatgpt_bridge_openai_api_key')}}"
+      CHATGPT_CONTEXT: 'thread'
+      CHATGPT_API_MODEL: 'gpt-3.5-turbo'
+      CHATGPT_REVERSE_PROXY: 'https://api.openai.com/v1/chat/completions'
+      CHATGPT_MAX_PROMPT_TOKENS: '3000'
+      KEYV_BACKEND: 'file'
+      KEYV_URL: ''
+      KEYV_BOT_ENCRYPTION: 'false'
+      KEYV_BOT_STORAGE: 'true'
+      MATRIX_HOMESERVER_URL: '{{ MATRIX_SYNAPSE_URL }}'
+      MATRIX_BOT_USERNAME: '@chatgptbot:{{ MATRIX_SERVER_NAME }}'
+      MATRIX_ACCESS_TOKEN: "{{ lookup('config', application_id, 'credentials.chatgpt_bridge_access_token', '') }}"
+      MATRIX_BOT_PASSWORD: "{{ lookup('config', application_id, 'credentials.chatgpt_bridge_user_password') }}"
+      MATRIX_DEFAULT_PREFIX: '!chatgpt'
+      MATRIX_DEFAULT_PREFIX_REPLY: 'false'
+      MATRIX_WHITELIST: ':{{ MATRIX_SERVER_NAME }}'
+      MATRIX_AUTOJOIN: 'true'
+      MATRIX_ENCRYPTION: 'true'
+      MATRIX_THREADS: 'true'
+      MATRIX_PREFIX_DM: 'false'
+      MATRIX_RICH_TEXT: 'true'
+{% endif %}

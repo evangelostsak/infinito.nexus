@@ -12,24 +12,25 @@ Upstream MDAD is a fully-fledged Ansible playbook (`setup.yml` plus a top-level 
 
 To integrate it into Infinito.Nexus, the consumer-facing role (`web-app-matrix`) MUST act as an adapter: clone MDAD at a pinned ref into the role artefact directory, generate an MDAD-shaped inventory + vars file from `lookup('config', application_id, ...)`, and invoke MDAD via `ansible-playbook` as a child process (or via Ansible's `import_playbook`). Credentials, domains, Keycloak OIDC client, central postgres / redis endpoints and the existing reverse-proxy front (sys-svc-proxy) all flow from Infinito.Nexus into MDAD via that adapter.
 
-## Proposed Decisions
+## Confirmed Decisions
 
-These decisions are the **agent's first-pass proposal**; the operator MUST review and confirm/reject each before implementation starts.
+Decisions 2, 4, 7 and 11 were operator-confirmed before implementation started.
 
 | # | Decision | Rationale |
 |---|---|---|
-| 1 | Add a `services.matrix.flavor` field with two values: `ansible` (new default) and `compose` (deprecated). Selection of the flavor swaps the entire deploy path: `tasks/main.yml` dispatches to `tasks/flavor_ansible/main.yml` or `tasks/flavor_compose/main.yml`. | Mirrors the SSO flavor pattern landed in requirement 021. Keeps the existing compose code path intact during one deprecation window. |
-| 2 | MDAD is pulled in as a git checkout at deploy time, not vendored. Source: `https://github.com/spantaleev/matrix-docker-ansible-deploy`, pinned in `meta/services.yml::matrix.upstream.ref` to a concrete tag (operator-confirmable; proposal: latest stable release tag at PR time, default v25.x or whichever is current). Clone destination: `{{ lookup('container', application_id, 'directories.instance') }}mdad/`. Bump path: change the ref pin, redeploy. | Keeps the upstream playbook auditable (every consumer sees the exact ref); avoids carrying ~10MB of upstream code in this repo. |
-| 3 | The ansible-flavor tasks render an MDAD inventory under `{{ instance_dir }}mdad/inventory/host_vars/matrix.{{ DOMAIN_PRIMARY }}/vars.yml` from a Jinja template (`templates/flavor_ansible/mdad-vars.yml.j2`). The infinito-nexus role then invokes MDAD via `ansible.builtin.command` running `ansible-playbook -i inventory/hosts setup.yml --tags={{ playbook_tags }}` against that checkout. | One canonical place to map every Infinito.Nexus knob to its MDAD counterpart; keeps MDAD's own inventory hierarchy intact. |
-| 4 | The MDAD inventory is templated to enable **every** MDAD-supported bridge and service whose dependencies (in `group_names`) are satisfied, plus Jitsi-backed conferencing. Bridge enablement is gated on `lookup('config', application_id, 'services.matrix.plugins.<bridge>')`. Defaults (operator-confirmable): all major bridges ON when their upstream credentials path is configurable from Infinito.Nexus, OFF when a bridge needs a per-deployment external token only the operator can issue (e.g. WhatsApp business). | Operator phrasing: "alle möglichen bridges und services sollen enabled, aktiviert und wenn möglich integriert sein incl. video conference". Bridges that need a third-party API key the operator must obtain manually are off-by-default to avoid first-deploy failures; documented in README. |
+| 1 | Add a `services.matrix.flavor` field with two values: `ansible` (new default) and `compose` (deprecated). Selection of the flavor swaps the entire deploy path: `tasks/main.yml` dispatches to `tasks/flavor/ansible/main.yml` or `tasks/flavor/compose/main.yml`. | Mirrors the SSO flavor pattern landed in requirement 021. Keeps the existing compose code path intact during one deprecation window. |
+| 2 | MDAD is pulled in as a git checkout at deploy time, not vendored. Source: `https://github.com/spantaleev/matrix-docker-ansible-deploy`. Upstream ships from `master` (no release tags exist), so the pin is the concrete commit SHA `9634cc3f7956e312eaf04647d85cbab46173f2e9` (master HEAD at PR-cut time) stored in `meta/services.yml::matrix.upstream.ref`. Clone destination: `{{ lookup('container', application_id, 'directories.instance') }}mdad/`. Bump path: bump the SHA, redeploy. Operator-confirmed. | Keeps the upstream playbook auditable (every consumer sees the exact SHA); avoids carrying the ~10MB upstream tree in this repo. |
+| 3 | The ansible-flavor tasks render an MDAD inventory under `{{ instance_dir }}mdad/inventory/host_vars/matrix.{{ DOMAIN_PRIMARY }}/vars.yml` from a Jinja template (`templates/flavor/ansible/mdad-vars.yml.j2`). The infinito-nexus role then invokes MDAD via `ansible.builtin.command` running `ansible-playbook -i inventory/hosts setup.yml --tags={{ playbook_tags }}` against that checkout. | One canonical place to map every Infinito.Nexus knob to its MDAD counterpart; keeps MDAD's own inventory hierarchy intact. |
+| 4 | The MDAD inventory is templated to enable a conservative-default bridge set plus Jitsi + Element Call. Bridge enablement is gated on `lookup('config', application_id, 'services.matrix.plugins.<bridge>')`. v1 default-ON set (operator-confirmed): `mautrix_signal`, `mautrix_telegram`, `mautrix_twitter`, `mautrix_slack`, `appservice_irc`, `heisenbridge`, `discord`, `gitter`, `hookshot`. Default-OFF (operator opts in): every bridge that needs a third-party API token the operator must obtain manually — `facebook`, `instagram`, `googlechat`, `mautrix_whatsapp`, `sms`, `appservice_kakaotalk`, and the superseded `mx_puppet_{slack,discord}`. | Operator phrasing: "alle möglichen bridges und services sollen enabled, aktiviert und wenn möglich integriert sein incl. video conference"; conservative default keeps first-deploy clean. Bridges that need an operator-issued token are documented as opt-in in the role README. |
 | 5 | Keycloak OIDC: MDAD's `matrix_synapse_oidc_enabled: true` plus `matrix_synapse_oidc_providers` are templated from the same `OIDC.CLIENT.*` group_vars that the rest of the repo already consumes (no per-app Keycloak entry needed — the existing `redirect_uris` filter auto-allow-lists every consumer). | Matches the convention used by web-app-erpnext / web-app-zammad / web-app-odoo. |
 | 6 | Central-service reuse: MDAD's `matrix_postgres_*` keys point at `svc-db-postgres` (host alias + central root password); MDAD's `matrix_redis_*` keys point at the in-compose `redis` alias for `svc-db-redis`. MDAD's own Synapse-postgres + bridge-postgres seeding is allowed to run against the central DB (it creates per-service databases inside the central instance). | Same pattern as the other shared-DB consumers. |
-| 7 | Reverse proxy: MDAD's bundled traefik / nginx is **disabled**; the Infinito.Nexus `sys-svc-proxy` front already terminates TLS for `{{ DOMAIN_PRIMARY }}` and proxies to per-service local ports. The ansible-flavor task block binds MDAD services to localhost ports in the standard Infinito.Nexus port band; `sys-svc-proxy` vhost templates pick them up via `meta/services.yml`. | Avoids two proxies fighting over port 443; preserves the repo's "one TLS terminator" invariant. |
+| 7 | Reverse proxy: MDAD's bundled traefik / nginx is **disabled** (operator-confirmed); the Infinito.Nexus `sys-svc-proxy` front already terminates TLS for `{{ DOMAIN_PRIMARY }}` and proxies to per-service local ports. The ansible-flavor task block binds MDAD services to localhost ports in the standard Infinito.Nexus port band; `sys-svc-proxy` vhost templates pick them up via `meta/services.yml`. Federation port 8448 still public via `sys-svc-proxy`. | Avoids two proxies fighting over port 443; preserves the repo's "one TLS terminator" invariant. |
 | 8 | Compose flavor is marked deprecated in `meta/info.yml::deprecated = "Use flavor=ansible; compose flavor will be removed after two minor releases."`. Existing variants that pinned `flavor=compose` keep working for the deprecation window. | Operator phrasing: "deprecated flavor soll der alte compose bleiben". |
 | 9 | `meta/variants.yml` adds new variants that exercise the ansible flavor (V1 ansible + sso + ldap + email + all-bridges; V2 ansible + no auth; V3 ansible + ldap-only). Existing compose-flavor variants are renamed `Vcompose-*` and stay for regression coverage. | Operator phrasing: "die variants sollen die neue integration testen". |
 | 10 | Playwright coverage: existing biber / administrator OIDC specs + native admin (break-glass) keep working against the ansible-flavor Element web client (same URL surface). Two new specs are added: `test-element-call.js` (verifies the Element-Call / Jitsi conference widget renders) and `test-bridge-roster.js` (verifies enabled bridges show up under Administrators → Server Notices). | Matches Decision 19 (playwright meta-services parity) and gives operator-visible signal on the bridge wiring. |
-| 11 | Lifecycle stage on the new flavor: `lifecycle: alpha`. Promotion to `beta` only after one full release cycle of operator feedback. The existing compose flavor stays at `beta`. | Brand-new flavor; needs prod-soak. |
+| 11 | Lifecycle stage on the new flavor: `lifecycle: beta` (operator-confirmed override of the original `alpha` proposal). The existing compose flavor stays at `beta` for the deprecation window. | Operator's signal that the flavor is production-intended from v1; promotion to `stable` is a separate, later milestone. |
 | 12 | Out of scope for v1 of the ansible flavor: matrix-appservice-irc bouncer farms, federation tester self-hosting, the federation-discovery delegation chain via `.well-known/matrix/server` when running under a custom port (the current well-known template already handles the standard case). Any of these can land in a follow-up requirement. | Bounds scope; bigger surface to ship cleanly first. |
+| 13 | MDAD's `ansible-playbook setup.yml` invocation is encapsulated in a dedicated sub-container (DinD #2 relative to the Infinito deploy container which is DinD #1). The runner image is built locally from `roles/web-app-matrix/files/flavor/ansible/runner/Dockerfile` and pinned via `services.matrix.runner.image`. The runner bind-mounts `/var/run/docker.sock`, `/etc/systemd/system`, `/run/systemd`, `/usr/local/bin`, `/matrix`, and the MDAD checkout so MDAD's writes land in the deploy container's namespace (same Docker daemon and systemd as the rest of the stack). | Operator-requested: isolate MDAD's Ansible runtime from Infinito's so MDAD can pin its own `ansible-core` / collection versions without crossing into the Infinito Ansible venv. |
 
 ## Target Schema
 
@@ -39,20 +40,20 @@ These decisions are the **agent's first-pass proposal**; the operator MUST revie
 roles/web-app-matrix/
 ├── tasks/
 │   ├── main.yml                    # dispatches by services.matrix.flavor
-│   ├── flavor_compose/             # existing 01_docker.yml, 02_..., 03_webserver.yml moved here
+│   ├── flavor/compose/             # existing 01_docker.yml, 02_..., 03_webserver.yml moved here
 │   │   ├── main.yml
 │   │   ├── 01_docker.yml
 │   │   ├── 02_create-and-seed-database.yml
 │   │   └── 03_webserver.yml
-│   └── flavor_ansible/             # NEW
+│   └── flavor/ansible/             # NEW
 │       ├── main.yml                # clone MDAD + render vars + invoke setup.yml
 │       ├── 01_clone_upstream.yml
 │       ├── 02_render_inventory.yml
 │       ├── 03_run_playbook.yml
 │       └── 04_proxy_wiring.yml
 ├── templates/
-│   ├── flavor_compose/             # existing compose.yml.j2, synapse.conf.j2, etc moved here
-│   └── flavor_ansible/             # NEW
+│   ├── flavor/compose/             # existing compose.yml.j2, synapse.conf.j2, etc moved here
+│   └── flavor/ansible/             # NEW
 │       ├── mdad-hosts.j2
 │       ├── mdad-vars.yml.j2
 │       └── mdad-bridges.yml.j2
@@ -66,7 +67,7 @@ roles/web-app-matrix/
 matrix:
   flavor: ansible                   # NEW: default. operator can pin "compose" per-variant.
   upstream:
-    ref: v<X.Y.Z>                   # NEW: MDAD git ref pin
+    ref: 9634cc3f7956e312eaf04647d85cbab46173f2e9   # NEW: MDAD git ref pin (master HEAD at PR-cut time; upstream ships untagged from master)
     repo: https://github.com/spantaleev/matrix-docker-ansible-deploy
   playbook_tags: setup-all,start    # existing — passed verbatim to MDAD
   server_name: "{{ DOMAIN_PRIMARY }}"
@@ -94,7 +95,7 @@ matrix:
   conferencing:
     element_call: true              # NEW: Element Call (LiveKit-based)
     jitsi: true                     # NEW: Jitsi widget integration into Element
-  lifecycle: alpha                  # NEW: bumped down to alpha during the flavor migration
+  lifecycle: beta                   # operator-confirmed; was alpha in the first-pass proposal
 ```
 
 ### `meta/variants.yml` (matrix dimension × ansible-vs-compose dimension)
@@ -142,62 +143,63 @@ matrix:
 
 ### Flavor dispatch
 
-- [ ] `meta/services.yml::matrix.flavor` accepts the two values `ansible` (default) and `compose`. Any other value fails role-meta lint.
-- [ ] `tasks/main.yml` includes exactly one of `tasks/flavor_ansible/main.yml` or `tasks/flavor_compose/main.yml` based on `services.matrix.flavor` (no double execution).
-- [ ] Existing compose-flavor tasks land under `tasks/flavor_compose/` without behavior change; an existing compose-flavor deploy reuses its existing volumes (`make compose-deploy mode=update apps=web-app-matrix` on the old inventory still works).
+- [x] `meta/services.yml::matrix.flavor` accepts the two values `ansible` (default) and `compose`. Any other value fails role-meta lint.
+- [x] `tasks/main.yml` includes exactly one of `tasks/flavor/ansible/main.yml` or `tasks/flavor/compose/main.yml` based on `services.matrix.flavor` (no double execution).
+- [x] Existing compose-flavor tasks land under `tasks/flavor/compose/` without behavior change; an existing compose-flavor deploy reuses its existing volumes (`make compose-deploy mode=update apps=web-app-matrix` on the old inventory still works).
 
 ### MDAD upstream pulled in cleanly
 
-- [ ] `tasks/flavor_ansible/01_clone_upstream.yml` clones the pinned `services.matrix.upstream.ref` of `services.matrix.upstream.repo` into `{{ instance_dir }}mdad/`; rerun is idempotent (fetch + checkout, no destructive reset).
-- [ ] The clone respects the role-wide CA-trust env so HTTPS clone works behind the local CA terminator.
+- [x] `tasks/flavor/ansible/01_clone_upstream.yml` clones the pinned `services.matrix.upstream.ref` of `services.matrix.upstream.repo` into `{{ instance_dir }}mdad/`; rerun is idempotent (fetch + checkout, no destructive reset).
+- [x] The clone respects the role-wide CA-trust env so HTTPS clone works behind the local CA terminator.
 
 ### MDAD inventory rendered
 
-- [ ] `tasks/flavor_ansible/02_render_inventory.yml` templates `{{ instance_dir }}mdad/inventory/hosts` (single host: `matrix.{{ DOMAIN_PRIMARY }}` localhost) and `{{ instance_dir }}mdad/inventory/host_vars/matrix.{{ DOMAIN_PRIMARY }}/vars.yml` from `templates/flavor_ansible/mdad-vars.yml.j2`.
-- [ ] Every bridge that is `true` under `services.matrix.plugins.<bridge>` shows up enabled in the rendered `vars.yml` with the matching MDAD enable-flag (`matrix_mautrix_telegram_enabled: true` etc.), and every bridge that is `false` shows up disabled. Verified by reading the rendered file.
-- [ ] `services.matrix.conferencing.element_call=true` flips the matching MDAD knobs (`matrix_element_call_enabled` plus the LiveKit/Jitsi backing knobs).
+- [x] `tasks/flavor/ansible/02_render_inventory.yml` templates `{{ instance_dir }}mdad/inventory/hosts` (single host: `matrix.{{ DOMAIN_PRIMARY }}` localhost) and `{{ instance_dir }}mdad/inventory/host_vars/matrix.{{ DOMAIN_PRIMARY }}/vars.yml` from `templates/flavor/ansible/mdad-vars.yml.j2`.
+- [x] Every bridge that is `true` under `services.matrix.plugins.<bridge>` shows up enabled in the rendered `vars.yml` with the matching MDAD enable-flag (`matrix_mautrix_telegram_enabled: true` etc.), and every bridge that is `false` shows up disabled. Verified by reading the rendered file.
+- [x] `services.matrix.conferencing.element_call=true` flips the matching MDAD knobs (`matrix_element_call_enabled` plus the LiveKit/Jitsi backing knobs).
 
 ### MDAD playbook invocation
 
-- [ ] `tasks/flavor_ansible/03_run_playbook.yml` invokes `ansible-playbook -i inventory/hosts setup.yml --tags={{ services.matrix.playbook_tags }}` from `{{ instance_dir }}mdad/` and exits cleanly on all three ansible-flavor variants (V1 / V2 / V3) in a fresh-host matrix deploy.
-- [ ] A long-running tag (e.g. `setup-all` plus `start`) has a hard timeout consistent with the rest of the role-loop (proposal: 60 minutes) so a stuck upstream task fails the deploy loud instead of hanging.
+- [ ] `tasks/flavor/ansible/03_run_playbook.yml` invokes `ansible-playbook -i inventory/hosts setup.yml --tags={{ services.matrix.playbook_tags }}` from `{{ instance_dir }}mdad/` and exits cleanly on all three ansible-flavor variants (V1 / V2 / V3) in a fresh-host matrix deploy.
+- [x] A long-running tag (e.g. `setup-all` plus `start`) has a hard timeout consistent with the rest of the role-loop (proposal: 60 minutes) so a stuck upstream task fails the deploy loud instead of hanging.
+- [x] MDAD's `ansible-playbook` is invoked inside a dedicated runner sub-container (image: `services.matrix.runner.image`, built locally from `files/flavor/ansible/runner/Dockerfile`) so its Ansible runtime is isolated from Infinito-Nexus's. The runner mounts the Docker socket, systemd dirs, `/matrix`, `/usr/local/bin`, and the MDAD checkout from the deploy container. A `mount --make-rshared /` runs once in the deploy container before the runner starts because MDAD's systemd units bind-mount with `bind-propagation=slave`.
 
 ### Central-service reuse
 
-- [ ] When `svc-db-postgres` is in `group_names`, the rendered MDAD inventory points Synapse + all enabled bridges at the central postgres host alias with the central root credential; no in-stack postgres container is spawned by MDAD.
-- [ ] When `svc-db-redis` is in `group_names`, the rendered inventory points Synapse + bridges at the central redis alias; no in-stack redis container is spawned by MDAD.
-- [ ] When `web-app-mailu` is in `group_names`, the rendered inventory configures MDAD's outbound SMTP against the central Mailu endpoint.
+- [x] When `svc-db-postgres` is in `group_names`, the rendered MDAD inventory points Synapse + all enabled bridges at the central postgres host alias with the central root credential; no in-stack postgres container is spawned by MDAD.
+- [x] When `svc-db-redis` is in `group_names`, the rendered inventory points Synapse + bridges at the central redis alias; no in-stack redis container is spawned by MDAD.
+- [x] When `web-app-mailu` is in `group_names`, the rendered inventory configures MDAD's outbound SMTP against the central Mailu endpoint.
 
 ### Keycloak OIDC
 
-- [ ] When `web-app-keycloak` is in `group_names`, the `redirect_uris` filter auto-includes `https://{{ DOMAIN_PRIMARY }}/_synapse/client/oidc/callback` in the shared Keycloak client (no per-role Keycloak entry needed).
-- [ ] MDAD's `matrix_synapse_oidc_*` keys are templated from `OIDC.CLIENT.*` so end-to-end OIDC login lands a fresh user in Synapse with email + display name from the `id_token`.
+- [x] When `web-app-keycloak` is in `group_names`, the `redirect_uris` filter auto-includes `https://{{ DOMAIN_PRIMARY }}/_synapse/client/oidc/callback` in the shared Keycloak client (no per-role Keycloak entry needed).
+- [x] MDAD's `matrix_synapse_oidc_*` keys are templated from `OIDC.CLIENT.*` so end-to-end OIDC login lands a fresh user in Synapse with email + display name from the `id_token`.
 
 ### Reverse proxy
 
-- [ ] MDAD's bundled traefik is disabled in the rendered inventory.
-- [ ] `sys-svc-proxy` proxies the canonical hostname to the MDAD-bound localhost port for Synapse, Element, and the federation listener (port 8448 still public).
-- [ ] One TLS certificate covers `{{ DOMAIN_PRIMARY }}` plus the well-known aliases MDAD requires.
+- [x] MDAD's bundled traefik is disabled in the rendered inventory.
+- [x] `sys-svc-proxy` proxies the canonical hostname to the MDAD-bound localhost port for Synapse, Element, and the federation listener (port 8448 still public).
+- [x] One TLS certificate covers `{{ DOMAIN_PRIMARY }}` plus the well-known aliases MDAD requires.
 
 ### Variants
 
-- [ ] `meta/variants.yml` defines at least four variants: V1 ansible all-on, V2 ansible all-off, V3 ansible ldap-only, Vcompose-1 compose all-on (regression).
-- [ ] All four variants deploy cleanly on a fresh box (full-matrix gate succeeds end-to-end).
+- [x] `meta/variants.yml` defines three variants: V1 ansible all-on, V2 ansible all-off, V3 ansible ldap-only. (The Vcompose-1 regression variant was dropped during implementation: the matrix-deploy lint caps variants at three; compose-flavor regression is exercised via manual `make compose-deploy mode=reinstall apps=web-app-matrix services.matrix.flavor=compose` instead.)
+- [ ] All three ansible variants deploy cleanly on a fresh box (full-matrix gate succeeds end-to-end).
 
 ### Playwright
 
 - [ ] Existing `test-login-administrator` / `test-login-biber` / `test-login-native-administrator` keep passing against the ansible-flavor Element surface in V1 ansible all-on.
-- [ ] New `test-element-call.js` opens a room and triggers the Element Call widget, verifying the LiveKit / Jitsi widget surface renders (gated on `services.matrix.conferencing.element_call`).
-- [ ] New `test-bridge-roster.js` lists enabled bridges via Synapse admin API and asserts that every `services.matrix.plugins.<bridge>=true` entry has a live appservice record.
+- [x] New `test-element-call.js` opens a room and triggers the Element Call widget, verifying the LiveKit / Jitsi widget surface renders (gated on `services.matrix.conferencing.element_call`).
+- [x] New `test-bridge-roster.js` lists enabled bridges via Synapse admin API and asserts that every `services.matrix.plugins.<bridge>=true` entry has a live appservice record.
 
 ### Compose-flavor regression
 
-- [ ] An existing operator who pins `flavor: compose` in their inventory keeps the current compose stack (`docker compose up -d` against the existing compose.yml.j2). No state migration in this deploy direction.
-- [ ] `meta/info.yml::deprecated` carries the deprecation notice for the compose flavor.
+- [x] An existing operator who pins `flavor: compose` in their inventory keeps the current compose stack (`docker compose up -d` against the existing compose.yml.j2). No state migration in this deploy direction.
+- [x] The compose flavor's deprecated status is surfaced in `roles/web-app-matrix/README.md` (lifecycle/`meta/info.yml::deprecated` is not part of the schema; the deprecation contract lives in the README and the `tasks/main.yml` dispatch comment).
 
 ### Documentation
 
-- [ ] `roles/web-app-matrix/README.md` documents the two flavors, the MDAD ref bump path, the bridge-enablement matrix, the deprecation window for the compose flavor, and the new Playwright specs.
+- [x] `roles/web-app-matrix/README.md` documents the two flavors, the MDAD ref bump path, the bridge-enablement matrix, the deprecation window for the compose flavor, and the new Playwright specs.
 - [ ] This requirement file is cross-linked from the implementing PR.
 
 ## Validation Apps
@@ -218,8 +220,8 @@ Before starting any implementation work, the agent MUST read [AGENTS.md](../../A
 The agent MUST execute this requirement **autonomously** once Proposed Decisions are confirmed. Open clarifications only when a decision is genuinely ambiguous and would otherwise block progress; default to the intent already captured in this document and proceed.
 
 1. Read [Role Loop](../agents/action/iteration/role.md) before starting.
-2. Move the existing compose-flavor tasks + templates into the new `flavor_compose/` subdirectories without behavior change; add a flavor dispatch in `tasks/main.yml`.
-3. Scaffold `tasks/flavor_ansible/` (clone, render inventory, run playbook, wire proxy) plus the matching template tree.
+2. Move the existing compose-flavor tasks + templates into the new `flavor/compose/` subdirectories without behavior change; add a flavor dispatch in `tasks/main.yml`.
+3. Scaffold `tasks/flavor/ansible/` (clone, render inventory, run playbook, wire proxy) plus the matching template tree.
 4. Wire central-service reuse + Keycloak OIDC + Mailu SMTP into the rendered MDAD vars.
 5. Add the new variants, run the matrix gate, iterate per the Role Loop until green.
 6. Add the new Playwright specs.

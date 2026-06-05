@@ -1,0 +1,54 @@
+---
+- name: "ansible-flavor: probe Synapse client API on host loopback"
+  uri_retry:
+    url: "http://127.0.0.1:{{ MATRIX_SYNAPSE_PORT }}/_matrix/client/versions"
+    status_code: 200
+    follow_redirects: none
+  register: matrix_synapse_loopback_probe
+  retries: 60
+  delay: 2
+  until: matrix_synapse_loopback_probe.status == 200
+
+- name: "ansible-flavor: probe Element web client on host loopback"
+  uri_retry:
+    url: "http://127.0.0.1:{{ MATRIX_ELEMENT_PORT }}/"
+    status_code: 200
+    follow_redirects: none
+  register: matrix_element_loopback_probe
+  retries: 30
+  delay: 2
+  until: matrix_element_loopback_probe.status == 200
+
+- name: "ansible-flavor: create native admin in Synapse (idempotent via shared-secret)"
+  ansible.builtin.command:
+    argv:
+      - container
+      - exec
+      - matrix-synapse
+      - register_new_matrix_user
+      - -u
+      - "{{ MATRIX_ADMINISTRATOR_USERNAME }}"
+      - -p
+      - "{{ MATRIX_ADMINISTRATOR_PASSWORD }}"
+      - -a
+      - -c
+      - /data/homeserver.yaml
+      - http://localhost:8008
+  register: matrix_admin_create
+  changed_when: matrix_admin_create.rc == 0 and 'User ID already taken' not in (matrix_admin_create.stdout + matrix_admin_create.stderr)
+  failed_when: matrix_admin_create.rc != 0 and 'User ID already taken' not in (matrix_admin_create.stdout + matrix_admin_create.stderr)
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
+
+- name: "front-proxy: Element web client"
+  ansible.builtin.include_role:
+    name: sys-stk-front-proxy
+  vars:
+    domain: "{{ MATRIX_ELEMENT_DOMAIN }}"
+    http_port: "{{ MATRIX_ELEMENT_PORT }}"
+
+- name: "front-proxy: Synapse client/federation"
+  ansible.builtin.include_role:
+    name: sys-stk-front-proxy
+  vars:
+    domain: "{{ MATRIX_SYNAPSE_DOMAIN }}"
+    http_port: "{{ MATRIX_SYNAPSE_PORT }}"

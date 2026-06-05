@@ -1,0 +1,18 @@
+---
+- name: "ensure MDAD inventory host_vars dir exists"
+  ansible.builtin.file:
+    path: "{{ MATRIX_MDAD_DIR }}/inventory/host_vars/{{ MATRIX_SYNAPSE_DOMAIN }}"
+    state: directory
+    mode: "0755"
+
+- name: "render MDAD inventory hosts file"
+  ansible.builtin.template:
+    src: "flavor/ansible/mdad-hosts.j2"
+    dest: "{{ MATRIX_MDAD_DIR }}/inventory/hosts"
+    mode: "0644"
+
+- name: "render MDAD host_vars vars.yml"
+  ansible.builtin.template:
+    src: "flavor/ansible/mdad-vars.yml.j2"
+    dest: "{{ MATRIX_MDAD_DIR }}/inventory/host_vars/{{ MATRIX_SYNAPSE_DOMAIN }}/vars.yml"
+    mode: "0644"

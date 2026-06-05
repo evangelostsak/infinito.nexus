@@ -1,0 +1,18 @@
+---
+- name: "compose-flavor: tear down any prior MDAD systemd services + containers"
+  include_tasks: 00_cleanup_mdad_residue.yml
+
+- name: Load bridges configuration
+  include_vars:
+    file: "bridges.yml"
+
+- name: Filter enabled bridges and register as fact
+  set_fact:
+    MATRIX_BRIDGES: "{{ bridges_configuration | filter_enabled_bridges(lookup('config', application_id, 'services.matrix.plugins')) }}"
+  changed_when: false
+
+- name: "compose-flavor: docker stack for '{{ application_id }}'"
+  include_tasks: 01_docker.yml
+
+- name: "compose-flavor: webserver for '{{ application_id }}'"
+  include_tasks: 03_webserver.yml
