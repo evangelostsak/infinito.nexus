@@ -53,7 +53,6 @@ async function penpotOidcLogin(page, username, password) {
 // (disabled until the work-email + password fields are filled) that binds
 // against OpenLDAP directly — no Keycloak round-trip.
 async function penpotLdapLogin(page, email, password) {
-  const expectedBase = baseUrl.replace(/\/$/, "");
   await page.goto(loginRoute(baseUrl));
   const emailField = page.getByLabel(/work email/i);
   const passwordField = page.getByLabel(/^password$/i);
