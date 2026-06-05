@@ -17,10 +17,10 @@ listeners:
 database:
   name: psycopg2
   args:
-    user: "{{ lookup('database', application_id, 'username') }}"
-    password: "{{ lookup('database', application_id, 'password') }}"
-    database: "{{ lookup('database', application_id, 'name') }}"
-    host: "{{ lookup('database', application_id, 'host') }}"
+    user: "{{ MATRIX_POSTGRES_USER }}"
+    password: "{{ MATRIX_POSTGRES_PASSWORD }}"
+    database: "{{ MATRIX_POSTGRES_DATABASE }}"
+    host: "{{ MATRIX_POSTGRES_HOST }}"
     cp_min: 5
     cp_max: {{ POSTGRES_ALLOWED_AVG_CONNECTIONS }}
 log_config:                     "{{ MATRIX_SYNAPSE_LOG_PATH_CONTAINER }}"

@@ -31,7 +31,7 @@ Pinned MDAD upstream lives at `services.matrix.upstream.{repo,ref}`. To bump:
 2. Run `make compose-deploy mode=reinstall apps=web-app-matrix full_cycle=true variant=0`.
 3. Iterate `mode=update` for follow-up adjustments.
 
-MDAD knobs are rendered from `templates/flavor/ansible/mdad-vars.yml.j2`. Central-service consumers (postgres, redis, mailu, keycloak, openldap) are wired automatically when their `services.<name>.enabled` toggles are true.
+MDAD knobs are rendered from `templates/flavor/ansible/vars.yml.j2`. Central-service consumers (postgres, redis, mailu, keycloak, openldap) are wired automatically when their `services.<name>.enabled` toggles are true.
 
 **Runner-container encapsulation.** MDAD's `ansible-playbook setup.yml` invocation runs inside a dedicated sub-container (image: `services.matrix.runner.image`, built from `files/flavor/ansible/runner/Dockerfile`). This isolates MDAD's Ansible runtime from the Infinito-Nexus deploy container's Ansible — MDAD can pin its own `ansible-core` / `community.docker` / `community.general` versions without colliding with Infinito's. The runner mounts:
 

@@ -5,8 +5,11 @@
 - name: "ansible-flavor: render MDAD inventory"
   include_tasks: 02_render_inventory.yml
 
+- name: "ansible-flavor: provision Matrix database on central postgres"
+  include_tasks: 03_database.yml
+
 - name: "ansible-flavor: launch matrix-mdad DiD container"
-  include_tasks: 03_run_playbook.yml
+  include_tasks: 04_run_playbook.yml
 
 - name: "ansible-flavor: wire sys-svc-proxy to matrix-mdad loopback ports"
-  include_tasks: 04_proxy_wiring.yml
+  include_tasks: 05_proxy_wiring.yml

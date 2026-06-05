@@ -55,6 +55,12 @@ MATRIX_CONFERENCING_ELEMENT_CALL: "{{ lookup('config', application_id, 'services
 
 MATRIX_LDAP_ENABLED: "{{ lookup('config', application_id, 'services.ldap.enabled') | bool }}"
 
+MATRIX_POSTGRES_HOST: "{{ lookup('database', application_id, 'host') }}"
+MATRIX_POSTGRES_PORT: "{{ lookup('database', application_id, 'port') }}"
+MATRIX_POSTGRES_USER: "{{ lookup('database', application_id, 'username') }}"
+MATRIX_POSTGRES_PASSWORD: "{{ lookup('database', application_id, 'password') }}"
+MATRIX_POSTGRES_DATABASE: "{{ lookup('database', application_id, 'name') }}"
+
 MATRIX_OUTBOUND_MAIL_ENABLED: "{{ lookup('config', application_id, 'services.email.enabled') | bool }}"
 MATRIX_OUTBOUND_MAIL: "{{ lookup('email', application_id) if MATRIX_OUTBOUND_MAIL_ENABLED else {} }}"
 MATRIX_OUTBOUND_MAIL_HOST: "{{ MATRIX_OUTBOUND_MAIL.host | default('') }}"

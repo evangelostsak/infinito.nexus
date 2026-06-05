@@ -10,13 +10,24 @@ matrix_homeserver_generic_secret_key: "{{ lookup('config', application_id, 'cred
 traefik_enabled: false
 matrix_playbook_reverse_proxy_type: none
 
-postgres_enabled: true
+postgres_enabled: false
+postgres_connection_hostname: "{{ MATRIX_POSTGRES_HOST }}"
+postgres_connection_port: {{ MATRIX_POSTGRES_PORT }}
+postgres_connection_username: "{{ MATRIX_POSTGRES_USER }}"
+postgres_connection_password: "{{ MATRIX_POSTGRES_PASSWORD }}"
 
+matrix_synapse_database_host: "{{ MATRIX_POSTGRES_HOST }}"
+matrix_synapse_database_port: {{ MATRIX_POSTGRES_PORT }}
+matrix_synapse_database_user: "{{ MATRIX_POSTGRES_USER }}"
+matrix_synapse_database_password: "{{ MATRIX_POSTGRES_PASSWORD }}"
+matrix_synapse_database_database: "{{ MATRIX_POSTGRES_DATABASE }}"
+
+matrix_synapse_container_network: host
 matrix_synapse_container_client_api_host_bind_port: "0.0.0.0:{{ MATRIX_SYNAPSE_PORT }}"
 matrix_synapse_container_federation_api_plain_host_bind_port: "0.0.0.0:{{ MATRIX_FEDERATION_PORT }}"
 matrix_client_element_container_http_host_bind_port: "0.0.0.0:{{ MATRIX_ELEMENT_PORT }}"
 
-valkey_enabled: true
+valkey_enabled: false
 
 exim_relay_enabled: {{ (not MATRIX_OUTBOUND_MAIL_ENABLED) | string | lower }}
 matrix_synapse_email_enabled: {{ MATRIX_OUTBOUND_MAIL_ENABLED | string | lower }}
