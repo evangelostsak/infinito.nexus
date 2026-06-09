@@ -1,4 +1,4 @@
-# 235 - Setup Penpot
+# 023 - Setup Penpot
 
 ## User Story
 
@@ -34,8 +34,10 @@ Penpot's upstream stack is **frontend + backend + exporter + PostgreSQL + Redis*
 
 ### Identity integration
 
-- [x] OIDC login is available via `web-app-keycloak`, enabled through `PENPOT_FLAGS` (e.g. `enable-login-with-oidc`). _(config complete; live login flow pending a real deploy)_
-- [x] LDAP login is available via `svc-db-openldap`, enabled through `PENPOT_FLAGS` (e.g. `enable-login-with-ldap`). _(config complete; live login flow pending a real deploy)_
+- [x] OIDC login is available via `web-app-keycloak`, enabled through `PENPOT_FLAGS` (e.g. `enable-login-with-oidc`). _(verified live against a Penpot + Keycloak deploy.)_
+- [x] LDAP login is available via `svc-db-openldap`, enabled through `PENPOT_FLAGS` (e.g. `enable-login-with-ldap`). _(verified live against a Penpot + OpenLDAP deploy.)_
+- [x] Native local email/password login is available (`enable-login-with-password`); the role bootstraps a local password for the `administrator` profile via the backend PREPL (`enable-prepl-server`) in `tasks/main.yml`, so native login works alongside OIDC/LDAP.
+- [x] Self-registration follows `services.penpot.registration_enabled` (default off once OIDC is the login path; overridable per inventory) and renders `enable-registration`/`disable-registration` in `PENPOT_FLAGS`.
 - [x] OIDC and LDAP configuration is fully automated via Ansible (env vars / templated config), requiring no manual post-deploy steps.
 
 ### CSP & reverse proxy
@@ -55,8 +57,9 @@ Penpot's upstream stack is **frontend + backend + exporter + PostgreSQL + Redis*
 - [x] A per-role Playwright spec exists and gates authenticated scenarios via `skipUnlessServiceEnabled` per [006 - Service-gated Playwright tests](README.md#archive).
 - [x] A **separate** OIDC login scenario and LDAP login scenario exist (not combined into one test body) per [018](018-playwright-ldap-coverage.md).
 - [x] Both the canonical admin persona and the non-admin RBAC persona `biber` are exercised per [017](017-playwright-biber-rbac-coverage.md).
-- [ ] A scenario verifies project creation.
-- [ ] A scenario verifies asset upload.
+- [x] A native (local-password) admin login scenario exists (`test-login-native.js`), separate from the OIDC/LDAP companions.
+- [x] A scenario verifies project creation.
+- [x] A scenario verifies asset upload.
 
 ### Infinito.Nexus integration
 
@@ -75,7 +78,7 @@ Penpot's upstream stack is **frontend + backend + exporter + PostgreSQL + Redis*
 ### Definition of done
 
 - [ ] Penpot deploys successfully with one command on a fresh host.
-- [ ] The app is reachable at its generated domain (e.g. `design.infinito.nexus`).
+- [ ] The app is reachable at its generated canonical domain (`penpot.design.{{ DOMAIN_PRIMARY }}`, e.g. `penpot.design.infinito.nexus`).
 - [x] `roles/web-app-penpot/README.md` documents the role's purpose, configuration, and the S3 future option.
 - [ ] `make test` passes with the new role in place. _(Penpot-relevant lint + integration suites verified green on host; full in-container `make test` requires `make setup`/sudo not available in the sandbox.)_
 

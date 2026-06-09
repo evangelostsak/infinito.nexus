@@ -23,7 +23,7 @@ modeled on [`web-app-openproject`](../web-app-openproject/) and
 | `frontend` | `penpotapp/frontend`   | Nginx + SPA; public HTTP surface, proxies to backend/exporter. |
 | `backend`  | `penpotapp/backend`    | API, auth (OIDC/LDAP), persistence, asset storage.             |
 | `exporter` | `penpotapp/exporter`   | Headless renderer for SVG/PDF/image export and dev handoff.    |
-| `redis`    | shared `svc-db-redis`  | Cache / pub-sub for real-time collaboration.                   |
+| `redis`    | `svc-db-redis` (role-local sidecar, service name `redis`) | Cache / pub-sub for real-time collaboration. |
 | `postgres` | shared `svc-db-postgres` | Relational store.                                            |
 
 The **exporter** is mandatory: it backs the export (SVG/PDF) and developer
@@ -41,12 +41,20 @@ handoff features.
 Login methods are toggled through `PENPOT_FLAGS` and configured by Ansible:
 
 - **OIDC** via [`web-app-keycloak`](../web-app-keycloak/) — enabled when the
-  `sso` service is active (`flavor: oidc`, native in-app login). Adds
+  `sso` service is active (`flavor: oidc`, native in-app "OpenID" login). Adds
   `enable-login-with-oidc`.
 - **LDAP** via [`svc-db-openldap`](../svc-db-openldap/) — enabled when the
   `ldap` service is active. Adds `enable-login-with-ldap`.
+- **Native** local email/password login (`enable-login-with-password`). The role
+  bootstraps a local password for the `administrator` profile via the backend
+  PREPL (`enable-prepl-server`) in `tasks/main.yml`, so native login works
+  alongside OIDC/LDAP — `create-profile` for a fresh profile, `update-profile`
+  to set the password when a federated login already created it.
 
-Local registration / password login stay on as the baseline account tier.
+**Self-registration** follows `services.penpot.registration_enabled` — the
+default is *on* when no IdP is configured and *off* once OIDC (Keycloak) is the
+login path, and it is overridable per inventory. `PENPOT_FLAGS` renders
+`enable-registration` / `disable-registration` accordingly.
 
 ## Storage & scalability
 
@@ -62,8 +70,9 @@ Local registration / password login stay on as the baseline account tier.
 
 ## Ports & networking
 
+- Canonical domain: `penpot.design.{{ DOMAIN_PRIMARY }}`.
 - Local proxy bind: `services.penpot.ports.local.http` (`8041`).
-- Role network: `192.168.105.176/28`.
+- Role network: `192.168.105.192/28`.
 
 ## Autonomous-implementation notes
 
@@ -77,26 +86,39 @@ Procedure); revisit at PR review:
   containers, which the upstream image tolerates.
 - **CSP** allows `unsafe-inline`/`unsafe-eval` for `script-src-elem` and
   `blob:` workers/images, required by Penpot's SPA and worker-based renderer.
-- **OIDC JVM CA trust:** the backend command (in `templates/compose.yml.j2`)
-  imports the internal CA into a writable `cacerts` copy and points the JVM at
-  it via `JAVA_TOOL_OPTIONS`. The shared `with-ca-trust.sh` entrypoint covers
-  the OS/NSS/env trust stores but not the JVM truststore, so without this Penpot's
-  server-side OIDC token/userinfo calls to Keycloak fail with `PKIX path building
-  failed`. The CA path is hardcoded because the framework's CA-override
-  re-serialises the command and would double-escape a `$`.
+- **OIDC JVM CA trust (self-signed TLS only):** when `TLS_MODE == self_signed`,
+  the backend command (in `templates/compose.yml.j2`) imports the internal CA
+  into a writable `cacerts` copy and points the JVM at it via `JAVA_TOOL_OPTIONS`.
+  The shared `with-ca-trust.sh` entrypoint covers the OS/NSS/env trust stores but
+  not the JVM truststore, so without this Penpot's server-side OIDC
+  token/userinfo calls to Keycloak fail with `PKIX path building failed`. The
+  override is gated behind self-signed mode (it is a no-op in production, where
+  real CA-signed certs are already trusted) and the CA path is hardcoded because
+  the framework's CA-override re-serialises the command.
 - **`disable-onboarding`** is in `PENPOT_FLAGS` so users land directly on the
   dashboard (sovereign install; also keeps the project/asset flows testable).
 
-## Verification status
+## Testing
 
-Deployed end to end (Penpot + Keycloak + OpenLDAP) and the per-role Playwright
-suite passes live against the running stack — **8 passed, 2 skipped**: TLS
-baseline, OIDC (administrator + biber), LDAP (administrator + biber), project
-creation, and image asset upload. The two skips are the generic `biber` /
-`administrator` persona scenarios, declared blocked via `PERSONA_*_BLOCKED`
-(mirroring `web-app-taiga`): Penpot's in-app "OpenID" login entry and SPA
-user-menu logout are not driveable by the generic persona helper, so both users'
-real auth is instead exercised by the dedicated OIDC + LDAP scenarios.
+The Playwright suite is split per login surface (the runner globs every `*.js`
+under `files/playwright/`):
+
+- `_shared.js` — env + login helpers (`penpotOidcLogin`, `penpotLdapLogin`,
+  `penpotNativeLogin`, `penpotRegister`).
+- `test-login-native.js` — administrator native (local password) login.
+- `test-login-oidc.js` — OIDC via Keycloak for administrator **and** `biber`.
+- `test-login-ldap.js` — OpenLDAP bind for administrator **and** `biber`.
+- `playwright.spec.js` — orchestrator: TLS baseline, project creation, image
+  asset upload, and the `guest`/`biber`/`administrator` personas. The `biber` /
+  `administrator` personas are declared blocked via `PERSONA_*_BLOCKED`
+  (mirroring `web-app-taiga`): Penpot's in-app "OpenID" entry and SPA user-menu
+  logout aren't driveable by the generic persona helper, so both users' real
+  auth is exercised by the dedicated login companions above.
+
+Login/project/asset scenarios gate on the relevant service via
+`skipUnlessServiceEnabled`, so a deploy reports them `skipped` (not `failed`)
+when that service is disabled. Validated live against a Penpot + Keycloak +
+OpenLDAP deploy.
 
 ## Further Resources
 

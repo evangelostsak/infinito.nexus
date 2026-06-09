@@ -7,3 +7,56 @@
     # proxy body limit so asset imports are not truncated at the front door.
     webserver_client_max_body_size: "100m"
     compose_handlers_flush: true
+
+# Bootstrap a local password for the administrator via the backend PREPL
+# (enable-prepl-server) so the native email/password login works alongside
+# OIDC/LDAP. create-profile makes an active local profile; if the profile
+# already exists (e.g. a federated login created it first), set its password.
+- name: "Bootstrap the Penpot administrator's local account (idempotent)"
+  ansible.builtin.command:
+    argv:
+      - compose
+      - exec
+      - -T
+      - "{{ PENPOT_BACKEND_SERVICE }}"
+      - python3
+      - manage.py
+      - create-profile
+      - -n
+      - "{{ PENPOT_ADMIN_FULLNAME }}"
+      - -e
+      - "{{ PENPOT_ADMIN_EMAIL }}"
+      - -p
+      - "{{ PENPOT_ADMIN_PASSWORD }}"
+    chdir: "{{ lookup('container', application_id, 'directories.instance') }}"
+  register: penpot_admin_create
+  retries: 30
+  delay: 5
+  until: >-
+    penpot_admin_create.rc == 0 or
+    ('already exists' in (penpot_admin_create.stdout | default('') ~ penpot_admin_create.stderr | default('')))
+  changed_when: "'Created' in (penpot_admin_create.stdout | default(''))"
+  failed_when:
+    - penpot_admin_create.rc != 0
+    - "'already exists' not in (penpot_admin_create.stdout | default('') ~ penpot_admin_create.stderr | default(''))"
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
+
+- name: "Set the Penpot administrator's local password when the profile already exists"
+  ansible.builtin.command:
+    argv:
+      - compose
+      - exec
+      - -T
+      - "{{ PENPOT_BACKEND_SERVICE }}"
+      - python3
+      - manage.py
+      - update-profile
+      - -e
+      - "{{ PENPOT_ADMIN_EMAIL }}"
+      - -p
+      - "{{ PENPOT_ADMIN_PASSWORD }}"
+    chdir: "{{ lookup('container', application_id, 'directories.instance') }}"
+  when: "'already exists' in (penpot_admin_create.stdout | default('') ~ penpot_admin_create.stderr | default(''))"
+  register: penpot_admin_update
+  changed_when: "'Updated' in (penpot_admin_update.stdout | default(''))"
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"

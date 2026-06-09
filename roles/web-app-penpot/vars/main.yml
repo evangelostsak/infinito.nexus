@@ -62,10 +62,17 @@ PENPOT_REGISTRATION_ENABLED: "{{ lookup('config', application_id, 'services.penp
 PENPOT_FLAGS: >-
   {{ 'enable-registration' if PENPOT_REGISTRATION_ENABLED | bool else 'disable-registration' }}
   enable-login-with-password
+  enable-prepl-server
   disable-telemetry
   disable-onboarding
   {{ 'enable-login-with-oidc' if PENPOT_SSO_ENABLED | bool else '' }}
   {{ 'enable-login-with-ldap' if PENPOT_LDAP_ENABLED | bool else '' }}
+
+# Administrator local account — bootstrapped (tasks/main.yml) via the backend
+# PREPL so the native email/password login works alongside OIDC/LDAP.
+PENPOT_ADMIN_EMAIL: "{{ lookup('users', 'administrator').email }}"
+PENPOT_ADMIN_PASSWORD: "{{ lookup('users', 'administrator').password }}"
+PENPOT_ADMIN_FULLNAME: "{{ lookup('users', 'administrator').username }}"
 
 # OIDC (Keycloak) — only consumed when services.sso.enabled
 PENPOT_OIDC_CLIENT_ID: "{{ OIDC.CLIENT.ID }}"
