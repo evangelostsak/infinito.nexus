@@ -2,10 +2,15 @@
 set -euo pipefail
 
 MARKER=/var/lib/matrix-mdad/bootstrap.done
+SYNAPSE_UNIT=/etc/systemd/system/matrix-synapse.service
 mkdir -p /var/lib/matrix-mdad
-if [ -f "$MARKER" ]; then
-  echo ">>> matrix-mdad-bootstrap: marker present, skipping"
+if [ -f "$MARKER" ] && [ -f "$SYNAPSE_UNIT" ]; then
+  echo ">>> matrix-mdad-bootstrap: marker + synapse unit present, skipping"
   exit 0
+fi
+if [ -f "$MARKER" ] && [ ! -f "$SYNAPSE_UNIT" ]; then
+  echo ">>> matrix-mdad-bootstrap: stale marker (no synapse unit), re-running"
+  rm -f "$MARKER"
 fi
 
 export PATH="/opt/ansible/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"

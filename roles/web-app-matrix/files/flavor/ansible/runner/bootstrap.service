@@ -2,7 +2,6 @@
 Description=Bootstrap matrix-docker-ansible-deploy on first boot
 After=docker.service
 Requires=docker.service
-ConditionPathExists=!/var/lib/matrix-mdad/bootstrap.done
 
 [Service]
 Type=oneshot
