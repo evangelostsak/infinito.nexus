@@ -59,7 +59,7 @@ install -d %{buildroot}%{_docdir}/%{name}
 
 %changelog
 * Thu Jun 11 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 9.3.0-1
-- New Penpot role (web-app-penpot, requirement 235) that ships the upstream Penpot design platform comprising frontend, backend, exporter and Redis at image version 2.5.4, wired into the central Keycloak via OIDC and into the central OpenLDAP. Native local-password login is available as a toggle that is disabled automatically under OIDC, with the native-login and registration flags derived from the SSO flag. A custom JVM truststore imports the Infinito self-signed CA so OIDC over TLS succeeds, and the role is exercised end-to-end with Playwright covering OIDC login, logout and project creation. The local subnet was moved to 192.168.105.192/28 to avoid a collision with the ERPNext range.
+- * New Penpot role (web-app-penpot, requirement 235) that ships the upstream Penpot design platform comprising frontend, backend, exporter and Redis at image version 2.5.4, wired into the central Keycloak via OIDC and into the central OpenLDAP. Native local-password login is available as a toggle that is disabled automatically under OIDC, with the native-login and registration flags derived from the SSO flag. A custom JVM truststore imports the Infinito self-signed CA so OIDC over TLS succeeds, and the role is exercised end-to-end with Playwright covering OIDC login, logout and project creation. The local subnet was moved to 192.168.105.192/28 to avoid a collision with the ERPNext range.
 * The Matrix role gains an ansible flavor (requirement 025) built on a unified compose template, with full Docker-in-Docker isolation, host-network mode cascaded to the addons and Jitsi, a central Postgres backend sharing the MATRIX_POSTGRES variables, and a central coturn aligned to the shared coturn variables for the MASH role. A dedicated MDAD runner image (python 3.13-slim with docker 28.0.4 CLI, migration validated against v2026.05.18.0) mounts the Infinito self-signed CA into both the runner and Synapse, and bootstrap now recovers cleanly from a stale marker.
 * Smaller role fixes: ERPNext bypasses the v16 setup wizard per app and clears the Frappe cache after applying social-login, LDAP and email configuration; Friendica strips a trailing slash from the base URL and makes the admin-follow Playwright test idempotent; Funkwhale starts its API with gunicorn and binds the port.
 * Routine maintenance: a lint that enforces a parameterised FROM in role Dockerfiles, a re-sync of the Claude settings allow-list with upstream, git references bumped to the latest semver tags (Bluesky 1.122.0 to 1.123.0, Bookwyrm v0.8.6 to v0.8.7), and Docker image version bumps across ERPNext v15.45.0 to v16.22.0, Friendica 2026.01 to 2026.05, Funkwhale 2.0.2 to 2.0.4, GitLab 19.0.1-ee.0 to 19.0.2-ee.0, Mattermost 11.7.2 to 11.8.0, OpenTalk v1.12.0 to v1.13.1, Prometheus v0.32.1 to v0.32.2, Shopware 3.6.0 to 3.7.0, MariaDB 12.2 to 12.3 and CoreDNS 1.14.3 to 1.14.4.
@@ -70,7 +70,7 @@ install -d %{buildroot}%{_docdir}/%{name}
 * [Kevin Veen-Birkenbach](https://veen.world): Matrix ansible flavor, role fixes and review
 
 * Wed Jun 03 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 9.2.0-1
-- New ERPNext role that ships the upstream Frappe Framework v15 stack as a web-app-erpnext role — backend, frontend, websocket, scheduler and two queue workers — wired into the central Keycloak via a built-in Keycloak Social Login Key and into the central OpenLDAP via the LDAP Settings doctype. The three-variant matrix (SSO plus LDAP, no auth, LDAP only) is exercised end-to-end and a repo-wide lint caps Ansible task names at 120 characters.
+- * New ERPNext role that ships the upstream Frappe Framework v15 stack as a web-app-erpnext role — backend, frontend, websocket, scheduler and two queue workers — wired into the central Keycloak via a built-in Keycloak Social Login Key and into the central OpenLDAP via the LDAP Settings doctype. The three-variant matrix (SSO plus LDAP, no auth, LDAP only) is exercised end-to-end and a repo-wide lint caps Ansible task names at 120 characters.
 * New Jitsi Meet role that adds an oauth2-proxy gated meeting surface plus matching LDAP-variant Playwright coverage. The spec layout is reorganised into a shared module and per-scenario test files so future scenarios can be added without touching the monolith.
 * Outbound mail and Nix install resilience: the dev-nix role guards its set_fact against getent returning None on hosts without an nixbld group, and the host-stack mail health checks keep behaving cleanly on minimal images.
 * Routine maintenance: Docker image version bumps including Friendica 2026.01, eslint 10.4.0 to 10.4.1, and a dockerignore re-sync after the recent claude hooks addition.
@@ -78,7 +78,7 @@ install -d %{buildroot}%{_docdir}/%{name}
 Release maintained by Kevin Veen-Birkenbach, <https://veen.world>.
 
 * Mon Jun 01 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 9.1.0-1
-- * More robust Nix installer on Debian, Ubuntu, Fedora and CentOS systems: stale nixbld users from earlier installation attempts are cleaned up before the multi-user installer runs, and a long-standing crash on hosts where the nixbld group is absent has been resolved.
+- * * More robust Nix installer on Debian, Ubuntu, Fedora and CentOS systems: stale nixbld users from earlier installation attempts are cleaned up before the multi-user installer runs, and a long-standing crash on hosts where the nixbld group is absent has been resolved.
 * Outbound mail health checks no longer fail silently on minimal container images: the heartbeat-email script copes with images that ship without the hostname binary, and the SSL trust file path is detected automatically across Red Hat, Debian, Ubuntu, Alpine and NixOS layouts.
 * The Zammad helpdesk role completes its single-sign-on schema unification, with the variant matrix and Playwright test suite brought in line with the new shape.
 * Internal infrastructure cleanups: re-synchronised .dockerignore and a shifted weekly CI schedule.
@@ -86,13 +86,13 @@ Release maintained by Kevin Veen-Birkenbach, <https://veen.world>.
 Release maintained by [Kevin Veen-Birkenbach](https://veen.world).
 
 * Fri May 29 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 9.0.2-1
-- Restores the Debian dev-image build by introducing the INFINITO_VENV_DIR SPOT and calling infinito via its absolute venv path in scripts/docker/entry.sh, so the post-`make install` version check no longer trips on the PATH that bash -lc clobbers via /etc/profile; also scopes the auto-update PR dedup fingerprint to the files a run actually committed (instead of the whole commit tree) so unrelated drift on main no longer forces a fresh PR on every daily cron, nests web-app-bluesky's nocheck markers under the acl block they describe, and rolls up dependabot bumps (actions/cache 4→5, actions/setup-node 4→6) plus routine Docker image / git ref refreshes.
+- * Restores the Debian dev-image build by introducing the INFINITO_VENV_DIR SPOT and calling infinito via its absolute venv path in scripts/docker/entry.sh, so the post-`make install` version check no longer trips on the PATH that bash -lc clobbers via /etc/profile; also scopes the auto-update PR dedup fingerprint to the files a run actually committed (instead of the whole commit tree) so unrelated drift on main no longer forces a fresh PR on every daily cron, nests web-app-bluesky's nocheck markers under the acl block they describe, and rolls up dependabot bumps (actions/cache 4→5, actions/setup-node 4→6) plus routine Docker image / git ref refreshes.
 
 * Thu May 28 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 9.0.1-1
-- CI pipeline pass: PR flow now gates the env-matrix via a new detect-affected-roles resolver (skipped on role-only diffs); push CI skipped when an open PR exists (with 20s race retry for bot branches); pip cache + python 3.12 across all 16 workflows, plus npm and ansible-galaxy caches where missing. Update bot now deletes its own branches when closing superseded PRs.
+- * CI pipeline pass: PR flow now gates the env-matrix via a new detect-affected-roles resolver (skipped on role-only diffs); push CI skipped when an open PR exists (with 20s race retry for bot branches); pip cache + python 3.12 across all 16 workflows, plus npm and ansible-galaxy caches where missing. Update bot now deletes its own branches when closing superseded PRs.
 
 * Thu May 28 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 9.0.0-1
-- Collapses the parallel **oauth2** and **oidc** top-level blocks in every role *meta/services.yml* into a single *services.sso* block with a **flavor** discriminator (*oidc* | *oauth2* | *saml*, default *oidc*). Flavor-specific keys live under *sso.<flavor>* (*sso.oauth2.{origin,acl,allowed_groups}*, *sso.oidc.plugin*).
+- * Collapses the parallel **oauth2** and **oidc** top-level blocks in every role *meta/services.yml* into a single *services.sso* block with a **flavor** discriminator (*oidc* | *oauth2* | *saml*, default *oidc*). Flavor-specific keys live under *sso.<flavor>* (*sso.oauth2.{origin,acl,allowed_groups}*, *sso.oidc.plugin*).
 
 **Removed**
 
@@ -133,281 +133,23 @@ End-to-end against *web-app-{keycloak,nextcloud,bookwyrm,gitea,friendica,dashboa
 * [Kevin Veen-Birkenbach](https://www.veen.world/)
 
 * Thu May 28 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 8.0.5-1
-- Adds --version / -V flag to the infinito CLI, drops a dead Compose-CLI reference link, and fixes the dev-deploy router so per-invocation routing knobs (apps, mode, purge, bundles, disable, full_cycle, variant) no longer leak into the persistent .env and the make-alias / env-var surface is unified 1:1.
-
-* Thu May 28 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 8.0.4-1
-- Repairs the update PR workflow end-to-end: tree-SHA dedup replaces the >300-file-breaking diff API, the GitHub App token is now migrated to `client-id` (with renamed secret + docs) and reaches the push wire by blanking actions/checkout's external credentials file.
-
-* Thu May 28 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 8.0.3-1
-- Loads the project dotenv (`make dotenv` + `set -a; . .env; set +a`) inside the update workflow wrappers so `INFINITO_WORKER_FETCH` resolves on CI runners that skip compose.
-
-* Thu May 28 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 8.0.2-1
-- Restores CI by dropping pkgmgr from the dev Dockerfile (entry.sh now `make install`s straight from INFINITO_SRC_DIR) and bumping the pkgmgr role pin to v1.15.2, which re-registers the `infinito` alias.
-
-* Thu May 28 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 8.0.1-1
-- Restores Debian build viability, satisfies the new eslint rules, moves the requirements archive CLI to kpmx, adds make requirements-archive, pins pkgmgr to v1.14.0, sharpens the agent iteration docs, and rolls up dependabot bumps.
-
-**Added**
-
-* make requirements-archive installs kpmx and runs pkgmgr archive docs/requirements in one shot
-
-**Fixed**
-
-* debian/changelog source-package name restored to infinito-nexus so dpkg-source builds succeed again
-* eslint preserve-caught-error and no-useless-assignment violations in five Playwright helpers
-
-**Changed**
-
-* Archive CLI for completed requirement files moved out of cli/contributing/requirements/archive into pkgmgr.actions.archive shipped by kpmx; the lint test inlines the discovery and unchecked-counter primitives so the suite no longer pulls kpmx as a dependency
-* pkgmgr dependency pinned to v1.14.0 (was floating stable), bringing in the package_name resolver and pkgmgr release --retry
-
-**Docs**
-
-* docs/agents/action/iteration/role.md sharpens the in-container verify rule and full-matrix flow
-
-**Dependencies**
-
-* eslint, eslint-plugin-playwright, eslint/js, actions/setup-python, actions/create-github-app-token
-
-**Contributors**
-
-* [Kevin Veen-Birkenbach](https://www.veen.world/)
-
-* Wed May 27 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 8.0.0-1
-- This release lands the matrix-deploy hardening pass, an interactive console for the CLI, the bundles workflow, a per-consumer Postgres builder, a shared Playwright persona library across every web role, a SPOT env pipeline under the INFINITO_ namespace, and a new education-suite bundle (openwebui + mailu) alongside the KIX Service Management role.
-
-**Major Changes**
-
-* Promoted matrix-deploy to a full purge + full redeploy between rounds, taught the inventory validator to honour variants.yml keys, and split the variant runner into auth-isolated rounds so OIDC, LDAP, and native personas never share residual state
-* Replaced inline SQL task templates with a first-class database_query Ansible module that takes a caller-controlled mask_values parameter, and migrated every role to call it instead of templating ad-hoc psql/mysql commands
-* Rebuilt the env pipeline around a SPOT default.env at the repository root, retired the env/ subtree and the env.development marker, folded ci.env into default.env, and put every runtime knob under the INFINITO_ namespace (BUILDKIT_ENABLED, OUTER_NETWORK_MTU auto-detected from the host route, CONTAINER_CA_ENABLED, and the path/image overrides)
-* Reworked the Make surface into domain prefixes (compose-, network-, clean-, container-), added comment-derived make help, parallel test/lint wrappers with per-target wall-clock, a default help target, a single make deploy router, a make console REPL, make compose-playwright, a test-signed pre-push gate, and a clean-container-owned target
-* Routed every role image reference through lookup(config, ...) so the GHCR mirror takes effect uniformly, and introduced a per-consumer Postgres image builder so shared:false rdbms consumers get the extensions and libraries they need via initdb.d
-
-**Added**
-
-* Added web-app-kix (KIX Service Management, req-015), the education-suite bundle wiring web-app-openwebui and web-app-mailu, the bundles deploy-bundles / redeploy-bundles flow, and a deploy verifier that walks required_by for every non-invokable role
-* Added an interactive CLI console with stateful navigation, ls, and modular subcommands; a meta roles applications complexity command with reverse direction, level filter, total column, ordering, and cli/json output; and a meta roles services called verifier hooked into dev-deploy
-* Added a shared Playwright persona library that now drives every web role, parameterized matomo tracker checks, web-svc-logout injection specs via roles_with_service, dashboard dropdown handling, iframe-aware deny checks, keycloak auth-provider exemption, the PERSONA_*_BLOCKED contract, a PLAYWRIGHT_KEEP_ALL artefact toggle, persisted artefacts per variant and pass, and a Time column in the summary table
-* Added lint guards: auth-isolation across variants.yml, variants-services-match with a nocheck opt-out, required_by on non-invokable roles (Bundle C), lint-playwright per-role spec parse, a raw-image ban in compose templates (and the eight existing violations fixed), expanded required_by[web] for the webserver and CSP infra, and a Python-ized lint installer with host/docker dispatch
-* Added a requirements archive CLI with a completeness lint, a live registry-reachability probe for pinned images, top-N Ansible role runtimes in the deploy job summary, Playwright JUnit reports rendered as a workflow step summary, an affected-roles filter that skips .md/.rst outside roles, and an update open-pr deduper that supersedes stale class siblings
-* Added native admin login for web-app-bluesky when oauth2 is disabled, native + LDAP + OIDC persona tests for web-app-openwebui, a multi-auth dispatcher for web-app-matrix (OIDC plus native/LDAP password), web-app-lam registered as a service provider with moodle v0/v1 opt-in, web-app-prometheus navbar logout injection, SMTP wiring for web-app-pgadmin, dynamic LDAP and Playwright LDAP coverage for web-app-opencloud, version-incompatible plugin tolerance for web-app-nextcloud, gated enable_local_logins for web-app-discourse, and biber+admin persona blocks for web-app-akaunting, web-app-bookwyrm, web-app-bluesky, and web-app-postmarks
-
-**Removed and Renamed**
-
-* Renamed deploy to compose-deploy across Make, container-* purges and refresh to compose-*, the legacy backup roles to svc-bkp-* with container/local-2-remote invokable entrypoints, lookup status to deployment with a runtime-aware deployed flag, dmbs_*/dbms_base templates to a container_depends_on lookup, INFINITO_CMD to a plain cmd parameter, and web-opt-rdr-www canonical to w3redirect with lookup-based mappings
-* Dropped the ci compose profile and its --profile ci arg, the run-once guard on web-opt-rdr-domains, the slim pkgmgr base image variant, requirement-file references from runtime code, and the inline XML payload duplication in web-app-xwiki
-
-* Fri May 08 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 7.0.0-1
-- This major release migrates every role to the new meta/ layout with explicit per-role networks, ports, run_after, and info.yml metadata, introduces a variant-aware matrix-deploy planner, ships a process-wide YAML / file / registry caching stack, promotes 13+ apps from alpha to beta, and adds a lint corpus that pins the new conventions in CI.
-
-**Major Changes**
-
-* Migrated every role's meta/ to the req-008/009/010/011 layout: per-role services.yml is the single source of truth for service flags, server.yml carries per-role local subnets, ports live next to the service that owns them, run_after / lifecycle move next to the entity, and a new meta/info.yml carries non-Galaxy descriptive metadata
-* Replaced the legacy single-pass deploy with a variant-aware combined resolver and per-round include path: each role can declare a meta/variants.yml, the matrix-deploy planner produces one folder per round, and Playwright specs run once per variant
-* Routed every YAML touchpoint and every project-tree walk through utils.cache.{yaml,files} and consolidated the cache modules into a single utils/cache/ package; integration tests now share one parse and one walk per make test invocation
-* Promoted 13 web-app roles from alpha to beta with full per-role baselines: native OIDC for Joomla via plg_system_keycloak, in-role login-broker for Bluesky (variant A+), real OIDC integration for four further roles, and the matching Playwright SSO coverage
-* Added two new pull-through caches: a Sonatype Nexus 3 OSS package cache (req-012) and a registry cache with TLS frontend, override-only gating, and dev-only Compose profiles
-
-**Added**
-
-* Added new application roles: web-app-opencloud and web-app-opentalk with shared OIDC + LDAP, web-app-hugo for static-site hosting (req-016), web-app-moodle self-built image with OIDC+LDAP hybrid and LDAP-only variants (req-015), web-app-fediwall as multi-wall public-timeline aggregator, plus web-app-mig and web-app-sphinx E2E coverage
-* Added the per-role matrix-deploy variant model with folder-per-round inventories, meta/variants.yml declarations, and variant-aware Playwright env wiring
-* Added hierarchical /roles/<app>/<role> RBAC paths, service-gated Playwright specs, and the WordPress ↔ Discourse round-trip flow
-* Added lookup(email) as the shared SMTP resolution layer and wired email integration into pretix, gitlab, openwebui, flowise, and others
-* Added the package-cache (Nexus 3 OSS) and registry-cache stacks with inner-build override, TTL env vars, and SPOT documentation
-* Added the diff-driven app whitelist for deploy tests, the unified # noqa / # nocheck suppression grammar, and the info.yml per-role metadata file
-* Added web-app-keycloak per-app mapper SPOT via filter plugin and shell-script extraction; OpenLDAP schema for Moodle; web-app-mediawiki install/update via composer_install_extension.sh
-* Added new lint guards: project-walk, cache-read, project-root-import, noqa-only-ruff-codes, no-direct-yaml, no-inline-multiline-php-in-sh, no-inline-multiline-sql, no-lookup-config-jinja-default, role-meta-layout, web-role-no-web-dependency, run-once-on-shared-services, redundant-bool-patterns, sed-escape, no-sh-pipefail, compose-resource-limits, dynamic-flag, auth-coverage, variant-coverage, variants-services-match
-
-**Changed**
-
-* Routed every yaml.safe_load / yaml.safe_dump / glob.glob / os.walk / Path.rglob / Path.read_text callsite in tests through utils.cache.{yaml,files} so the project walk and reads are shared across the pytest session
-* Reworked the combined resolver to be variant-aware, dropped non-Galaxy keys (license_url, repository, documentation) from meta/main.yml, and consumed web-svc-html via the service registry from web-svc-legal
-* Registered web-app-{mastodon,friendica,pixelfed} as shared services for the Fediwall aggregator
-* Consolidated update to a single role with per-package-family task files; replaced the MODE_CI flag with a direct RUNTIME check
-* Pinned image versions explicitly: SuiteCRM PHP 8.2, Nextcloud 33-fpm-alpine, Moodle PHP 8.3-fpm, Hugo nginx 1.30.0-alpine; opted Ubuntu's docker-compose-v2 out of the package selection
-* Migrated Decidim, OpenLDAP schema, Postgres grant-schema, Fider, Odoo OIDC, and svc-db-postgres SQL into dedicated files/*.sql so the inline-multiline-SQL lint stays at zero
-* Tightened the compose-resource-limits lint and reconciled the entire role corpus against it
-* Adopted the unified `# nocheck: <kebab-rule>` suppression marker repo-wide; reserved `# noqa:` markers for real ruff/flake8 codes
-
-**Fixed**
-
-* Fixed Joomla admin-password handling ($ no longer eaten by bash), plugin manifest waits, and Playwright login hardening
-* Fixed Moodle deploy: PHP 8.3-fpm pin, serialized PHP-ext build to avoid modules/ race, dropped msmtp from the FPM healthcheck, aligned meta/services.yml with the image+version mirror convention
-* Fixed Nextcloud Talk admin spec, Settings-menu locator drift, Metadata plugin incompatibility, OIDC alt-login click, and the files_bpm plugin entry
-* Fixed WordPress multisite wp-config quoting, hardcoded plugin-enable lookups, discourse-integration ordering, and per-variant Discourse toggle gating
-* Fixed Mig + Sphinx container_port pointing at a non-existent flat .port key (added a wildcard-path validator)
-* Fixed OpenCloud / OpenTalk Playwright OIDC scenarios; added the OpenTalk recorder; fixed OpenCloud SPA wait after the OIDC callback
-* Fixed Discourse asset compilation by setting DISCOURSE_FORCE_HTTPS; marked Discourse as a discourse-service provider; dropped the WordPress run_after dep
-* Fixed env-test suites: dynamic Fedora release resolution in the cache probe, compose-network discovery for the DiD probe, and oauth2-proxy allowed_groups slash normalization
-* Fixed meta drift: req-008 sweep gaps (lost suppressions, silent test breakage, one prod bug), host-bound port collisions on 8071/8072, subnet collisions on 192.168.105.{48,64}/28, and Moodle resource limits
-* Fixed utils.cache Ansible coupling: data is importable without ansible, the GID resolver works without ansible, and the YAML cache invalidates per-path entries when mtime/size changes
-* Fixed the sys-svc-container package selection on Ubuntu; the Makefile clean target is resilient to container-owned __pycache__ files
-* Fixed Bluesky cross-variant recovery + URL-test failures (req-013)
-
-**CI and Tests**
-
-* Added a diff-driven app whitelist so deploy tests run only against roles touched in the change
-* Added the lint corpus for: project-walk / cache-read / project-root-import / no-direct-yaml / no-inline-multiline-php-in-sh / no-inline-multiline-sql / no-lookup-config-jinja-default / role-meta-layout / web-role-no-web-dependency / run-once-on-shared-services / redundant-bool-patterns / sed-escape / no-sh-pipefail / compose-resource-limits / dynamic-flag / auth-coverage / variant-coverage / variants-services-match / Ansible Galaxy schema / inline literal script-block size cap / production Python file-size cap / SPOT-of-truth for domain literals / oauth2 proxy-port allocation
-* Added the unified # noqa / # nocheck suppression grammar and the noqa-only-ruff-codes guard that forbids project rules in # noqa:
-* Routed every fixture write through utils.cache.yaml.dump_yaml and every fixture read through utils.cache.files.read_text
-* Added the rbac-group-path static guard, the run-once guard for shared service-registry roles, the Mattermost SSO-button + onboarding dismissal coverage, and the WordPress discourse-roundtrip + finally-cleanup-bound spec
-* Promoted the docker-raw-call guard onto the unified suppression grammar and scoped it to roles/
-* Centralized INFINITO_DISTRO / INFINITO_CONTAINER SPOT and moved INFINITO_MAKE_DEPLOY defaults into scripts/meta/env/ci.sh
-
-**Contributors**
-
-* [Kevin Veen-Birkenbach](https://www.veen.world/)
-
-* Sat Apr 25 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 6.0.0-1
-- This release expands the application portfolio with new civic, ERP, feedback, and observability roles, replaces legacy generated runtime data with lookup-driven configuration and service loading, broadens Playwright end-to-end coverage across the stack, and hardens CI, local development, and deployment reliability.
-
-**Major Changes**
-
-* Added major new application roles including web-app-odoo, web-app-decidim, web-app-fider, and web-app-prometheus
-* Replaced legacy generated applications / users setup flows with cached lookup-driven runtime data, centralized service-registry semantics, and nested compose.services.* configuration paths
-* Replaced the legacy Cypress-based browser test path with the dedicated test-e2e-playwright role and role-local Playwright specs / env files
-* Expanded shared platform integrations for SMTP, Prometheus / native metrics, OIDC, LDAP, and role-based RBAC provisioning
-* Hardened CI and local development with better WSL2 bootstrap support, safer swap / disk handling, stronger GHCR mirroring and release workflows, and updated fork / PR automation
-
-**Added**
-
-* Added web-app-odoo with Docker Compose deployment, Redis integration, LDAP support, Keycloak / OIDC auto-provisioning, HTTPS-safe OAuth customization, and Playwright login / logout coverage
-* Added web-app-decidim with dedicated Docker image, OIDC bootstrap wiring, Ruby helper scripts, administrator setup, and Playwright coverage
-* Added web-app-fider as a new feedback platform role with deployment, OIDC setup, and end-to-end browser coverage
-* Added web-app-prometheus with alerting, alertmanager, blackbox, UI integration assets, and Playwright coverage
-* Added the dedicated test-e2e-playwright runner role plus broad new Playwright suites for apps including Pixelfed, Taiga, Mailu, Mattermost, Friendica, Joomla, Odoo, Decidim, PeerTube, Nextcloud, Matrix, BigBlueButton, and dashboard-linked flows
-* Added lookup(email) as the shared SMTP resolution layer and wired email integration into roles such as openwebui, flowise, pretix, and gitlab
-* Added generic OIDC group-to-RBAC auto-provisioning for WordPress through OpenLDAP-backed role mapping
-* Added issue templates, split PR templates by contribution type, and introduced CODEOWNERS
-* Added broader GHCR tooling including mirror cleanup, Docker image version fixing, and release / update workflow helpers
-
-**Changed**
-
-* Migrated runtime resolution away from legacy generated dictionaries and setup CLIs toward cached lookup plugins such as applications, users, domains, image, service, and service_registry
-* Reworked shared service discovery and loading around the new sys-utils-service-loader flow and the required service semantics
-* Reorganized role configuration toward clearer service-scoped keys under compose.services.*
-* Extended Docker image version handling to support ghcr.io, depth-aware comparisons, and flavored semver tags such as 5.4.5-php8.3-apache
-* Expanded Prometheus / native metrics integration across application roles, especially communication-oriented apps
-* Reworked contributor, agent, and operations documentation into granular SPOT-style guides covering workflow, testing, debugging, sandboxing, PR creation, and environment setup
-* Improved WSL2 and local development bootstrap flow with better Docker, DNS, CA trust, package installation, and smoke-test coverage
-* Adopted git-maintainer-tools for fork / upstream remote routing and signed-push workflow handling
-
-**Fixed**
-
-* Fixed the Joomla install / re-deploy flow across the open regression classes: raw-git-tree refusal handling, re-deploy idempotency, dash pipefail incompatibility, cleanup-phase crashes, and fresh-install password-reset races
-* Fixed PeerTube plugin-install reliability with explicit image pinning, improved diagnostics, memory-cap-aware install handling, and local OOM reproduction support
-* Fixed Mattermost SSO button regressions, Mailu DNS behavior, Nextcloud Talk TURN publishing, Friendica LDAP addon activation, Baserow bootstrap timing, BigBlueButton database race conditions, and multiple Odoo OAuth / provisioning edge cases
-* Fixed GHCR mirror visibility publication, propagation timing, and authenticated package handling
-* Fixed PR / branch cancellation behavior, branch-scope CI gating, fork prerequisite handling, and several GitHub Actions orchestration edge cases
-* Fixed multiple domain, CSP, email, lookup, and proxy wiring issues uncovered during the applications / users migration
-
-**CI and Tests**
-
-* Added the external Docker image version-check workflow, a weekly CodeQL safety cron, dedicated PR close / branch delete cancel workflows, and stronger development-environment testing
-* Expanded lint, unit, and integration coverage around service-registry behavior, compose resource limits, email integration requirements, no_log policy, lookup usage, min-storage validation, and non-bash pipefail regressions
-* Improved CI diagnostics, runner-state dumps, disk / swap handling, image wait logic, and mirror / release backfill workflows for fork-based development
-* Centralized more CI helper logic into reusable scripts and utility modules to reduce workflow duplication
-
-**Contributors**
-
-* [Kevin Veen-Birkenbach](https://www.veen.world/)
-* [Alejandro Roman](https://github.com/AlejandroRomanIbanez)
-* [Evangelos Tsakoudis](https://github.com/evangelostsak)
-* [Prageeth Panicker](https://github.com/pragepani)
-
-* Sat Mar 21 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 5.2.0-1
-- This minor release adds Mattermost deployment support, improves release image automation, and hardens CI, Ansible plugin handling, and application deployment reliability across the stack.
-
-**Added**
-* Added *web-app-mattermost* with Docker Compose deployment, PostgreSQL support, Keycloak-based SSO via the GitLab OAuth2 provider, and optional Mailu integration
-* Added retry-capable *uri_retry* and *get_url_retry* action plugins with dedicated unit and integration test coverage
-* Added a scheduled/manual workflow to backfill the highest missing release image tag in GHCR
-* Added a pull request template and consolidated contributor workflow documentation
-* Added Manjaro ID support
-**Changed**
-* Reorganized custom Ansible plugins into the unified *plugins/* layout
-* Moved backend service-load decisions into a dedicated lookup plugin
-* Increased Nextcloud Talk and Talk Recording resources and made upload size handling configurable
-* Reworked image build, push, mirror, wait, and release helper scripts for clearer repository and distro resolution
-* Pinned Docker GitHub Actions used in release image workflows to commit SHAs
-* Hardened *baserow* by pinning the image version to *2.1.6*
-**Fixed**
-* Fixed Mailu admin readiness checks and reduced Mailu deploy race conditions in CI
-* Fixed flaky Nix-related network failures and added explicit failure-path coverage for retry handling
-* Fixed *strong_password* filter *module_utils* resolution
-* Fixed reusable workflow wait parameter wiring and test-dns CI image selection
-* Fixed GHCR namespace lowercasing edge cases in image-related workflows
-* Added deeper Matomo bootstrap failure diagnostics for easier troubleshooting
-**CI and Tests**
-* Refactored fork PR image handling to safely build, mirror, and validate CI images for external contributions
-* Improved GHCR publish authentication, source linking, and source labels on pushed CI images
-* Added explicit prebuilt-image wait errors and clearer release-image backfill detection
-* Reduced false CI failures by skipping cleanup during the second deploy pass
-* Expanded lint, unit, and integration coverage around retry plugins and plugin path usage
-**Contributors**
-* [Kevin Veen-Birkenbach](https://www.veen.world/)
-* [Alejandro Roman](https://github.com/AlejandroRomanIbanez)
-
-* Sat Feb 28 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 5.1.0-1
-- This minor release improves cross-distro package handling, hardens CI reliability, fixes Ansible compatibility issues, and adds clearer contributor and local test workflows.
-
-**Added**
-* Introduced *docs/guides/developer/CONTRIBUTION_WORKFLOW.md* with fork-based workflow, mandatory green fork CI before PRs, and merge policy guidance
-* Added the single-app local deploy wrapper and related local test documentation
-* Added *min_storage* entries for warned roles
-**Changed**
-* Made *dev-base-devel* distro-aware for default distros
-* Removed hardcoded *base-devel* from workstation bundles and *sys-aur*
-* Set *drv-epson-multiprinter* lifecycle to *pre-alpha*
-* Refactored *dev-fakeroot* by extracting *01_core* tasks
-* Documented local *make check* targets
-**Fixed**
-* Fixed *sys-aur-install* name/upgrade clash
-* Enabled EPEL for *dev-fakeroot* on CentOS
-* Made *drv-intel* VA-API package handling distro-specific
-* Fixed undefined *run_once* lookup in backend service loader
-* Restored DB seed enablement semantics without bool-coercion warning
-* Fixed Ansible fact deprecations and loop variable collisions
-**CI and Tests**
-* Added retries for Docker-in-Docker DNS handling
-* Added retry loop for buildx push
-* Aggressively pruned Docker artifacts between distro runs
-* Removed deprecated buildx install input
-
-* Wed Feb 25 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 5.0.0-1
-- * **Supported distributions:** *Fedora*, *CentOS*, *Ubuntu*, *Debian*
-* **Breaking Changes:** Migration from *util-* to bundle inventories under *inventories/bundles/*; deployments must migrate to new bundle and role names. Central package and AUR model via *SYS_PACKAGES* and *SYS_AUR_PACKAGES*; new roles *sys-aur* and *sys-aur-install*; renames including *util-desk-dev-core* to *dev-core*, *util-desk-dev-python* to *dev-python*, *util-desk-dev-arduino* to *dev-arduino*; *util-srv-corporate-identity* removed.
-* **Added:** New workstation bundles (*admin*, *admin-network*, *browser*, *design*, *dev-arduino*, *dev-core*, *dev-java*, *dev-php*, *dev-python*, *dev-shell*, *game-compose*, *game-os*, *game-windows*, *office*). Inventory driven *sys-package* role with constructor auto load when *SYS_PACKAGES* is set. New roles *sys-openssl* and *sys-aur-install*. New lookup plugin *command_path*. New variable *SOFTWARE_URL* and updated login banner.
-* **Changed:** Default distribution switched to *Debian* and CI image handling aligned. Python baseline raised: *dev-python* installs Python 3.11+ by default; *requires-python* raised to *>=3.11*. Cross distro Python interpreter and pip handling unified via *sys-pip-install*. Dashboard deployment uses fixed image *ghcr.io/kevinveenbirkenbach/port-ui:1.0.0* and mounts generated *config.yaml* read only. Alerting hardened with explicit timeouts for compose and email, plus portable mailer and systemd instance fallbacks.
-* **Fixed:** OpenProject migrations stabilized (simplified migration step; preload *CustomFieldContext* before *db:migrate*). Nextcloud LDAP config hardened and incompatible apps disabled in production. XWiki extension install hardened and one time seed ensures *Main.WebHome* exists. Matomo bootstrap fails fast on root cause. TLS and CA improvements (unified self signed CA env for health services, retries for CA trust override generation, Nix TLS CA trust fix). *msmtp* improved on Fedora. OpenLDAP *python-ldap* build prerequisites and header fallback refactored; per user *password_update* policy added. Backup and ops fixes (OnlyOffice no restart during backups; backup home and ACL tasks more reliable). Container setup hardened (Fedora Docker CE CLI, dnf5 repo add, Debian buildx conflict fix, Docker readiness and SSH restart improvements).
-* **CI and Tests:** New integration tests for portable python shebangs, forbid *sh -lc* with *pipefail*, and improved variable checks. CI stability improvements for per distro stacks and mirror resolver via venv Python, plus more robust package manager retries.
-
-* Tue Feb 17 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 4.1.0-1
-- **Added**
-* Controller-side *version* lookup plugin reading from *pyproject.toml* (with Poetry fallback)
-* New *unit_name* lookup plugin for consistent versioned systemd unit generation
-* Automatic prune phase in *sys-service* (stop/disable outdated units, remove old unit files, trigger daemon-reload)
-* Persist application version as *INFINITO_VERSION* in */etc/environment*
-* Parameterized image and version handling for *web-svc-simpleicons*
-* Introduced *entity_name* derived from *application_id*
-**Changed**
-* *sys-service* now uses *SOFTWARE_DOMAIN* instead of *SOFTWARE_NAME* for versioned units
-* Reordered service lifecycle: *prune → lockdown → reset*
-* Refactored internal task structure for clearer execution flow
-* Made */etc/environment* path configurable
-**Removed**
-* Legacy *FILE_VERSION* mechanism
-* Deprecated *get_service_name* filter
-* Legacy *simpleicons_host_* variables
-
-* Mon Feb 16 2026 Kevin Veen-Birkenbach <kevin@veen.world> - 4.0.3-1
-- * Try Matomo Boostrap 7 times if errors occure
+- * Adds --version / -V flag to the infinito CLI, drops a dead Compose-CLI reference link, and fixes the dev-deploy router so per-invocation routing knobs (apps, mode, purge, bundles, disable, full_cycle, variant) no longer leak into the persistent .env and the make-alias / env-var surface is unified 1:1.
 
 For older releases, see https://docs.infinito.nexus/
 
 Earlier releases:
+  8.0.4 (2026-05-28)
+  8.0.3 (2026-05-28)
+  8.0.2 (2026-05-28)
+  8.0.1 (2026-05-28)
+  8.0.0 (2026-05-27)
+  7.0.0 (2026-05-08)
+  6.0.0 (2026-04-25)
+  5.2.0 (2026-03-21)
+  5.1.0 (2026-02-28)
+  5.0.0 (2026-02-25)
+  4.1.0 (2026-02-17)
+  4.0.3 (2026-02-16)
   4.0.2 (2026-02-15)
   4.0.1 (2026-02-15)
   4.0.0 (2026-02-13)
