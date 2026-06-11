@@ -1,4 +1,5 @@
 ---
+# nocheck: seaweedfs-required — object storage not implemented for this role
 # nocheck: playwright-service-flag — static-asset provider, no Playwright surface
 asset:
   enabled: "{{ 'web-svc-asset' in group_names }}"
