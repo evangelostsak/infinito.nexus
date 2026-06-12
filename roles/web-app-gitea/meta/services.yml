@@ -1,4 +1,5 @@
 ---
+# nocheck: seaweedfs-playwright — Gitea uses S3 for storage, but its UI login is not automatable here (oauth2-proxy + OIDC account-link / native login both fail; personas are blocked), so a login-dependent storage check cannot run
 logout:
   enabled: "{{ 'web-svc-logout' in group_names }}"
   shared: "{{ 'web-svc-logout' in group_names }}"
@@ -77,7 +78,7 @@ redis:
 minio:
   enabled: false # nocheck: dynamic-flag
   shared: false # nocheck: dynamic-flag
-# nocheck: playwright-service-flag — object store, no Playwright surface
+# nocheck: playwright-service-flag — object store; storage check needs a UI login, but Gitea's personas are blocked (PERSONA_ADMINISTRATOR_BLOCKED/PERSONA_BIBER_BLOCKED), so it has no automatable Playwright login surface
 seaweedfs:
   enabled: "{{ 'web-app-seaweedfs' in group_names }}"
   shared: "{{ 'web-app-seaweedfs' in group_names }}"

@@ -31,6 +31,7 @@ require("./test-login-oidc-admin").register(shared);
 require("./test-login-oidc-biber").register(shared);
 require("./test-login-ldap-admin").register(shared);
 require("./test-login-ldap-biber").register(shared);
+require("./test-seaweedfs");
 
 test("project: administrator creates a design project", async ({ page }) => {
   skipUnlessServiceEnabled("sso");
