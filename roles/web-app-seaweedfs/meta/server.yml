@@ -1,6 +1,6 @@
 ---
 status_codes:
-  api: 403
+  api: 200
   filer:
     - 302
     - 403
