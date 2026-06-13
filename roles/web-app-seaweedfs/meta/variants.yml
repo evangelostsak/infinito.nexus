@@ -3,9 +3,6 @@
     sso:
       enabled: true
       shared: true
-    ldap:
-      enabled: true
-      shared: true
     logout:
       enabled: true
       shared: true
@@ -17,9 +14,6 @@
       shared: true
 - services:
     sso:
-      enabled: false
-      shared: false
-    ldap:
       enabled: false
       shared: false
     logout:
