@@ -6,6 +6,7 @@ sso:
   flavor: oidc
   oidc:
     plugin: ""
+# nocheck: dynamic-flag — LDAP is disabled for this role; the literal false is intentional, not group-gated.
 ldap:
   enabled: false
   shared: false
