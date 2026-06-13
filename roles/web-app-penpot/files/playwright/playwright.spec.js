@@ -64,17 +64,14 @@ test("asset: administrator uploads an image asset into a design file", async ({ 
     .toContain("/workspace");
 
   // Upload a small PNG into the file via the workspace image file input.
-  const onePixelPng = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-    "base64",
-  );
+  const validPng = shared.validImagePng();
   const fileInput = page.locator('input[type="file"]').first();
   await fileInput.waitFor({ state: "attached", timeout: 60_000 });
-  await fileInput.setInputFiles({ name: "pw-asset.png", mimeType: "image/png", buffer: onePixelPng });
+  await fileInput.setInputFiles({ name: "pw-asset.png", mimeType: "image/png", buffer: validPng });
 
   // The uploaded image becomes a board/shape on the canvas; assert Penpot
-  // acknowledges the upload (a layer/element referencing the file appears).
-  await expect(page.getByText(/pw-asset|image/i).first()).toBeVisible({ timeout: 60_000 });
+  // acknowledges the upload (a layer/element named after the file appears).
+  await expect(page.getByText(/pw-asset/i).first()).toBeVisible({ timeout: 60_000 });
 });
 
 // Persona scenarios. Bodies live in the shared persona helpers. Penpot's login

@@ -32,15 +32,12 @@ test("seaweedfs: an uploaded Penpot image asset is stored in the SeaweedFS bucke
         .poll(() => appPage.url(), { timeout: 90_000, message: "expected to enter the Penpot workspace editor" })
         .toContain("/workspace");
 
-      const onePixelPng = Buffer.from(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-        "base64",
-      );
+      const validPng = shared.validImagePng();
       const markerBase = `infinito-storage-check-${Date.now()}`;
       const marker = `${markerBase}.png`;
       const fileInput = appPage.locator('input[type="file"]').first();
       await fileInput.waitFor({ state: "attached", timeout: 60_000 });
-      await fileInput.setInputFiles({ name: marker, mimeType: "image/png", buffer: onePixelPng });
+      await fileInput.setInputFiles({ name: marker, mimeType: "image/png", buffer: validPng });
 
       // Penpot names the created layer/asset after the uploaded basename
       // (extension stripped), so match the basename — a single, unique node —
