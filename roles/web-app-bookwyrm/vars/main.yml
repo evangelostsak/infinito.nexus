@@ -20,7 +20,6 @@ BOOKWYRM_URL: "{{ lookup('tls', application_id, 'url.base') }}"
 BOOKWYRM_HOSTNAME: "{{ container_hostname }}"
 
 ## SSO
-BOOKWYRM_LDAP_ENABLED: "{{ lookup('config', application_id, 'services.ldap.enabled') }}"
 BOOKWYRM_SSO_PROXY_GATED: "{{ lookup('sso', application_id, 'is_proxy_gated') }}"
 
 ## Docker
