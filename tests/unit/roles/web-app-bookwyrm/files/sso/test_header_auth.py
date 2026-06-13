@@ -92,7 +92,10 @@ class TestFirstHeader(unittest.TestCase):
         self.mod = _load_module(_fake_user_model(existing=None))
 
     def test_returns_first_present_candidate(self):
-        meta = {"HTTP_X_FORWARDED_USER": "alice", "HTTP_REMOTE_USER": "bob"}
+        meta = {
+            "HTTP_X_FORWARDED_PREFERRED_USERNAME": "alice",
+            "HTTP_X_FORWARDED_USER": "bob",
+        }
         self.assertEqual(
             self.mod._first_header(meta, self.mod.CANDIDATE_USERNAME_HEADERS), "alice"
         )
@@ -100,6 +103,16 @@ class TestFirstHeader(unittest.TestCase):
     def test_returns_none_when_absent(self):
         self.assertIsNone(
             self.mod._first_header({}, self.mod.CANDIDATE_USERNAME_HEADERS)
+        )
+
+    def test_ignores_proxy_uncontrolled_headers(self):
+        meta = {
+            "HTTP_X_AUTH_REQUEST_USER": "attacker",
+            "HTTP_X_AUTH_REQUEST_PREFERRED_USERNAME": "attacker",
+            "HTTP_REMOTE_USER": "attacker",
+        }
+        self.assertIsNone(
+            self.mod._first_header(meta, self.mod.CANDIDATE_USERNAME_HEADERS)
         )
 
 
