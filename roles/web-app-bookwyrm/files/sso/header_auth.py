@@ -12,6 +12,10 @@ because BookWyrm is reachable exclusively through the oauth2-proxy, which
 overwrites the header on every request; the application port is bound to the
 internal container network. The bridge activates only when PROXY_HEADER_SSO is
 truthy (wired by the role's env template behind the oauth2 SSO flavor).
+
+Only the ``X-Forwarded-*`` headers nginx overwrites are read; the
+``X-Auth-Request-*``/``Remote-User`` variants are deliberately excluded so a
+client cannot inject an identity nginx did not set.
 """
 
 from django.conf import settings
@@ -23,16 +27,10 @@ CANONICAL_HEADER = "HTTP_X_FORWARDED_PREFERRED_USERNAME"
 
 CANDIDATE_USERNAME_HEADERS = (
     "HTTP_X_FORWARDED_PREFERRED_USERNAME",
-    "HTTP_X_AUTH_REQUEST_PREFERRED_USERNAME",
     "HTTP_X_FORWARDED_USER",
-    "HTTP_X_AUTH_REQUEST_USER",
-    "HTTP_REMOTE_USER",
 )
 
-CANDIDATE_EMAIL_HEADERS = (
-    "HTTP_X_FORWARDED_EMAIL",
-    "HTTP_X_AUTH_REQUEST_EMAIL",
-)
+CANDIDATE_EMAIL_HEADERS = ("HTTP_X_FORWARDED_EMAIL",)
 
 
 def _first_header(meta, names):

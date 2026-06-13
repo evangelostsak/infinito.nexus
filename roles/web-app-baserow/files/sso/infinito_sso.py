@@ -4,6 +4,12 @@ Infinito.Nexus gates Baserow with oauth2-proxy and forwards the verified
 Keycloak identity as request headers. Baserow's web frontend still needs native
 Baserow JWT tokens, so this module provisions or repairs a local Baserow user
 and returns the same token payload as Baserow's own login endpoint.
+
+Only the ``X-Forwarded-*`` identity headers are read; nginx overwrites those
+from the oauth2-proxy auth response on every request, so a client cannot forge
+them. The ``X-Auth-Request-*``/``Remote-User``/``X-Forwarded-Name`` variants are
+deliberately excluded: nginx does not overwrite them, so reading them would let
+an already-authenticated user inject a different identity.
 """
 
 import os
@@ -34,25 +40,11 @@ TRUE_VALUES = {"true", "1", "yes", "on"}
 
 USERNAME_HEADERS = (
     "HTTP_X_FORWARDED_PREFERRED_USERNAME",
-    "HTTP_X_AUTH_REQUEST_PREFERRED_USERNAME",
     "HTTP_X_FORWARDED_USER",
-    "HTTP_X_AUTH_REQUEST_USER",
-    "HTTP_REMOTE_USER",
 )
-EMAIL_HEADERS = (
-    "HTTP_X_FORWARDED_EMAIL",
-    "HTTP_X_AUTH_REQUEST_EMAIL",
-)
-NAME_HEADERS = (
-    "HTTP_X_FORWARDED_NAME",
-    "HTTP_X_AUTH_REQUEST_NAME",
-    "HTTP_X_FORWARDED_PREFERRED_USERNAME",
-    "HTTP_X_AUTH_REQUEST_PREFERRED_USERNAME",
-)
-GROUP_HEADERS = (
-    "HTTP_X_FORWARDED_GROUPS",
-    "HTTP_X_AUTH_REQUEST_GROUPS",
-)
+EMAIL_HEADERS = ("HTTP_X_FORWARDED_EMAIL",)
+NAME_HEADERS = ("HTTP_X_FORWARDED_PREFERRED_USERNAME",)
+GROUP_HEADERS = ("HTTP_X_FORWARDED_GROUPS",)
 
 User = get_user_model()
 
