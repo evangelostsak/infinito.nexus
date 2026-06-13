@@ -26,7 +26,7 @@ seaweedfs:
   enabled: true
   shared: true
   image: chrislusf/seaweedfs
-  version: "3.80"
+  version: "4.33"
   name: seaweedfs
   api_port: 8333
   region: us-east-1
@@ -44,7 +44,7 @@ seaweedfs:
       sso: 16507
 proxy:
   image: nginx
-  version: 1.29-alpine
+  version: 1.31-alpine
   cpus: "0.2"
   mem_reservation: 64m
   mem_limit: 128m

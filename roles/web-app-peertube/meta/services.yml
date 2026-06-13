@@ -41,7 +41,7 @@ seaweedfs:
   public: true
 peertube:
   name: peertube
-  version: v8.2.0
+  version: v8.2.1
   image: chocobozzz/peertube
   min_storage: 30GB
   backup:
