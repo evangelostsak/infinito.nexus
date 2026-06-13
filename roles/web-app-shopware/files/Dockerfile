@@ -38,7 +38,7 @@ RUN set -eux; \
       --ignore-platform-req=ext-gd \
       --ignore-platform-req=ext-intl \
       --ignore-platform-req=ext-pdo_mysql; \
-    composer require symfony/redis-messenger:^7.4 \
+    composer require symfony/redis-messenger:^7.4 league/flysystem-async-aws-s3:^3.0 \
       -W \
       --no-scripts \
       --no-progress \

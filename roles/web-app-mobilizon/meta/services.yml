@@ -1,5 +1,5 @@
 ---
-# nocheck: seaweedfs-required — object storage not implemented for this role
+# nocheck: seaweedfs-playwright — Mobilizon (mainline, incl. 5.2.3) ships only Mobilizon.Web.Upload.Uploader.Local (no ex_aws/Uploader.S3 backend per upstream docs), so uploads cannot be routed to the object store and no S3 write surface exists to drive
 sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
@@ -41,6 +41,9 @@ mobilizon:
   mem_reservation: 128m
   mem_limit: 256m
   pids_limit: 256
+seaweedfs:
+  enabled: "{{ 'web-app-seaweedfs' in group_names }}"
+  shared: "{{ 'web-app-seaweedfs' in group_names }}"
 css:
   enabled: "{{ 'web-svc-css' in group_names }}"
   shared: "{{ 'web-svc-css' in group_names }}"
