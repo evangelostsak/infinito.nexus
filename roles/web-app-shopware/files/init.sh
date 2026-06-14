@@ -133,11 +133,13 @@ $PHP_BIN bin/console dal:refresh:index || log "dal:refresh:index failed (non-cri
 # ---------------------------
 # 5) Verify admin bundles
 # ---------------------------
-if [ ! -d "public/bundles/administration" ]; then
-  fail "Missing directory public/bundles/administration (asset build failed)"
-fi
-if ! ls public/bundles/administration/* >/dev/null 2>&1; then
-  fail "No files found in public/bundles/administration (asset build failed)"
+if [ "${SHOPWARE_OBJSTORE_ENABLED:-false}" != "true" ]; then
+  if [ ! -d "public/bundles/administration" ]; then
+    fail "Missing directory public/bundles/administration (asset build failed)"
+  fi
+  if ! ls public/bundles/administration/* >/dev/null 2>&1; then
+    fail "No files found in public/bundles/administration (asset build failed)"
+  fi
 fi
 
 # ---------------------------
