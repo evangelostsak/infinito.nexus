@@ -59,15 +59,17 @@ test("seaweedfs: an uploaded Decidim avatar is stored in the SeaweedFS bucket", 
       await appPage.waitForLoadState("networkidle").catch(() => {});
 
       const openModal = appPage
-        .locator(".upload-modal")
-        .first()
-        .locator("xpath=preceding::button[1]")
-        .or(appPage.getByRole("button", { name: /avatar|add file|upload/i }).first());
-      if (await openModal.isVisible().catch(() => false)) {
+        .locator('[data-upload] button, .upload-container button, [data-upload-modal]')
+        .or(appPage.getByRole("button", { name: /avatar|add file|add image|edit image|replace image|upload|change/i }))
+        .first();
+      if (await openModal.isVisible({ timeout: 10_000 }).catch(() => false)) {
         await openModal.click().catch(() => {});
+        await appPage.waitForLoadState("networkidle").catch(() => {});
       }
 
-      const fileInput = appPage.locator('.upload-modal input[type="file"], input[type="file"]').first();
+      const fileInput = appPage
+        .locator('[data-upload] input[type="file"], .upload-modal input[type="file"], input[type="file"]')
+        .first();
       await fileInput.waitFor({ state: "attached", timeout: 60_000 });
 
       const marker = `infinito-storage-check-${Date.now()}.png`;

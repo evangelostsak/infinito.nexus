@@ -80,6 +80,24 @@ def patch_omniauth_registration_new_erb(content: str) -> str:
     )
 
 
+def patch_active_storage_env_rb(content: str) -> str:
+    """Read STORAGE_PROVIDER for ActiveStorage like production.rb does.
+
+    ``config/environments/development.rb`` hardcodes
+    ``config.active_storage.service = :local``, so a deployment running with
+    ``RAILS_ENV=development`` writes uploads to the local Disk service and never
+    reaches the configured S3 (SeaweedFS) bucket. Mirror production.rb so the
+    service follows ``STORAGE_PROVIDER`` in every environment.
+    """
+    target = "config.active_storage.service = :local"
+    replacement = (
+        'config.active_storage.service = Decidim::Env.new("STORAGE_PROVIDER", "local").to_s'
+    )
+    if replacement in content or target not in content:
+        return content
+    return content.replace(target, replacement)
+
+
 def patch_storage_yml(content: str) -> str:
     """Force path-style addressing for the s3 service so SeaweedFS is reachable."""
     if "force_path_style" in content:
@@ -132,6 +150,13 @@ if __name__ == "__main__":
         with Path(registration_view).open("w") as f:
             f.write(patch_omniauth_registration_new_erb(content))
         print(f"{registration_view} patched")
+
+    dev_env_path = find_app_file("config/environments/development.rb")
+    with Path(dev_env_path).open() as f:
+        content = f.read()
+    with Path(dev_env_path).open("w") as f:
+        f.write(patch_active_storage_env_rb(content))
+    print(f"{dev_env_path} patched")
 
     storage_path = find_app_file("config/storage.yml")
     with Path(storage_path).open() as f:
