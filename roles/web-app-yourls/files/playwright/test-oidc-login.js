@@ -43,7 +43,9 @@ test("OIDC: oauth2-proxy + trusted-header bridge sign the visitor into a real YO
   ).toHaveCount(0);
 
   await expect(
-    page.locator('a[href*="action=logout"]'),
+    page
+      .locator('a[href*="action=logout"], a[href*="openid-connect/logout"]')
+      .or(page.getByRole("link", { name: /log\s*out/i })),
     "an authenticated YOURLS admin session must expose the logout link",
   ).toBeVisible({ timeout: 30_000 });
   await expect(

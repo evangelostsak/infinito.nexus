@@ -17,3 +17,6 @@
 
 - name: "Flush compose handlers for {{ application_id }}"
   ansible.builtin.meta: flush_handlers
+
+- name: "Install the YOURLS database schema for {{ application_id }}"
+  ansible.builtin.include_tasks: install.yml

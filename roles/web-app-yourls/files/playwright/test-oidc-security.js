@@ -89,7 +89,9 @@ test("oidc-security: injected identity headers cannot re-identify an authenticat
 
   await page.goto(adminUrl, { waitUntil: "domcontentloaded" });
   await expect(
-    page.locator('a[href*="action=logout"]'),
+    page
+      .locator('a[href*="action=logout"], a[href*="openid-connect/logout"]')
+      .or(page.getByRole("link", { name: /log\s*out/i })),
     "the genuine oauth2 session must be authenticated before the injection probe",
   ).toBeVisible({ timeout: 30_000 });
 
@@ -108,7 +110,9 @@ test("oidc-security: injected identity headers cannot re-identify an authenticat
   await page.goto(adminUrl, { waitUntil: "domcontentloaded" });
 
   await expect(
-    page.locator('a[href*="action=logout"]'),
+    page
+      .locator('a[href*="action=logout"], a[href*="openid-connect/logout"]')
+      .or(page.getByRole("link", { name: /log\s*out/i })),
     "the genuine oauth2 session must survive the injection probe",
   ).toBeVisible({ timeout: 30_000 });
   expect(
