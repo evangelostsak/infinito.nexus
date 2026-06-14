@@ -3,8 +3,17 @@ const { skipUnlessServiceEnabled } = require("./service-gating");
 const { runSeaweedfsStorageCheck } = require("./personas");
 const shared = require("./_shared");
 
-const PNG_1x1 = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+// A real >1px PNG: Taiga's change_avatar runs pil_image() which rejects the
+// degenerate 1x1 sample ("Truncated File Read") before any S3 write happens.
+const AVATAR_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAIAAAAiOjnJAAABeElEQVR42u3SMQ0AAAgEsVeHMDQhEBMM" +
+    "DE2q4HKpHjgXCTAWxsJYYCyMhbHAWBgLY4GxMBbGAmNhLIwFxsJYGAuMhbEwFhgLY2EsMBbGwlhgLIyF" +
+    "scBYGAtjgbEwFsYCY2EsjAXGwlgYC4yFsTAWGAtjYSwwFsbCWGAsjIWxwFgYC2OBsTAWxgJjYSyMBcbC" +
+    "WBgLjIWxMBYYC2NhLDAWxsJYYCyMhbHAWBgLY4GxMBbGAmNhLIyFsVTAWBgLY4GxMBbGAmNhLIwFxsJY" +
+    "GAuMhbEwFhgLY2EsMBbGwlhgLIyFscBYGAtjgbEwFsYCY2EsjAXGwlgYC4yFsTAWGAtjYSwwFsbCWGAs" +
+    "jIWxwFgYC2OBsTAWxgJjYSyMBcbCWBgLjIWxMBYYC2NhLDAWxsJYYCyMhbHAWBgLY4GxMBbGAmNhLIyF" +
+    "sVTAWBgLY4GxMBbGAmNhLIwFxsJYGAtjqYCxMBbGAmNhLIwFxsJYGAuMhbEwFhgLY2EsMBbGwlhgLIyF" +
+    "scBYGAtjgbH4ZgHTqvyKw+KRzwAAAABJRU5ErkJggg==",
   "base64",
 );
 
@@ -31,7 +40,7 @@ test("seaweedfs: an uploaded Taiga avatar is stored in the SeaweedFS bucket", as
       await fileInput.setInputFiles({
         name: marker,
         mimeType: "image/png",
-        buffer: PNG_1x1,
+        buffer: AVATAR_PNG,
       });
 
       const saveAction = appPage
@@ -40,6 +49,11 @@ test("seaweedfs: an uploaded Taiga avatar is stored in the SeaweedFS bucket", as
         .first();
       if (await saveAction.isVisible({ timeout: 10_000 }).catch(() => false)) {
         await saveAction.click().catch(() => {});
+      }
+
+      const rejection = appPage.getByText(/invalid image format|something went wrong/i).first();
+      if (await rejection.isVisible({ timeout: 15_000 }).catch(() => false)) {
+        throw new Error("Taiga rejected the avatar upload (change_avatar pil_image validation) — no object written to SeaweedFS");
       }
     },
   });
