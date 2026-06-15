@@ -62,9 +62,7 @@ def _task_indent(lines: list[str]) -> int:
     """Indentation (column) of the top-level task list items — the
     smallest indent at which a ``- `` list item appears. Deeper ``- ``
     lines (argv entries, nested data) are not task boundaries."""
-    indents = [
-        len(m.group(1)) for line in lines if (m := _LIST_ITEM_RE.match(line))
-    ]
+    indents = [len(m.group(1)) for line in lines if (m := _LIST_ITEM_RE.match(line))]
     return min(indents) if indents else 0
 
 
@@ -90,7 +88,7 @@ def _enclosing_block(lines: list[str], idx: int, task_indent: int) -> tuple[int,
 def _block_name(lines: list[str], start: int, end: int) -> str:
     for i in range(start, end):
         stripped = lines[i].strip()
-        if stripped.startswith("- name:") or stripped.startswith("name:"):
+        if stripped.startswith(("- name:", "name:")):
             return stripped.split(":", 1)[1].strip().strip("\"'") or "<unnamed>"
     return "<unnamed>"
 
@@ -108,9 +106,8 @@ def _file_offenders(path: Path) -> list[str]:
         src = read_text(str(path))
     except (OSError, UnicodeDecodeError):
         return []
-    if "rails runner" not in src and "rails\trunner" not in src:
-        if not _RAILS_RUNNER_RE.search(src):
-            return []
+    if not _RAILS_RUNNER_RE.search(src):
+        return []
 
     lines = src.splitlines()
     indent = _task_indent(lines)
