@@ -66,6 +66,7 @@ async function runAdminFlow(page, opts = {}) {
   const appBaseUrl = normalizeUrl(process.env.APP_BASE_URL);
   const adminUsername = readEnv("ADMIN_USERNAME");
   const adminPassword = readEnv("ADMIN_PASSWORD");
+  const adminNativePassword = readEnv("ADMIN_NATIVE_PASSWORD");
 
   // Persona-collapse exception: roles whose env does not
   // expose APP_BASE_URL or CANONICAL_DOMAIN are auth-less by
@@ -120,21 +121,26 @@ async function runAdminFlow(page, opts = {}) {
     }
   }
 
-  // No-SSO fallback: with SSO disabled the OIDC step above is a no-op, so if
-  // the role renders its own username/password form, drive it with the admin
-  // credentials (the app's native auth is the only path without SSO).
+  // No-SSO fallback: with SSO disabled the OIDC step above is a no-op, so drive
+  // the role's own username/password form with the admin credentials. Try the
+  // landing page first, then common admin/login paths (e.g. YOURLS' form lives
+  // at /admin/, not the public root).
   if (!oidcEnabled && adminUsername && adminPassword) {
-    const passwordField = page.locator("input[type='password']").first();
-    if (await passwordField.isVisible({ timeout: 10_000 }).catch(() => false)) {
+    const base = appBaseUrl.replace(/\/$/, "");
+    const tryNativeLogin = async (probeTimeout = 5_000) => {
+      const passwordField = page.locator("input[type='password']:visible").first();
+      if (!(await passwordField.isVisible({ timeout: probeTimeout }).catch(() => false))) {
+        return false;
+      }
       const usernameField = page
         .locator(
-          "input[name='username'], input[name='email'], input[name='login'], input[type='email'], input[autocomplete='username']",
+          "input[name='username']:visible, input[name='email']:visible, input[name='login']:visible, input[type='email']:visible, input[autocomplete='username']:visible",
         )
         .first();
       if (await usernameField.isVisible().catch(() => false)) {
         await usernameField.fill(adminUsername).catch(() => {});
       }
-      await passwordField.fill(adminPassword).catch(() => {});
+      await passwordField.fill(adminNativePassword || adminPassword).catch(() => {});
       await page
         .getByRole("button", { name: /log\s*in|sign\s*in|login|submit/i })
         .or(page.locator("button[type='submit'], input[type='submit']"))
@@ -142,6 +148,14 @@ async function runAdminFlow(page, opts = {}) {
         .click()
         .catch(() => {});
       await page.waitForLoadState("networkidle").catch(() => {});
+      return true;
+    };
+
+    if (!(await tryNativeLogin(10_000))) {
+      for (const loginPath of ["/login", "/admin/", "/admin"]) {
+        await page.goto(`${base}${loginPath}`, { waitUntil: "domcontentloaded" }).catch(() => {});
+        if (await tryNativeLogin()) break;
+      }
     }
   }
 
