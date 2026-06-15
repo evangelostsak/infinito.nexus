@@ -5,7 +5,9 @@ csp:
       unsafe-inline: true
     style-src-attr:
       unsafe-inline: true
-  whitelist: {}
+  whitelist:
+    connect-src:
+      - "{{ lookup('tls', 'web-app-seaweedfs', 'protocols.web') }}://{{ lookup('config', 'web-app-seaweedfs', 'server.domains.canonical.api') }}"
 domains:
   aliases: []
   canonical:
