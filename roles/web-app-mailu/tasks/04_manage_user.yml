@@ -16,6 +16,13 @@
   args:
     chdir: "{{ MAILU_INSTANCE_DIR }}"
   register: mailu_user_result
+  retries: 12
+  delay: 10
+  until: >
+    mailu_user_result.rc == 0 or
+    ('exists' in (mailu_user_result.stderr | lower)) or
+    ('already' in (mailu_user_result.stderr | lower)) or
+    ('duplicate' in (mailu_user_result.stderr | lower))
   changed_when: mailu_user_result.rc == 0
   failed_when: >
     mailu_user_result.rc != 0 and
@@ -44,6 +51,9 @@
   args:
     chdir: "{{ MAILU_INSTANCE_DIR }}"
   register: mailu_user_password_change
+  retries: 12
+  delay: 10
+  until: mailu_user_password_change.rc == 0
   changed_when: mailu_user_password_change.rc == 0
   failed_when: mailu_user_password_change.rc != 0
   when: "'mail-bot' in mailu_user_roles or 'administrator' in mailu_user_roles"
