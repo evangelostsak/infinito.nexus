@@ -52,11 +52,11 @@ async function signInViaErpnextOidc(page, username, password, personaLabel) {
     .filter({ hasText: /sso\s*login|sign\s*in\s+with|continue\s+with|single\s+sign[-\s]*on|keycloak|infinito/i })
     .first();
 
-  if ((await oidcSignIn.count().catch(() => 0)) > 0) {
-    await oidcSignIn.click();
-  } else {
-    await page.goto(`${erpnextBaseUrl}/api/method/frappe.integrations.oauth2_logins.login_via_keycloak`).catch(() => {});
-  }
+  await expect(
+    oidcSignIn,
+    `${personaLabel}: the Keycloak SSO button must render on /login (Social Login Key not picked up by the workers?)`,
+  ).toBeVisible({ timeout: 30_000 });
+  await oidcSignIn.click();
 
   await expect
     .poll(() => page.url(), {

@@ -66,6 +66,7 @@ async function runAdminFlow(page, opts = {}) {
   const appBaseUrl = normalizeUrl(process.env.APP_BASE_URL);
   const adminUsername = readEnv("ADMIN_USERNAME");
   const adminPassword = readEnv("ADMIN_PASSWORD");
+  const adminNativePassword = readEnv("ADMIN_NATIVE_PASSWORD");
 
   // Persona-collapse exception: roles whose env does not
   // expose APP_BASE_URL or CANONICAL_DOMAIN are auth-less by
@@ -120,6 +121,48 @@ async function runAdminFlow(page, opts = {}) {
     }
   }
 
+  // No-SSO fallback: with SSO disabled the OIDC step above is a no-op, so drive
+  // the role's own username/password form with the admin credentials. Try the
+  // landing page first, then common admin/login paths (e.g. YOURLS' form lives
+  // at /admin/, not the public root).
+  if (!oidcEnabled && adminUsername && adminPassword) {
+    const base = appBaseUrl.replace(/\/$/, "");
+    const tryNativeLogin = async (probeTimeout = 5_000) => {
+      const passwordField = page.locator("input[type='password']:visible").first();
+      if (!(await passwordField.isVisible({ timeout: probeTimeout }).catch(() => false))) {
+        return false;
+      }
+      const usernameField = page
+        .locator(
+          "input[name='username']:visible, input[name='email']:visible, input[name='login']:visible, input[type='email']:visible, input[autocomplete='username']:visible",
+        )
+        .first();
+      if (await usernameField.isVisible().catch(() => false)) {
+        await usernameField.fill(adminUsername).catch(() => {});
+      }
+      await passwordField.fill(adminNativePassword || adminPassword).catch(() => {});
+      await passwordField.press("Enter").catch(() => {});
+      await page.waitForLoadState("networkidle").catch(() => {});
+      if (await passwordField.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        await page
+          .getByRole("button", { name: /log\s*in|sign\s*in|login|submit/i })
+          .or(page.locator("button[type='submit'], input[type='submit']"))
+          .first()
+          .click()
+          .catch(() => {});
+        await page.waitForLoadState("networkidle").catch(() => {});
+      }
+      return true;
+    };
+
+    if (!(await tryNativeLogin(10_000))) {
+      for (const loginPath of ["/login", "/admin/", "/admin"]) {
+        await page.goto(`${base}${loginPath}`, { waitUntil: "domcontentloaded" }).catch(() => {});
+        if (await tryNativeLogin()) break;
+      }
+    }
+  }
+
   // Verify administrator actually reached an authenticated surface.
   // The persona contract demands a full app → logout journey. When
   // the post-OIDC page does NOT expose a logout control / user menu,
@@ -133,8 +176,8 @@ async function runAdminFlow(page, opts = {}) {
       .getByRole("button", { name: /log\s*out|sign\s*out|sign-out|abmelden/i })
       .or(surface.getByRole("link", { name: /log\s*out|sign\s*out|sign-out|abmelden/i }))
       .or(surface.getByRole("menuitem", { name: /log\s*out|sign\s*out|sign-out|abmelden/i }))
-      .or(surface.getByRole("button", { name: /(account|profile|user.?menu|^menu$|signed\s*in)/i }))
-      .or(surface.getByRole("link", { name: /(account|profile|user.?menu|^menu$|signed\s*in)/i }))
+      .or(surface.getByRole("button", { name: /(profile|user.?menu|^menu$|signed\s*in)/i }))
+      .or(surface.getByRole("link", { name: /(profile|user.?menu|^menu$|signed\s*in)/i }))
       .or(
         surface.locator(
           "[data-region='user-menu-toggle'], .user-menu-toggle, .usermenu, [aria-label*='user menu' i], [aria-label*='account' i], [data-testid*='user' i], a[href*='logout' i], a[href*='end_session' i], a[href*='end-session' i]",
