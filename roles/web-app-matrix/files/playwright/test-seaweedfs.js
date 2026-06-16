@@ -30,6 +30,10 @@ test.use({ ignoreHTTPSErrors: true });
 
 test("seaweedfs: an uploaded Matrix avatar is stored in the SeaweedFS bucket", async ({ page, browser }) => {
   skipUnlessServiceEnabled("seaweedfs");
+  test.skip(
+    !(process.env.MATRIX_FLAVOR || "").toLowerCase().includes("ansible"),
+    "Matrix media is offloaded to SeaweedFS only in the ansible flavor; the compose flavor stores media on local disk, so the bucket never grows.",
+  );
   test.setTimeout(600_000);
 
   await runSeaweedfsStorageCheck(page, browser, {
