@@ -1,25 +1,3 @@
-/**
- * `administrator` persona: single-app authenticated journey.
- *
- *   appBaseUrl → (OIDC if applicable) → admin-only interaction
- *              → CSP injection check → in-app logout
- *              → unauthenticated landing assertion.
- *
- * The administrator persona is now scoped to the role under test only.
- * Cross-service surface checks (prometheus, matomo, dashboard tile
- * reachability) are owned by the dedicated provider specs:
- *
- *   - `roles/web-app-dashboard/files/playwright/playwright.spec.js` parameterises
- *     dashboard-tile reachability per consumer role.
- *   - `roles/web-app-prometheus/files/playwright/playwright.spec.js` parameterises
- *     scrape-target presence + admin reach + biber denial.
- *   - `roles/web-app-matomo/files/playwright/playwright.spec.js` parameterises
- *     tracker-site presence + admin reach + biber denial.
- *
- * Each role's persona scenario therefore visits its OWN canonical URL
- * directly (no dashboard tile click) and exercises only that role.
- */
-
 const { test, expect } = require("@playwright/test");
 const {
   normalizeUrl,
@@ -34,13 +12,6 @@ const {
 } = require("./utils");
 
 async function runAdminFlow(page, opts = {}) {
-  // Explicit role contract opt-out. Roles that
-  // genuinely have no OIDC-driven admin surface (auth-provider roles,
-  // bespoke local-only admin paths, mobile-first SPAs whose logout
-  // control is unreachable to the generic helper, ...) declare
-  // `PERSONA_ADMINISTRATOR_BLOCKED=true` in
-  // `templates/playwright.env.j2` with a documented rationale in the
-  // role's TODO.md or README.md.
   if ((process.env.PERSONA_ADMINISTRATOR_BLOCKED || "").toLowerCase() === "true") {
     test.skip(
       true,
@@ -49,15 +20,6 @@ async function runAdminFlow(page, opts = {}) {
     return;
   }
 
-  // Test B parity: the SSO-proxy sidecar (or in-app OIDC) gates the
-  // initial redirect chain, universal-logout rewrites the in-app
-  // logout click, and the shared CSP-injection helper
-  // (`assertCspInjections`) gates on `matomo` to verify every role's
-  // CSP allows the matomo tracker host when matomo is enabled. All
-  // three are consumed by the persona surface; reference them via
-  // safeIsEnabled with literal arguments so the env-gate parity guard
-  // recognises them as consumed by the spec via the shared persona
-  // helper.
   safeIsEnabled("sso");
   safeIsEnabled("logout");
   safeIsEnabled("matomo");
@@ -66,10 +28,8 @@ async function runAdminFlow(page, opts = {}) {
   const appBaseUrl = normalizeUrl(process.env.APP_BASE_URL);
   const adminUsername = readEnv("ADMIN_USERNAME");
   const adminPassword = readEnv("ADMIN_PASSWORD");
+  const adminNativePassword = readEnv("ADMIN_NATIVE_PASSWORD");
 
-  // Persona-collapse exception: roles whose env does not
-  // expose APP_BASE_URL or CANONICAL_DOMAIN are auth-less by
-  // construction; skip cleanly rather than fail.
   if (!appBaseUrl || !canonicalDomain) {
     test.skip(
       true,
@@ -82,28 +42,11 @@ async function runAdminFlow(page, opts = {}) {
 
   const oidcEnabled = safeIsEnabled("sso");
 
-  // Direct-app entry: bookmark-style navigation. The OAuth2-Proxy gate
-  // fires on the first request, redirecting unauthenticated requests
-  // to Keycloak; the auth chain is the same regardless of how the user
-  // arrived at the URL.
   await page.goto(`${appBaseUrl}/`, { waitUntil: "domcontentloaded" }).catch(() => {});
 
-  // Two auth shapes share a single login step:
-  //   * oauth2-proxy gate: the goto is intercepted and the page lands
-  //     directly on the Keycloak auth endpoint; perform Keycloak login.
-  //   * In-app OIDC plugin: the role's own UI exposes a Login link;
-  //     click it to trigger the redirect, then perform Keycloak login.
   let keycloakRoundTripCompleted = false;
   if (adminUsername && adminPassword) {
     if (oidcEnabled && !page.url().includes("openid-connect/auth")) {
-      // Two-pass: strict anchored regex targets the role's OWN Login button
-      // (e.g. nextcloud's plain `<a>Login</a>`); loose substring regex covers
-      // roles whose Login link gets a Bootstrap tooltip
-      // (`data-bs-toggle="tooltip"` moves `title` into
-      // `data-bs-original-title`, which the accessibility tree pulls into the
-      // link's accessible name — anchored regex misses such links). The
-      // `\s*` between `log` and `in` keeps both patterns from matching
-      // `Logout`/`logoff`.
       const strictLogin = page
         .getByRole("link", { name: /^\s*(log\s*in|sign\s*in|login|sso|admin)\s*$/i })
         .or(page.getByRole("button", { name: /^\s*(log\s*in|sign\s*in|login|sso|admin)\s*$/i }))
@@ -120,38 +63,74 @@ async function runAdminFlow(page, opts = {}) {
     }
   }
 
-  // Verify administrator actually reached an authenticated surface.
-  // The persona contract demands a full app → logout journey. When
-  // the post-OIDC page does NOT expose a logout control / user menu,
-  // that is a real regression UNLESS the role explicitly declares the
-  // admin persona blocked via env flag
-  // `PERSONA_ADMINISTRATOR_BLOCKED=true`. Without that flag the test
-  // fails loudly so a real regression cannot hide behind a silent
-  // skip.
+  let nativeLoginCompleted = false;
+  if (!oidcEnabled && adminUsername && adminPassword) {
+    const base = appBaseUrl.replace(/\/$/, "");
+    const tryNativeLogin = async (probeTimeout = 5_000) => {
+      const passwordField = page.locator("input[type='password']:visible").first();
+      if (!(await passwordField.isVisible({ timeout: probeTimeout }).catch(() => false))) {
+        return false;
+      }
+      const usernameField = page
+        .locator(
+          "input[name='username']:visible, input[name='email']:visible, input[name='login']:visible, input[type='email']:visible, input[autocomplete='username']:visible",
+        )
+        .first();
+      if (await usernameField.isVisible().catch(() => false)) {
+        await usernameField.fill(adminUsername).catch(() => {});
+      }
+      await passwordField.fill(adminNativePassword || adminPassword).catch(() => {});
+      await passwordField.press("Enter").catch(() => {});
+      await page.waitForLoadState("networkidle").catch(() => {});
+      if (await passwordField.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        await page
+          .getByRole("button", { name: /log\s*in|sign\s*in|login|submit/i })
+          .or(page.locator("button[type='submit'], input[type='submit']"))
+          .first()
+          .click()
+          .catch(() => {});
+        await page.waitForLoadState("networkidle").catch(() => {});
+      }
+      return true;
+    };
+
+    let loginAttempted = await tryNativeLogin(10_000);
+    if (!loginAttempted) {
+      for (const loginPath of ["/login", "/admin/", "/admin"]) {
+        await page.goto(`${base}${loginPath}`, { waitUntil: "domcontentloaded" }).catch(() => {});
+        if (await tryNativeLogin()) {
+          loginAttempted = true;
+          break;
+        }
+      }
+    }
+
+    const passwordStillVisible = await page
+      .locator("input[type='password']:visible")
+      .first()
+      .isVisible({ timeout: 2_000 })
+      .catch(() => false);
+    nativeLoginCompleted =
+      loginAttempted &&
+      !passwordStillVisible &&
+      new URL(page.url()).hostname.endsWith(canonicalDomain);
+  }
+
   const adminAuthMarker = (surface) =>
     surface
       .getByRole("button", { name: /log\s*out|sign\s*out|sign-out|abmelden/i })
       .or(surface.getByRole("link", { name: /log\s*out|sign\s*out|sign-out|abmelden/i }))
       .or(surface.getByRole("menuitem", { name: /log\s*out|sign\s*out|sign-out|abmelden/i }))
-      .or(surface.getByRole("button", { name: /(account|profile|user.?menu|^menu$|signed\s*in)/i }))
-      .or(surface.getByRole("link", { name: /(account|profile|user.?menu|^menu$|signed\s*in)/i }))
+      .or(surface.getByRole("button", { name: /(profile|user.?menu|^menu$|signed\s*in)/i }))
+      .or(surface.getByRole("link", { name: /(profile|user.?menu|^menu$|signed\s*in)/i }))
       .or(
         surface.locator(
           "[data-region='user-menu-toggle'], .user-menu-toggle, .usermenu, [aria-label*='user menu' i], [aria-label*='account' i], [data-testid*='user' i], a[href*='logout' i], a[href*='end_session' i], a[href*='end-session' i]",
         ),
       );
-  // A successful Keycloak round-trip (oauth2-proxy-gated login that
-  // returned to `canonicalDomain` after the form submit) is a strong
-  // proof of authentication on its own — some roles (oauth2-proxy
-  // gated services such as Prometheus, status pages, raw upstream UIs
-  // without their own account menu) have no in-app auth marker to
-  // probe. When the round-trip ran, treat the persona as authenticated
-  // and let `inAppLogout` decide whether a logout control is
-  // reachable. The `adminAuthMarker` poll below still tries to find a
-  // visible Account/Logout control so the post-login UI assertions
-  // remain effective for roles that DO expose one.
-  let adminReachedAuthenticated = keycloakRoundTripCompleted
-    && new URL(page.url()).hostname.endsWith(canonicalDomain);
+  let adminReachedAuthenticated =
+    (keycloakRoundTripCompleted || nativeLoginCompleted) &&
+    new URL(page.url()).hostname.endsWith(canonicalDomain);
   if (!adminReachedAuthenticated) {
     adminReachedAuthenticated = await adminAuthMarker(page)
       .first()
@@ -170,9 +149,6 @@ async function runAdminFlow(page, opts = {}) {
     }
   }
   if (!adminReachedAuthenticated) {
-    // URL-based fallback for NESTED frames only: see biber.js — the
-    // main frame can park on the canonical domain without an
-    // authenticated session, so URL alone is not proof of auth.
     for (const frame of page.frames()) {
       if (frame === page.mainFrame()) continue;
       const fUrl = frame.url();
@@ -201,9 +177,6 @@ async function runAdminFlow(page, opts = {}) {
 
   await assertCspInjections(page, { isEnabled: safeIsEnabled });
 
-  // Drive a real, app-specific interaction after login. Specs SHOULD
-  // override the default by passing an `adminInteraction` callback that
-  // exercises an admin-only surface (admin panel, realm settings, ...).
   await runRoleInteraction(page, { canonicalDomain, roleInteraction: opts.adminInteraction });
 
   await inAppLogout(page);

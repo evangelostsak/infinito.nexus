@@ -64,6 +64,11 @@ matrix-chatgpt-bot:
   mem_reservation: 128m
   mem_limit: 256m
   pids_limit: 256
+# nocheck: playwright-service-flag — object store, no Playwright surface (provider: web-app-seaweedfs)
+seaweedfs:
+  enabled: "{{ 'web-app-seaweedfs' in group_names }}"
+  shared: "{{ 'web-app-seaweedfs' in group_names }}"
+  public: true
 # nocheck: playwright-service-flag — css consumer, no Playwright surface (provider: web-svc-css)
 css:
   enabled: "{{ 'web-svc-css' in group_names }}"
@@ -80,7 +85,7 @@ prometheus:
 matrix:
   flavor: ansible
   upstream:
-    repo: https://github.com/kevinveenbirkenbach/matrix-docker-ansible-deploy
+    repo: https://github.com/spantaleev/matrix-docker-ansible-deploy
     ref: master
     migration_validated_version: v2026.05.18.0
   runner:
