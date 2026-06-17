@@ -43,9 +43,15 @@
   set_fact:
     vault_discourse_api_key: "{{ discourse_generated_api_key.stdout | trim }}"
 
-- name: "Load WP Discourse settings"
-  include_vars:
-    file: "{{ role_path }}/vars/discourse.yml"
+# Use include_vars (not lookup('file')|from_yaml) so values lazy-render and the deploy-time vault_discourse_api_key resolves in this scope.
+- name: "Load WP Discourse addon spec from meta/addons/wp-discourse.yml"
+  ansible.builtin.include_vars:
+    file: "{{ [role_path, 'meta/addons', 'wp-discourse.yml'] | path_join }}"
+    name: wp_discourse_addon
+- name: "Resolve WP Discourse settings"
+  set_fact:
+    discourse_settings: "{{ wp_discourse_addon.config.discourse_settings | default([]) }}"
+  changed_when: false
 
 - name: "Install WP Discourse plugin"
   command: >

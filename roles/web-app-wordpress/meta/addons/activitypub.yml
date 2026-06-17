@@ -1,0 +1,9 @@
+---
+enabled: true
+required: false
+mechanism: plugin
+source: upstream
+update:
+  monitored: true
+  catalog: wordpress-org
+  upstream_id: activitypub

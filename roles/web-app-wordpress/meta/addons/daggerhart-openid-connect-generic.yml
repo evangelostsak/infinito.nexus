@@ -1,0 +1,37 @@
+---
+enabled: "{{ lookup('config', 'web-app-wordpress', 'services.sso.enabled') | bool }}"
+required: false
+mechanism: plugin
+source: upstream
+bridges:
+  - sso
+update:
+  monitored: true
+  catalog: wordpress-org
+  upstream_id: daggerhart-openid-connect-generic
+config:
+  oidc_settings:
+    client_id: "{{ OIDC.CLIENT.ID }}"
+    client_secret: "{{ OIDC.CLIENT.SECRET }}"
+    issuer: "{{ OIDC.CLIENT.ISSUER_URL }}"
+    endpoint_login: "{{ OIDC.CLIENT.AUTHORIZE_URL }}"
+    endpoint_token: "{{ OIDC.CLIENT.TOKEN_URL }}"
+    endpoint_userinfo: "{{ OIDC.CLIENT.USER_INFO_URL }}"
+    endpoint_jwks: "{{ OIDC.CLIENT.CERTS }}"
+    endpoint_end_session: "{{ OIDC.CLIENT.LOGOUT_URL }}"
+    login_type: "auto"
+    scope: "openid profile email {{ RBAC.GROUP.CLAIM }}"
+    create_if_does_not_exist: true
+    enforce_privacy: false
+    link_existing_users: true
+    redirect_on_logout: true
+    redirect_user_back: true
+    enable_logging: "{{ MODE_DEBUG }}"
+    no_sslverify: false
+    http_request_timeout: 5
+    identity_key: "{{ OIDC.ATTRIBUTES.USERNAME }}"
+    nickname_key: "{{ OIDC.ATTRIBUTES.USERNAME }}"
+    email_format: "{{ OIDC.ATTRIBUTES.EMAIL }}"
+    displayname_format: "{{ OIDC.ATTRIBUTES.GIVEN_NAME }} {{ OIDC.ATTRIBUTES.FAMILY_NAME }}"
+    identify_with_username: true
+    state_time_limit: 180

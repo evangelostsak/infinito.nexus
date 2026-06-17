@@ -50,6 +50,22 @@ RBAC under Multisite uses the hierarchical Keycloak group path:
 
 Operator-facing instructions for assigning these groups live in [Administration RBAC](../../docs/administration/configuration/rbac.md). The design contract is in [RBAC design](../../docs/contributing/design/iam/rbac.md).
 
+## Addons
+
+Plugins and the OIDC→RBAC mu-plugin are declared in
+[`meta/addons/`](./meta/addons/) under the unified addon contract
+(requirement 026). The OIDC and WP-Discourse runtime config lives in each addon's `config:` block.
+
+| Addon | Mechanism | Default state | Bridges |
+|-------|-----------|---------------|---------|
+| `daggerhart-openid-connect-generic` | `plugin` | enabled with the `sso` service | `sso` → `web-app-keycloak` |
+| `wp-discourse` | `plugin` | enabled with the `discourse` service | `discourse` → `web-app-discourse` |
+| `activitypub` | `plugin` | always enabled (Fediverse federation) | none |
+| `infinito-oidc-rbac-mapper` | `mu_plugin` | `required` (always installed, vendored) | `sso` → `web-app-keycloak` |
+
+The OIDC login + RBAC paths are covered by `test-admin-oidc-login.js` /
+`test-rbac-roles.js`, the Discourse round-trip by `test-discourse-roundtrip.js`.
+
 ## Playwright service dependencies
 
 The Playwright suite in [files/playwright/playwright.spec.js](files/playwright/playwright.spec.js) gates its scenarios on the following shared services (requirement 006). Scenarios that depend on a service report as `skipped` when the corresponding `<SERVICE>_SERVICE_ENABLED=false` in the staged `.env`:

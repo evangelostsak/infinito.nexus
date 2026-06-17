@@ -1,5 +1,5 @@
 ---
-# nocheck: seaweedfs-required — object storage not implemented for this role
+# nocheck: seaweedfs-required, object storage not implemented for this role
 sso:
   enabled: "{{ 'web-app-keycloak' in group_names }}"
   shared: "{{ 'web-app-keycloak' in group_names }}"
@@ -13,7 +13,7 @@ dashboard:
 matomo:
   enabled: "{{ 'web-app-matomo' in group_names }}"
   shared: "{{ 'web-app-matomo' in group_names }}"
-# nocheck: playwright-service-flag — DB engine, covered by role-local integration tests
+# nocheck: playwright-service-flag, DB engine, covered by role-local integration tests
 mariadb:
   enabled: true # nocheck: dynamic-flag
   shared: "{{ 'svc-db-mariadb' in group_names }}"
@@ -35,20 +35,13 @@ wordpress:
   max_upload_size: 256M
   multisite:
     enabled: false
-  plugins:
-    wp-discourse:
-      enabled: "{{ lookup('config', 'web-app-wordpress', 'services.discourse.enabled') | bool }}"
-    daggerhart-openid-connect-generic:
-      enabled: "{{ lookup('config', 'web-app-wordpress', 'services.sso.enabled') | bool }}"
-    activitypub:
-      enabled: true
   ports:
     local:
       http: 8003
   run_after:
     - web-app-keycloak
   lifecycle: beta
-# nocheck: playwright-service-flag — verified by web-svc-css provider spec
+# nocheck: playwright-service-flag, verified by web-svc-css provider spec
 css:
   enabled: "{{ 'web-svc-css' in group_names }}"
   shared: "{{ 'web-svc-css' in group_names }}"
