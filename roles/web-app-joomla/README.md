@@ -10,6 +10,18 @@ This role deploys Joomla on Docker Compose. It builds a custom Joomla image that
 
 For the OIDC plugin source and its environment contract see [README.md](./files/joomla-oidc-plugin/README.md).
 
+## Addons
+
+Role-level extensions are declared in [`meta/addons/`](./meta/addons/)
+(unified addon contract, requirement 026):
+
+| Addon | Mechanism | Default state | Bridges |
+|-------|-----------|---------------|---------|
+| `plg_system_keycloak` | `plugin` | enabled whenever the `sso` service is present (`web-app-keycloak` co-deployed) | `sso` → `web-app-keycloak` |
+
+`plg_system_keycloak` is built imperatively inside the Joomla container and speaks OIDC against Keycloak.
+Its enablement derives directly from the `sso` service flag, and its OIDC runtime contract (issuer, client id/secret, redirect/end-session URLs, fallback toggle, and RBAC group paths) lives under the addon's `config:` block, which [`templates/env.j2`](./templates/env.j2) renders into the `JOOMLA_OIDC_*` plugin environment.
+
 ## Features
 
 - **Containerized deployment:** Run Joomla through Docker Compose with the role-specific custom image.
@@ -25,11 +37,11 @@ See [README.md](./files/joomla-oidc-plugin/README.md) for the OIDC plugin's mani
 
 ## End-to-end tests
 
-The Playwright spec at [files/playwright/playwright.spec.js](./files/playwright/playwright.spec.js) currently exercises the **administrator** path only: Keycloak SSO into the admin backend plus the local form-login emergency hatch (`?fallback=local`). The non-admin RBAC path via the canonical `biber` user is not yet covered.
+The Playwright spec at [`playwright.spec.js`](./files/playwright/playwright.spec.js) currently exercises the **administrator** path only: Keycloak SSO into the admin backend plus the local form-login emergency hatch (`?fallback=local`). The non-admin RBAC path via the canonical `biber` user is not yet covered.
 
 Until the biber path is added:
 
-- the role's [templates/playwright.env.j2](./templates/playwright.env.j2) MUST NOT carry stale `BIBER_USERNAME` / `BIBER_PASSWORD` keys (the lint at [tests/lint/ansible/roles/web-app/playwright/test_env_keys_used.py](../../tests/lint/ansible/roles/web-app/playwright/test_env_keys_used.py) enforces this);
+- the role's [`playwright.env.j2`](./templates/playwright.env.j2) MUST NOT carry stale `BIBER_USERNAME` / `BIBER_PASSWORD` keys (the lint at [`test_env_keys_used.py`](../../tests/lint/ansible/roles/web-app/playwright/test_env_keys_used.py) enforces this);
 - the admin scenarios stay gated on `oidc` (and on `ldap` for the LDAP-variant scenarios), so a deploy with `disable=oidc` reports the SSO scenario as `skipped`, never `failed`.
 
 ## Further Resources
