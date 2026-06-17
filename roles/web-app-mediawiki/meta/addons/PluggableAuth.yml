@@ -1,0 +1,9 @@
+---
+enabled: "{{ lookup('config', 'web-app-mediawiki', 'services.sso.enabled') | bool }}"
+required: false
+mechanism: extension
+source: upstream
+update:
+  monitored: true
+  catalog: mediawiki-extension
+  upstream_id: PluggableAuth

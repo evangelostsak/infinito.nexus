@@ -16,6 +16,15 @@ This role deploys MediaWiki using Docker, automating the setup of your wiki inst
 - **Scalable Deployment:** Utilize Docker for a portable and scalable setup that adapts as your community grows.
 - **Secure and Reliable:** Benefit from secure access via an NGINX reverse proxy combined with a MariaDB backend for reliable data storage.
 
+## Addons
+
+This role ships its OIDC login stack as unified addons declared in [`meta/addons/`](meta/addons/). Both are MediaWiki extensions installed from upstream and gated on the `sso` service flag (`web-app-keycloak` co-deployed). The OIDC client secret is rendered through `templates/oidc.php.j2` and never inlined into the addon declaration.
+
+| Addon | Mechanism | Default state | Bridges |
+|---|---|---|---|
+| PluggableAuth | extension | enabled when `services.sso.enabled` | none |
+| OpenIDConnect | extension | enabled when `services.sso.enabled` | `sso` |
+
 ## Further Resources
 
 - [MediaWiki Official Website](https://www.mediawiki.org/)

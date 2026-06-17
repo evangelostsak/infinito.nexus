@@ -1,0 +1,11 @@
+---
+enabled: "{{ lookup('config', 'web-app-mediawiki', 'services.sso.enabled') | bool }}"
+required: false
+mechanism: extension
+source: upstream
+bridges:
+  - sso
+update:
+  monitored: true
+  catalog: mediawiki-extension
+  upstream_id: OpenIDConnect
