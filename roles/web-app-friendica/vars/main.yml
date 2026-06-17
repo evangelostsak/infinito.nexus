@@ -14,7 +14,7 @@ FRIENDICA_APPLICATION_DIR: "/var/www/html"
 FRIENDICA_CONFIG_DIR: "{{ [ FRIENDICA_APPLICATION_DIR,          'config' ] | path_join }}"
 FRIENDICA_CONFIG_FILE: "{{ [ FRIENDICA_CONFIG_DIR,               'local.config.php' ] | path_join }}"
 FRIENDICA_USER: "www-data"
-FRIENDICA_ADDONS: "{{ lookup('config', application_id, 'services.friendica.addons') }}"
+FRIENDICA_ADDONS: "{{ lookup('config', application_id, 'addons') }}"
 
 # IAM
 FRIENDICA_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.sso.enabled') }}"

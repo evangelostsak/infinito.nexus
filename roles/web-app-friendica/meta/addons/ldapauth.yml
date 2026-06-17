@@ -1,0 +1,11 @@
+---
+enabled: "{{ lookup('config', 'web-app-friendica', 'services.ldap.enabled') | bool }}"
+required: false
+mechanism: addon
+source: upstream
+bridges:
+  - ldap
+update:
+  monitored: true
+  catalog: friendica-addons
+  upstream_id: ldapauth

@@ -1,18 +1,12 @@
 ---
-# nocheck: seaweedfs-required — object storage not implemented for this role
-# nocheck: playwright-service-flag — self-provider
+# nocheck: seaweedfs-required, object storage not implemented for this role
+# nocheck: playwright-service-flag, self-provider
 friendica:
   shared: true
   enabled: true
   image: friendica
   version: "2026.05"
   min_storage: 10GB
-  addons:
-    # SSO is owned by the oauth2-proxy gate in front of the friendica vhost
-    # (services.sso.enabled=keycloak below). `ldapauth` stays enabled
-    # because friendica has no header-trusted autocreate mechanism — the
-    # ldap bind is the only path that materialises a friendica.user row.
-    ldapauth: {}
   ports:
     local:
       sso: 16501
@@ -44,10 +38,10 @@ sso:
     # network / settings views, the admin panel) all force the Keycloak
     # round-trip. A blacklist that opens `/` and only gates `/login`
     # strips the POST body on the 401 redirect and breaks ldapauth.
-    # Everything Friendica considers naturally public — federation API,
+    # Everything Friendica considers naturally public (federation API,
     # ActivityPub / NodeInfo / WebFinger discovery, public profile and
     # post pages, the community feed, media, search, the theme assets
-    # and the static instance-info pages — is whitelisted here so
+    # and the static instance-info pages) is whitelisted here so
     # anonymous visitors (and the Fediwall SPA, foreign instances, and
     # crawlers) can reach those surfaces without being bounced through
     # Keycloak.
@@ -90,11 +84,11 @@ matomo:
 email:
   enabled: "{{ 'web-app-mailu' in group_names }}"
   shared: "{{ 'web-app-mailu' in group_names }}"
-# nocheck: playwright-service-flag — DB engine, covered by role-local integration tests
+# nocheck: playwright-service-flag, DB engine, covered by role-local integration tests
 mariadb:
   enabled: true # nocheck: dynamic-flag
   shared: "{{ 'svc-db-mariadb' in group_names }}"
-# nocheck: playwright-service-flag — verified by web-svc-css provider spec
+# nocheck: playwright-service-flag, verified by web-svc-css provider spec
 css:
   enabled: "{{ 'web-svc-css' in group_names }}"
   shared: "{{ 'web-svc-css' in group_names }}"

@@ -18,6 +18,19 @@ For detailed administration procedures, please refer to the [Administration.md](
 - **Configuration Debugging:** Quickly inspect environment variables, volume data, and configuration files to troubleshoot issues.
 - **Autoinstall Capability:** Automate initial installation steps to rapidly deploy a working Friendica instance.
 
+## Addons
+
+Role-level extensions are declared in [`meta/addons/`](./meta/addons/)
+(unified addon contract, requirement 026):
+
+| Addon | Mechanism | Default state | Bridges |
+|-------|-----------|---------------|---------|
+| `ldapauth` | `addon` | enabled whenever the `ldap` service is present (`svc-db-openldap` co-deployed) | `ldap` → `svc-db-openldap` |
+
+`ldapauth` is the only path that materialises a `friendica.user` row, so its enablement derives directly from the `ldap` service flag.
+The oauth2-proxy `sso` gate in front of the vhost is a front-door auth gate, not an addon bridge, and stays in [`meta/services.yml`](./meta/services.yml).
+The LDAP login path is covered by the existing LDAP Playwright spec (requirement 018), so no addon-specific spec is added.
+
 ## Further Resources
 
 - [Friendica Docker Hub](https://hub.docker.com/_/friendica)
