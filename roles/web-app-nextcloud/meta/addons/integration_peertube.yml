@@ -1,0 +1,4 @@
+---
+enabled: "{{ 'web-app-peertube' in group_names | lower }}"
+mechanism: plugin
+source: upstream

@@ -1,0 +1,4 @@
+---
+enabled: "{{ 'web-app-openproject' in group_names | lower }}"
+mechanism: plugin
+source: upstream

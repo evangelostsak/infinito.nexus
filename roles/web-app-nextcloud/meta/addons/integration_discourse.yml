@@ -1,0 +1,4 @@
+---
+enabled: false
+mechanism: plugin
+source: upstream
