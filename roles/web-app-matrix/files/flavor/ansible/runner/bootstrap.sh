@@ -15,6 +15,24 @@ fi
 
 export PATH="/opt/ansible/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
+PYTHON=/opt/ansible/bin/python3
+ready=0
+attempt=0
+while [ "$attempt" -lt 30 ]; do
+  if "$PYTHON" -c 'import _posixsubprocess, subprocess, ssl, ctypes' >/dev/null 2>&1; then
+    ready=1
+    break
+  fi
+  attempt=$((attempt + 1))
+  echo ">>> matrix-mdad-bootstrap: python runtime not ready yet (attempt ${attempt}/30), waiting"
+  sleep 2
+done
+if [ "$ready" -ne 1 ]; then
+  echo "!!! matrix-mdad-bootstrap: python runtime never became importable, aborting" >&2
+  "$PYTHON" -c 'import _posixsubprocess' || true
+  exit 1
+fi
+
 cd /mdad
 
 START_GALAXY=$SECONDS
