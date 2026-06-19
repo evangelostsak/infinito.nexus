@@ -2,20 +2,7 @@ const { test, expect } = require("@playwright/test");
 const { skipUnlessAddonEnabled } = require("../addon-gating");
 const shared = require("../_shared");
 
-// Functional cross-role coupling check for nextcloud/integration_suitecrm.
-//
-// The loader installs+enables the app and writes config:app:set integration_suitecrm
-// url <suitecrm>. But the upstream julien-nc/integration_suitecrm app never reads
-// `url`: both Settings/Admin.php and Settings/Personal.php read the SuiteCRM instance
-// address from the app value `oauth_instance_url`. tasks/addons/integration_suitecrm.yml
-// provisions oauth_instance_url ONLY when the partner SuiteCRM container is reachable;
-// in topologies where web-app-suitecrm is not deployed the hook is skipped and
-// oauth_instance_url stays unset. When the addon IS coupled, the admin SuiteCRM panel
-// (settings/admin/connected-accounts -> #suitecrm_prefs) renders the instance-URL field
-// (#suitecrm-oauth-instance) populated with the partner URL — a host distinct from
-// Nextcloud. That is the hard coupling signal asserted here; absent the partner the
-// spec skips rather than fails.
-test("integration integration_suitecrm: connects Nextcloud to suitecrm", async ({ browser }) => {
+test("integration integration_suitecrm: per-user OAuth password grant reaches the partner SuiteCRM token endpoint", async ({ browser }) => {
   skipUnlessAddonEnabled("integration_suitecrm");
   test.setTimeout(120_000);
 
@@ -25,69 +12,83 @@ test("integration integration_suitecrm: connects Nextcloud to suitecrm", async (
   try {
     await shared.loginToStandaloneNextcloud(page);
 
-    // Determine "app present" from its OWN admin panel rendering, not the lazy-loaded
-    // settings/apps/enabled list (that [data-id] check false-negatives even when the
-    // app is enabled). The SuiteCRM admin section lives under "connected-accounts".
     await page.goto(
-      new URL("settings/admin/connected-accounts", shared.env.nextcloudBaseUrl).toString(),
+      new URL("settings/user/connected-accounts", shared.env.nextcloudBaseUrl).toString(),
       { waitUntil: "domcontentloaded", timeout: 60_000 }
     );
     await shared.dismissBlockingNextcloudModals(page, page).catch(() => {});
 
-    // Strict-mode safe: #suitecrm_prefs may match both the Vue data-v-app mount and a
-    // .section div, so take .first(). A bounded wait tells absent from slow-to-render.
     const suitecrmPanel = page.locator("#suitecrm_prefs").first();
-    const panelPresent = await suitecrmPanel
-      .waitFor({ state: "visible", timeout: 30_000 })
-      .then(() => true)
-      .catch(() => false);
+    await expect(
+      suitecrmPanel,
+      "the SuiteCRM personal settings panel must render when integration_suitecrm is enabled"
+    ).toBeVisible({ timeout: 60_000 });
 
-    // Read the instance-URL field (oauth_instance_url) the addon hook provisions.
-    // Prefer the stable id; fall back to any URL-shaped input inside the panel
-    // (NcTextField may wrap the native <input>).
-    let configuredInstanceUrl = null;
-    if (panelPresent) {
-      const instanceField = suitecrmPanel.locator("#suitecrm-oauth-instance").first();
-      if ((await instanceField.count()) > 0) {
-        const value = (await instanceField.inputValue().catch(() => "")) || "";
-        if (/^https?:\/\//i.test(value.trim())) {
-          configuredInstanceUrl = value.trim();
-        }
-      }
-      if (!configuredInstanceUrl) {
-        const urlInputs = suitecrmPanel.locator(
-          "input[type='text'], input[type='url'], input:not([type])"
-        );
-        const inputCount = await urlInputs.count();
-        for (let i = 0; i < inputCount; i += 1) {
-          const value = (await urlInputs.nth(i).inputValue().catch(() => "")) || "";
-          if (/^https?:\/\//i.test(value.trim())) {
-            configuredInstanceUrl = value.trim();
-            break;
-          }
-        }
-      }
-    }
+    const oauthContent = suitecrmPanel.locator("#suitecrm-content");
+    await expect(
+      oauthContent,
+      "the SuiteCRM OAuth settings (#suitecrm-content) must render — its absence means the OAuth client was not provisioned"
+    ).toBeVisible({ timeout: 30_000 });
 
-    // SuiteCRM partner absent -> hook skipped -> oauth_instance_url unset. Whether the
-    // panel never rendered or rendered with no partner URL, the coupling is simply not
-    // configured in this topology: skip, do not fail.
-    if (!configuredInstanceUrl) {
-      test.skip(
-        true,
-        "integration_suitecrm: oauth_instance_url not configured (suitecrm partner not deployed; integration hook skipped)"
-      );
-      return;
-    }
-
-    // Coupled state: the configured SuiteCRM instance must be the partner host, not
-    // Nextcloud itself.
-    const nextcloudHost = new URL(shared.env.nextcloudBaseUrl).host;
-    const instanceHost = new URL(configuredInstanceUrl).host;
+    const instanceField = suitecrmPanel.locator("#suitecrm-url");
+    const instanceUrl = ((await instanceField.inputValue().catch(() => "")) || "").trim();
     expect(
-      instanceHost,
-      "the configured SuiteCRM instance must be the partner instance, not Nextcloud itself"
+      /^https?:\/\//i.test(instanceUrl),
+      "oauth_instance_url must be a real partner URL pinned into the connect panel"
+    ).toBeTruthy();
+
+    const nextcloudHost = new URL(shared.env.nextcloudBaseUrl).host;
+    const partnerHost = new URL(instanceUrl).host;
+    expect(
+      partnerHost,
+      "the configured SuiteCRM instance must be the partner host, not Nextcloud itself"
     ).not.toBe(nextcloudHost);
+
+    const loginField = suitecrmPanel.locator("#suitecrm-login");
+    const passwordField = suitecrmPanel.locator("#suitecrm-password");
+    const connectButton = suitecrmPanel.locator("#suitecrm-oauth");
+
+    await expect(
+      connectButton,
+      "the 'Connect to SuiteCRM' control must render once the partner OAuth client is provisioned"
+    ).toBeVisible({ timeout: 30_000 });
+
+    await loginField.fill(shared.env.loginUsername);
+    await passwordField.fill(shared.env.loginPassword);
+
+    const connectResponsePromise = page.waitForResponse(
+      (response) =>
+        /\/apps\/integration_suitecrm\/oauth-connect$/.test(new URL(response.url()).pathname) &&
+        response.request().method() === "POST",
+      { timeout: 60_000 }
+    );
+    await connectButton.click();
+    const connectResponse = await connectResponsePromise;
+
+    const connectStatus = connectResponse.status();
+    const connectBody = await connectResponse.json().catch(() => ({}));
+
+    expect(
+      [200, 401].includes(connectStatus),
+      `the oauth-connect token exchange must resolve to a partner auth verdict (200 connected or 401 invalid-credentials), got ${connectStatus} ${JSON.stringify(connectBody)}`
+    ).toBeTruthy();
+
+    if (connectStatus === 200) {
+      expect(
+        connectBody.user_name,
+        "a successful password-grant connect must return the authenticated SuiteCRM user_name"
+      ).toBeTruthy();
+      await expect(
+        suitecrmPanel.getByText(/connected as/i),
+        "the panel must flip to a connected state after a successful partner token exchange"
+      ).toBeVisible({ timeout: 30_000 });
+      await expect(suitecrmPanel.locator("#suitecrm-rm-cred")).toBeVisible({ timeout: 30_000 });
+    } else {
+      expect(
+        connectBody.error,
+        "a refused password grant must surface the partner's invalid-credentials verdict, proving the token request reached the partner client rather than failing on missing config"
+      ).toMatch(/invalid login\/password/i);
+    }
   } finally {
     await page.close().catch(() => {});
     await context.close().catch(() => {});
