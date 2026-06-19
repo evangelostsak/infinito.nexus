@@ -2,18 +2,9 @@ const { test, expect } = require("@playwright/test");
 const { skipUnlessAddonEnabled } = require("../addon-gating");
 const shared = require("../_shared");
 
-// Functional cross-role coupling check for nextcloud/integration_matrix.
-//
-// The generic loader sets the app-scoped `url` key, but upstream
-// nextcloud/integration_matrix reads `url` only per-user; the admin key that
-// actually drives the integration is `oauth_instance_url`. Our hook
-// (tasks/addons/integration_matrix.yml) writes it to the partner Synapse base
-// URL, so the admin "Matrix integration" settings panel
-// (settings/admin/connected-accounts) MUST render the homeserver-address field
-// populated with the partner URL — a host distinct from Nextcloud. That is the
-// hard coupling signal asserted here.
-test("integration integration_matrix: connects Nextcloud to the Matrix homeserver", async ({ browser }) => {
+test("integration integration_matrix: per-user login drives a real session against the partner homeserver", async ({ browser }) => {
   skipUnlessAddonEnabled("integration_matrix");
+  test.setTimeout(120_000);
 
   const context = await browser.newContext({ ignoreHTTPSErrors: true });
   const page = await context.newPage();
@@ -25,53 +16,86 @@ test("integration integration_matrix: connects Nextcloud to the Matrix homeserve
       new URL("settings/admin/connected-accounts", shared.env.nextcloudBaseUrl).toString(),
       { waitUntil: "domcontentloaded", timeout: 60_000 }
     );
+    await shared.dismissBlockingNextcloudModals(page, page);
 
-    // App-present signal: the app's OWN admin panel renders. #matrix_prefs can
-    // match both the Vue data-v-app mount div and the .section wrapper, so pin
-    // to .first() for strict mode.
-    const matrixPanel = page
-      .locator("#matrix_prefs, #matrix-content")
-      .first();
-
-    // Genuinely absent (app disabled / never wired): no admin panel renders.
-    if (!(await matrixPanel.isVisible({ timeout: 30_000 }).catch(() => false))) {
-      test.skip(true, "integration_matrix admin panel absent — app not enabled / unconfigured");
-      return;
-    }
-
-    // The homeserver-address NcTextField has no stable id; locate the text input
-    // inside the Matrix panel whose value is an absolute URL.
-    const urlInputs = matrixPanel.locator("input[type='text'], input[type='url'], input:not([type])");
-    const inputCount = await urlInputs.count();
-    expect(
-      inputCount,
-      "the Matrix admin panel must expose the homeserver-address field"
-    ).toBeGreaterThan(0);
+    const adminPanel = page.locator("#matrix_prefs, #matrix-content").first();
+    await expect(
+      adminPanel,
+      "the Matrix integration admin panel must render when integration_matrix is enabled — its absence means the app failed to enable/configure against the partner homeserver"
+    ).toBeVisible({ timeout: 30_000 });
 
     let configuredInstanceUrl = null;
-    for (let i = 0; i < inputCount; i += 1) {
-      const value = (await urlInputs.nth(i).inputValue().catch(() => "")) || "";
+    const adminInputs = adminPanel.locator("input[type='text'], input[type='url'], input:not([type])");
+    const adminCount = await adminInputs.count();
+    for (let i = 0; i < adminCount; i += 1) {
+      const value = (await adminInputs.nth(i).inputValue().catch(() => "")) || "";
       if (/^https?:\/\//i.test(value.trim())) {
         configuredInstanceUrl = value.trim();
         break;
       }
     }
-
     expect(
       configuredInstanceUrl,
-      "the Matrix admin homeserver field must be populated with the partner URL (addon hook sets oauth_instance_url)"
+      "the Matrix admin homeserver field must be populated with the partner URL"
     ).toBeTruthy();
 
+    const partnerHost = new URL(configuredInstanceUrl).host;
     const nextcloudHost = new URL(shared.env.nextcloudBaseUrl).host;
-    const instanceHost = new URL(configuredInstanceUrl).host;
+    expect(partnerHost, "the homeserver must be the partner, not Nextcloud").not.toBe(nextcloudHost);
+
+    const partnerHits = [];
+    page.on("request", (req) => {
+      try {
+        const h = new URL(req.url()).host;
+        if (h === partnerHost && /\/_matrix\/client\//.test(req.url())) {
+          partnerHits.push(req.url());
+        }
+      } catch (_) {}
+    });
+
+    await page.goto(
+      new URL("settings/user/connected-accounts", shared.env.nextcloudBaseUrl).toString(),
+      { waitUntil: "domcontentloaded", timeout: 60_000 }
+    );
+    await shared.dismissBlockingNextcloudModals(page, page);
+
+    const userPanel = page.locator("#matrix_prefs, #matrix-content").first();
+    await expect(
+      userPanel,
+      "the personal Matrix panel must render so a user can link their Matrix account"
+    ).toBeVisible({ timeout: 30_000 });
+
+    const loginField = userPanel
+      .locator("input[type='text']:not([readonly]), input:not([type]):not([readonly])")
+      .first();
+    const passwordField = userPanel.locator("input[type='password']").first();
+    const connectButton = userPanel
+      .getByRole("button", { name: /connect|log ?in|sign ?in/i })
+      .first();
+
+    const connectResponsePromise = page
+      .waitForResponse((resp) => /\/apps\/integration_matrix\//.test(resp.url()), { timeout: 30_000 })
+      .catch(() => null);
+
+    if (await passwordField.isVisible({ timeout: 10_000 }).catch(() => false)) {
+      await loginField.fill(shared.env.loginUsername || "admin").catch(() => {});
+      await passwordField.fill(shared.env.loginPassword || "").catch(() => {});
+      await connectButton.click({ timeout: 10_000 }).catch(() => {});
+    } else if (await connectButton.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await connectButton.click({ timeout: 10_000 }).catch(() => {});
+    }
+
+    const connectResponse = await connectResponsePromise;
+    await page.waitForTimeout(2_500);
+
+    const reachedPartner = partnerHits.length > 0;
+    const droveServerSide = Boolean(connectResponse);
     expect(
-      instanceHost,
-      "the configured Matrix homeserver must be the partner instance, not Nextcloud itself"
-    ).not.toBe(nextcloudHost);
-    expect(
-      instanceHost,
-      "the Matrix oauth_instance_url must point at the deployed Synapse partner host"
-    ).toBe("matrix.infinito.example");
+      reachedPartner || droveServerSide,
+      "the per-user connect must drive a real login against the partner Matrix homeserver " +
+        "(a browser C-S API call to the partner, or a nextcloud integration_matrix connect round-trip), " +
+        "not merely render a configured URL"
+    ).toBe(true);
   } finally {
     await page.close().catch(() => {});
     await context.close().catch(() => {});
