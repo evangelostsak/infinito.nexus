@@ -2,24 +2,13 @@ const { test, expect } = require("@playwright/test");
 const { skipUnlessAddonEnabled } = require("../addon-gating");
 const shared = require("../_shared");
 
-// Functional cross-role check: the Nextcloud `integration_google` app must be
-// wired with a real Google OAuth client (client_id/client_secret rendered from
-// the `api` lookup in meta/addons/integration_google.yml). Upstream renders the
-// Google personal settings under the "Data migration" section (PersonalSection
-// getID() === "migration"), NOT connected-accounts, so we land there first and
-// fall back to connected-accounts only if the control is missing. Clicking
-// "Sign in with Google" runs window.location.replace() to
-// accounts.google.com/o/oauth2/v2/auth with the configured client_id; reaching
-// that authorize endpoint proves the integration URL + client are live. Full
-// consent needs live Google credentials and is a separate Tier-2 concern.
-test("integration integration_google: connects Nextcloud to Google", async ({ browser }) => {
+test("integration integration_google: per-user OAuth connect reaches the Google authorize endpoint", async ({ browser }) => {
   skipUnlessAddonEnabled("integration_google");
+  test.setTimeout(120_000);
 
   const context = await browser.newContext({ ignoreHTTPSErrors: true });
   const page = await context.newPage();
 
-  // Match the upstream button text ("Sign in with Google") on any of the
-  // settings pages the app may render under across NC versions.
   const connectFor = (target) =>
     target.getByRole("button", { name: /sign in with google/i });
 
@@ -30,6 +19,7 @@ test("integration integration_google: connects Nextcloud to Google", async ({ br
       new URL("settings/user/migration", shared.env.nextcloudBaseUrl).toString(),
       { waitUntil: "domcontentloaded", timeout: 60_000 }
     );
+    await shared.dismissBlockingNextcloudModals(page, page);
 
     let connect = connectFor(page);
     if ((await connect.count()) === 0) {
@@ -37,22 +27,51 @@ test("integration integration_google: connects Nextcloud to Google", async ({ br
         new URL("settings/user/connected-accounts", shared.env.nextcloudBaseUrl).toString(),
         { waitUntil: "domcontentloaded", timeout: 60_000 }
       );
+      await shared.dismissBlockingNextcloudModals(page, page);
       connect = connectFor(page);
     }
 
-    if ((await connect.count()) === 0) {
-      test.skip(true, "integration_google: connect control not present (integration not provisioned)");
-      return;
-    }
+    await expect(
+      connect.first(),
+      "the 'Sign in with Google' control must render once the integration_google OAuth client_id is provisioned — its absence means the meta/addons client_id/client_secret coupling failed to land"
+    ).toBeVisible({ timeout: 60_000 });
 
+    const popupPromise = context.waitForEvent("page", { timeout: 15_000 }).catch(() => null);
     await Promise.all([
-      page.waitForEvent("framenavigated", { timeout: 60_000 }).catch(() => {}),
-      connect.first().click()
+      page
+        .waitForURL((u) => /accounts\.google\.com/i.test(new URL(u).host), { timeout: 60_000 })
+        .catch(() => {}),
+      connect.first().click(),
     ]);
+    const popup = await popupPromise;
+    const target = popup || page;
+    await target.waitForLoadState("domcontentloaded", { timeout: 30_000 }).catch(() => {});
 
-    await expect
-      .poll(() => page.url(), { timeout: 60_000 })
-      .toMatch(/accounts\.google\.com\/o\/oauth2|Successfully connected to Google/);
+    const authorize = new URL(target.url());
+    const nextcloudHost = new URL(shared.env.nextcloudBaseUrl).host;
+
+    expect(
+      authorize.host,
+      `the per-user connect must hand the browser off to the Google authorize endpoint, not stay on Nextcloud (got ${authorize.href})`
+    ).toBe("accounts.google.com");
+    expect(
+      authorize.host,
+      "the Google OAuth authorize must be served by the partner (accounts.google.com), not Nextcloud"
+    ).not.toBe(nextcloudHost);
+    expect(
+      authorize.pathname,
+      "the connect must drive the Google OAuth2 authorize path"
+    ).toMatch(/^\/o\/oauth2(\/v2)?\/auth/);
+    expect(
+      (authorize.searchParams.get("client_id") || "").length,
+      "the authorize request must carry the provisioned Google OAuth client_id (proves the client_id from meta/addons is live)"
+    ).toBeGreaterThan(0);
+    expect(
+      authorize.searchParams.get("response_type"),
+      "the coupling must use the authorization-code grant"
+    ).toBe("code");
+
+    if (popup) await popup.close().catch(() => {});
   } finally {
     await page.close().catch(() => {});
     await context.close().catch(() => {});
