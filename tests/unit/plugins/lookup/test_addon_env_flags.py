@@ -107,5 +107,85 @@ class TestNoAddons(unittest.TestCase):
             self.assertEqual(lookup.run(["web-app-x"], variables={}), [""])
 
 
+class TestBridgeDeploymentGating(unittest.TestCase):
+    """A bridged addon's flag is true only when one of its partner roles is in the
+    deployed playwright set (TEST_E2E_PLAYWRIGHT_APPS). When the set cannot be
+    resolved the gating is skipped (flag falls back to enabled AND required)."""
+
+    def setUp(self):
+        self.lookup = LookupModule()
+        self.addons = {
+            "gl_bridge": {"enabled": True, "required": True, "bridges": ["gitlab"]},
+            "masto_bridge": {
+                "enabled": True,
+                "required": True,
+                "bridges": ["mastodon"],
+            },
+            "multi_bridge": {
+                "enabled": True,
+                "required": True,
+                "bridges": ["openwebui", "flowise"],
+            },
+            "no_bridge": {"enabled": True, "required": True},
+            "disabled_bridge": {
+                "enabled": False,
+                "required": True,
+                "bridges": ["gitlab"],
+            },
+        }
+        self._patchers = [
+            patch(
+                "plugins.lookup.addon_env_flags.get_merged_applications",
+                return_value={},
+            ),
+            patch("plugins.lookup.addon_env_flags.get", return_value=self.addons),
+            patch(
+                "plugins.lookup.addon_env_flags._render_with_templar",
+                side_effect=lambda v, **k: v,
+            ),
+        ]
+        for p in self._patchers:
+            p.start()
+        self.addCleanup(lambda: [p.stop() for p in self._patchers])
+
+    def _flags(self, variables):
+        out = self.lookup.run(["web-app-x"], variables=variables)[0]
+        return dict(line.split("=", 1) for line in out.splitlines())
+
+    def test_partner_deployed_keeps_true(self):
+        f = self._flags(
+            {"TEST_E2E_PLAYWRIGHT_APPS": ["web-app-gitlab", "web-app-nextcloud"]}
+        )
+        self.assertEqual(f["GL_BRIDGE_ADDON_ENABLED"], "true")
+
+    def test_partner_not_deployed_gated_false(self):
+        f = self._flags(
+            {"TEST_E2E_PLAYWRIGHT_APPS": ["web-app-gitlab", "web-app-nextcloud"]}
+        )
+        self.assertEqual(f["MASTO_BRIDGE_ADDON_ENABLED"], "false")
+
+    def test_any_partner_of_multi_bridge_counts(self):
+        f = self._flags({"TEST_E2E_PLAYWRIGHT_APPS": ["svc-ai-flowise"]})
+        self.assertEqual(f["MULTI_BRIDGE_ADDON_ENABLED"], "true")
+
+    def test_no_bridge_addon_unaffected(self):
+        f = self._flags({"TEST_E2E_PLAYWRIGHT_APPS": ["web-app-nextcloud"]})
+        self.assertEqual(f["NO_BRIDGE_ADDON_ENABLED"], "true")
+
+    def test_disabled_addon_stays_false(self):
+        f = self._flags({"TEST_E2E_PLAYWRIGHT_APPS": ["web-app-gitlab"]})
+        self.assertEqual(f["DISABLED_BRIDGE_ADDON_ENABLED"], "false")
+
+    def test_no_deployed_set_falls_back_no_gating(self):
+        f = self._flags({})
+        self.assertEqual(f["MASTO_BRIDGE_ADDON_ENABLED"], "true")
+        self.assertEqual(f["GL_BRIDGE_ADDON_ENABLED"], "true")
+
+    def test_deployed_set_as_string_is_split(self):
+        f = self._flags({"TEST_E2E_PLAYWRIGHT_APPS": "web-app-gitlab web-app-nextcloud"})
+        self.assertEqual(f["GL_BRIDGE_ADDON_ENABLED"], "true")
+        self.assertEqual(f["MASTO_BRIDGE_ADDON_ENABLED"], "false")
+
+
 if __name__ == "__main__":
     unittest.main()
