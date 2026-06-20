@@ -4,17 +4,7 @@ const shared = require("../_shared");
 
 test.use({ ignoreHTTPSErrors: true });
 
-// The Nextcloud `bbb` app (cloud_bbb / BigBlueButton integration) renders its
-// admin settings into the generic "additional" admin section as a `#bbb-settings`
-// block whose `#bbb-api` form carries input[name='api.url'] (type=url) and
-// input[name='api.secret'] (type=password). The plugin loader enables the app and
-// writes api.url (partner base URL + the `/bigbluebutton/` API suffix) and
-// api.secret (partner shared secret) via config:app:set. This test proves FULL
-// coupling: the section renders (app enabled), the api.url field is populated with
-// a valid https URL pointing at the BigBlueButton API mount, and the api.secret
-// field is present (the credential half of the coupling). It FAILS if the app is
-// not enabled or the partner endpoint was never wired.
-test("bbb addon: BigBlueButton integration is configured and coupled to the partner server", async ({ browser }) => {
+test("bbb addon: cloud_bbb app route renders its own UI and is coupled to the partner server", async ({ browser }) => {
   skipUnlessAddonEnabled("bbb");
   test.setTimeout(120_000);
 
@@ -23,6 +13,26 @@ test("bbb addon: BigBlueButton integration is configured and coupled to the part
 
   try {
     await shared.loginToStandaloneNextcloud(page);
+
+    const appUrl = new URL("apps/bbb/", shared.env.nextcloudBaseUrl).toString();
+    await page.goto(appUrl, { waitUntil: "commit", timeout: 60_000 });
+    await shared.dismissBlockingNextcloudModals(page, page);
+
+    const appContainer = page.locator(
+      "#app-content, #app-content-vue, #content, #content-vue"
+    );
+    await expect(
+      appContainer.first(),
+      "the cloud_bbb app shell must render at /apps/bbb/ (the app is installed and enabled)"
+    ).toBeVisible({ timeout: 60_000 });
+
+    const bbbAppSurface = page.locator(
+      "#bbb, .app-bbb, [id^='bbb'], a[href*='/apps/bbb']"
+    );
+    await expect(
+      bbbAppSurface.first(),
+      "the cloud_bbb app's own UI surface (its room-management view / active app menu entry) must render, so a disabled or broken bbb app fails"
+    ).toBeVisible({ timeout: 60_000 });
 
     await page.goto(
       new URL("settings/admin/additional", shared.env.nextcloudBaseUrl).toString(),
