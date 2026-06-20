@@ -42,7 +42,11 @@ async function signInViaOidc(page) {
     .toContain(discourseBaseUrl);
 }
 
-test("docker_manager: admin plugin manager surface is reachable for an authenticated admin", async ({ page }) => {
+function pluginName(plugin) {
+  return String((plugin && (plugin.name || plugin.id)) || "").toLowerCase();
+}
+
+test("docker_manager: the docker_manager plugin is installed and registered on the Discourse instance", async ({ page }) => {
   skipUnlessAddonEnabled("docker_manager");
 
   expect(oidcIssuerUrl, "OIDC_ISSUER_URL must be set").toBeTruthy();
@@ -54,19 +58,51 @@ test("docker_manager: admin plugin manager surface is reachable for an authentic
     await page.context().clearCookies();
     await signInViaOidc(page);
 
-    const response = await page
-      .goto(`${discourseBaseUrl}/admin/plugins`, { waitUntil: "domcontentloaded" })
-      .catch(() => null);
-
-    if (!response || response.status() >= 400 || !page.url().includes("/admin/plugins")) {
-      test.skip(true, "docker_manager: admin plugins surface not reachable for this persona (verified at deploy/config level)");
-      return;
-    }
-
     await expect(page.locator("body")).toContainText(
-      /plugin|discourse|admin/i,
+      /topic|category|welcome|latest|discourse/i,
       { timeout: 60_000 },
     );
+
+    const plugins = await page.evaluate(async (base) => {
+      const res = await fetch(`${base}/admin/plugins.json`, {
+        headers: { Accept: "application/json" },
+        credentials: "include",
+      });
+      if (!res.ok) return { ok: false, status: res.status };
+      const body = await res.json();
+      return { ok: true, plugins: (body && body.plugins) || [] };
+    }, discourseBaseUrl);
+
+    expect(
+      plugins.ok,
+      `expected /admin/plugins.json to be reachable as admin (status ${plugins.status})`,
+    ).toBe(true);
+
+    const dockerManager = plugins.plugins.find(
+      (p) => pluginName(p) === "docker_manager" || pluginName(p) === "discourse-docker-manager",
+    );
+    expect(
+      dockerManager,
+      "the docker_manager plugin must be present in /admin/plugins.json (proves the upstream plugin was cloned and registered; when docker_manager is enabled but absent the install failed — the test MUST fail here, not skip)",
+    ).toBeTruthy();
+
+    expect(
+      dockerManager.enabled,
+      "the docker_manager plugin must be enabled on the running instance",
+    ).toBe(true);
+
+    const upgradeResponse = await page.evaluate(async (base) => {
+      const res = await fetch(`${base}/admin/upgrade.json`, {
+        headers: { Accept: "application/json" },
+        credentials: "include",
+      });
+      return { ok: res.ok, status: res.status };
+    }, discourseBaseUrl);
+
+    expect(
+      upgradeResponse.ok,
+      `the docker_manager upgrade surface (/admin/upgrade.json) the plugin owns must be served (status ${upgradeResponse.status})`,
+    ).toBe(true);
   } finally {
     await page.context().clearCookies().catch(() => {});
   }
