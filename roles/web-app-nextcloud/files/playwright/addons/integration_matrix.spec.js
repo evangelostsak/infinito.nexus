@@ -50,7 +50,7 @@ test("integration integration_matrix: per-user login drives a real session again
         if (h === partnerHost && /\/_matrix\/client\//.test(req.url())) {
           partnerHits.push(req.url());
         }
-      } catch (_) {}
+      } catch {}
     });
 
     await page.goto(

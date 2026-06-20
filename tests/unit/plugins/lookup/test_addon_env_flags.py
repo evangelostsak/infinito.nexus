@@ -182,7 +182,9 @@ class TestBridgeDeploymentGating(unittest.TestCase):
         self.assertEqual(f["GL_BRIDGE_ADDON_ENABLED"], "true")
 
     def test_deployed_set_as_string_is_split(self):
-        f = self._flags({"TEST_E2E_PLAYWRIGHT_APPS": "web-app-gitlab web-app-nextcloud"})
+        f = self._flags(
+            {"TEST_E2E_PLAYWRIGHT_APPS": "web-app-gitlab web-app-nextcloud"}
+        )
         self.assertEqual(f["GL_BRIDGE_ADDON_ENABLED"], "true")
         self.assertEqual(f["MASTO_BRIDGE_ADDON_ENABLED"], "false")
 

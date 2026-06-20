@@ -109,10 +109,10 @@ test("discourse-activity-pub: federation plugin installed and the live ActivityP
         headers: { Accept: "application/activity+json, application/json" },
         credentials: "include",
       });
-      let json = null;
+      let json;
       try {
         json = await res.json();
-      } catch (e) {
+      } catch {
         json = null;
       }
       return { status: res.status, json };
@@ -138,10 +138,10 @@ test("discourse-activity-pub: federation plugin installed and the live ActivityP
         credentials: "include",
         body: JSON.stringify({ handle: remoteHandle }),
       });
-      let json = null;
+      let json;
       try {
         json = await res.json();
-      } catch (e) {
+      } catch {
         json = null;
       }
       return { status: res.status, json, remoteHandle };
