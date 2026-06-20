@@ -4,11 +4,7 @@ const shared = require("../_shared");
 
 test.use({ ignoreHTTPSErrors: true });
 
-// recognize runs background ML tagging of photos/audio/video and is configured
-// under its admin settings section; it has no dedicated per-user route (its
-// results surface inside Photos/Files tags). Log in as administrator and assert
-// the admin recognize settings page renders as its observable surface.
-test("recognize addon: admin recognize settings page renders", async ({ browser }) => {
+test("recognize addon: admin recognize settings UI mounts its own surface", async ({ browser }) => {
   skipUnlessAddonEnabled("recognize");
   test.setTimeout(120_000);
 
@@ -22,9 +18,15 @@ test("recognize addon: admin recognize settings page renders", async ({ browser 
     await page.goto(settingsUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
     await shared.dismissBlockingNextcloudModals(page, page);
 
+    const recognizeRoot = page.locator("#recognize");
     await expect(
-      page.locator("#app-content, #app-content-vue, #content, #content-vue").first(),
-      "the Nextcloud admin recognize settings page must be visible (recognize is a background ML app, no per-user route)",
+      recognizeRoot,
+      "the recognize admin settings Vue component (#recognize) must mount (app installed + enabled)",
+    ).toBeVisible({ timeout: 60_000 });
+
+    await expect(
+      recognizeRoot.getByText(/Face recognition/i).first(),
+      "recognize's own settings sections (e.g. Face recognition) must render inside #recognize",
     ).toBeVisible({ timeout: 60_000 });
   } finally {
     await page.close().catch(() => {});
