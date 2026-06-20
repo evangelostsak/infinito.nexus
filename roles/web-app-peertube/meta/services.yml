@@ -47,6 +47,9 @@ seaweedfs:
   shared: "{{ 'web-app-seaweedfs' in group_names }}"
   public: true
 peertube:
+  bond: 1
+  enabled: true
+  shared: true
   name: peertube
   version: v8.2.1
   image: chocobozzz/peertube

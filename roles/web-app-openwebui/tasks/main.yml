@@ -1,6 +1,6 @@
 ---
-- name: "load docker, proxy for '{{ application_id }}'"
-  include_role:
-    name: sys-stk-full
+- name: "Execute Role (once)"
+  include_tasks: 01_core.yml
+  when: run_once_web_app_openwebui is not defined
   vars:
-    compose_repository_pull: false
+    application_id: "web-app-openwebui"

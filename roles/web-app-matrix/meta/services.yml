@@ -94,6 +94,9 @@ prometheus:
   communication:
     channel: true
 matrix:
+  bond: 1
+  enabled: true
+  shared: true
   flavor: ansible
   upstream:
     repo: https://github.com/spantaleev/matrix-docker-ansible-deploy

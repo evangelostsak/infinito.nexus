@@ -1,5 +1,8 @@
 ---
 redis:
+  bond: 1
+  enabled: true
+  shared: true
   image: redis
   version: alpine
   min_storage: 1GB

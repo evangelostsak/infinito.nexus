@@ -31,6 +31,9 @@ mariadb:
   enabled: true # nocheck: dynamic-flag
   shared: "{{ 'svc-db-mariadb' in group_names }}"
 moodle:
+  bond: 1
+  enabled: true
+  shared: true
   # Self-built image. The `image`+`version` pair is the PHP base the
   # Dockerfile builds FROM (php:8.3-fpm) — this is also what GHCR
   # image-mirror discovery picks up, so the base stays cached.

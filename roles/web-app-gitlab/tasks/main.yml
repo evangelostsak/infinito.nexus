@@ -1,4 +1,6 @@
 ---
-- name: "load docker, db and proxy for {{ application_id }}"
-  include_role:
-    name: sys-stk-full
+- name: "Execute Role (once)"
+  include_tasks: 01_core.yml
+  when: run_once_web_app_gitlab is not defined
+  vars:
+    application_id: "web-app-gitlab"

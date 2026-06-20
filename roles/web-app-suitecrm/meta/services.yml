@@ -34,6 +34,9 @@ mariadb:
   enabled: true # nocheck: dynamic-flag
   shared: "{{ 'svc-db-mariadb' in group_names }}"
 suitecrm:
+  bond: 1
+  enabled: true
+  shared: true
   image: php
   # TODO: Make SuiteCRM compatible with PHP 8.5; update currently not possible. Reason: intentional legacy pin.
   # nocheck: docker-version

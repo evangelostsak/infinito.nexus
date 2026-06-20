@@ -38,6 +38,9 @@ postgres:
   enabled: true # nocheck: dynamic-flag
   shared: "{{ 'svc-db-postgres' in group_names }}"
 xwiki:
+  bond: 1
+  enabled: true
+  shared: true
   image: xwiki
   version: lts-postgres-tomcat
   name: xwiki

@@ -1,5 +1,8 @@
 ---
 memcached:
+  bond: 1
+  enabled: true
+  shared: true
   image: memcached
   version: latest
   min_storage: 1GB

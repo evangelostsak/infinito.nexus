@@ -56,6 +56,9 @@ memcached:
   enabled: true
   shared: "{{ 'svc-db-memcached' in group_names }}"
 zammad:
+  bond: 1
+  enabled: true
+  shared: true
   image: ghcr.io/zammad/zammad
   version: "6.5.0"
   min_storage: 15GB

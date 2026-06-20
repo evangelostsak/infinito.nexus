@@ -107,6 +107,9 @@ prometheus:
   enabled: "{{ 'web-app-prometheus' in group_names }}"
   shared: "{{ 'web-app-prometheus' in group_names }}"
 openproject:
+  bond: 1
+  enabled: true
+  shared: true
   repository: https://github.com/opf/openproject-deploy
   ref: "stable/{{ lookup('config', 'web-app-openproject', 'services.web.version') }}"
   ldap:

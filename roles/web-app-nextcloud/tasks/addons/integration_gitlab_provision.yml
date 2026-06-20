@@ -25,12 +25,14 @@
 
 - name: Resolve the GitLab OAuth client secret (freshly emitted or persisted)
   set_fact:
-    nextcloud_gl_fresh_secret: "{{ (nextcloud_gl_provision.stdout | regex_search('CLIENT_SECRET=(.+)', '\\1') | default([], true) | first | default('', true)) | trim }}"
+    nextcloud_gl_fresh_secret: "{{ (nextcloud_gl_provision.stdout | regex_search('CLIENT_SECRET=(.+)', '\\1') | default([], true) | first | default('', true)) | trim
+      }}"
   no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
 
 - name: Pick the effective GitLab OAuth client secret
   set_fact:
-    nextcloud_gl_client_secret: "{{ nextcloud_gl_fresh_secret if (nextcloud_gl_fresh_secret | length > 0) else (nextcloud_gl_client_secret_current.stdout | trim) }}"
+    nextcloud_gl_client_secret: "{{ nextcloud_gl_fresh_secret if (nextcloud_gl_fresh_secret | length > 0) else (nextcloud_gl_client_secret_current.stdout | trim)
+      }}"
   no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
 
 - name: Fail when no usable GitLab OAuth client secret is available

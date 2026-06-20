@@ -25,6 +25,9 @@ email:
   enabled: "{{ 'web-app-mailu' in group_names }}"
   shared: "{{ 'web-app-mailu' in group_names }}"
 bigbluebutton:
+  bond: 1
+  enabled: true
+  shared: true
   repository: https://github.com/bigbluebutton/docker.git
   ref: main
   recording:

@@ -36,6 +36,9 @@ postgres:
   enabled: true # nocheck: dynamic-flag
   shared: "{{ 'svc-db-postgres' in group_names }}"
 gitlab:
+  bond: 1
+  enabled: true
+  shared: true
   image: gitlab/gitlab-ee
   version: 19.0.2-ee.0
   name: gitlab
