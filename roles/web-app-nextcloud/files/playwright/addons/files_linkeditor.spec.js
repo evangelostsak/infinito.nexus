@@ -4,10 +4,7 @@ const shared = require("../_shared");
 
 test.use({ ignoreHTTPSErrors: true });
 
-// files_linkeditor adds a ".url"/".webloc" link create+edit action to the Files
-// app; it has no standalone route. Log in, open Files, and assert the Files app
-// content renders with the link-editor action registered.
-test("files_linkeditor addon: Files app loads with the link editor registered", async ({ browser }) => {
+test("files_linkeditor addon: Files New menu exposes the link-editor create entries", async ({ browser }) => {
   skipUnlessAddonEnabled("files_linkeditor");
   test.setTimeout(120_000);
 
@@ -23,7 +20,24 @@ test("files_linkeditor addon: Files app loads with the link editor registered", 
 
     await expect(
       page.locator("#app-content, #app-content-vue, #app-navigation-vue").first(),
-      "the Nextcloud Files app content must be visible with the files_linkeditor action registered",
+      "the Nextcloud Files app content must be visible before opening its New menu",
+    ).toBeVisible({ timeout: 60_000 });
+
+    const newMenuButton = page.getByRole("button", { name: "New", exact: true });
+    await expect(
+      newMenuButton,
+      "the Files app must expose its New file-creation menu button",
+    ).toBeVisible({ timeout: 60_000 });
+    await newMenuButton.click();
+
+    await expect(
+      page.getByRole("menuitem", { name: "New link (.URL)" }),
+      "files_linkeditor must register its 'New link (.URL)' entry in the Files New menu",
+    ).toBeVisible({ timeout: 60_000 });
+
+    await expect(
+      page.getByRole("menuitem", { name: "New link (.webloc)" }),
+      "files_linkeditor must register its 'New link (.webloc)' entry in the Files New menu",
     ).toBeVisible({ timeout: 60_000 });
   } finally {
     await page.close().catch(() => {});
