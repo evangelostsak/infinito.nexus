@@ -4,10 +4,7 @@ const shared = require("../_shared");
 
 test.use({ ignoreHTTPSErrors: true });
 
-// files_bpm registers an in-Files audio/video player; it has no standalone
-// route, it only augments the Files app. Log in, open Files, and assert the
-// Files app content renders with the player app registered.
-test("files_bpm addon: Files app loads with the media player registered", async ({ browser }) => {
+test("files_bpm addon: BPMN editor route renders the modeler canvas", async ({ browser }) => {
   skipUnlessAddonEnabled("files_bpm");
   test.setTimeout(120_000);
 
@@ -17,13 +14,17 @@ test("files_bpm addon: Files app loads with the media player registered", async 
   try {
     await shared.loginToStandaloneNextcloud(page);
 
-    const filesUrl = new URL("apps/files/", shared.env.nextcloudBaseUrl).toString();
-    await page.goto(filesUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    const appUrl = new URL("apps/files_bpm/", shared.env.nextcloudBaseUrl).toString();
+    const response = await page.goto(appUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    expect(
+      response === null || response.status() !== 404,
+      "the files_bpm app must serve its apps/files_bpm/ modeler route (app installed + enabled)",
+    ).toBeTruthy();
     await shared.dismissBlockingNextcloudModals(page, page);
 
     await expect(
-      page.locator("#app-content, #app-content-vue, #app-navigation-vue").first(),
-      "the Nextcloud Files app content must be visible with the files_bpm media player registered",
+      page.locator("#canvas.bpmn-canvas").first(),
+      "the files_bpm app must render its own BPMN editor modeler canvas",
     ).toBeVisible({ timeout: 60_000 });
   } finally {
     await page.close().catch(() => {});
