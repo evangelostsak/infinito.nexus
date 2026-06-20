@@ -18,9 +18,12 @@ from utils.roles.applications.services.registry import (
     build_service_registry_from_applications,
     load_applications_from_roles_dir,
 )
+from utils.roles.applications.services.resources import (
+    SUMMABLE_FIELDS,
+    aggregate,
+    collect_role_resources,
+)
 
-from .aggregate import SUMMABLE_FIELDS, aggregate
-from .collect import collect_role_resources
 from .query import apply_filters, apply_order
 from .render import DEFAULT_TOTAL_LABEL, render_json, render_text
 

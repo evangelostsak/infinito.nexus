@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import unittest
 
-from cli.meta.roles.applications.ressources import aggregate, render
+from cli.meta.roles.applications.ressources import render
+from utils.roles.applications.services import resources
 
 
 class TestRenderText(unittest.TestCase):
@@ -46,7 +47,7 @@ class TestRenderText(unittest.TestCase):
                 "cpus_float": 4.0,
             },
         ]
-        totals = aggregate.aggregate(rows)
+        totals = resources.aggregate(rows)
         text = render.render_text("web-app-peertube", rows, totals, warnings=[])
 
         lines = text.splitlines()
@@ -68,7 +69,7 @@ class TestRenderText(unittest.TestCase):
         text = render.render_text(
             role_name="web-app-x",
             rows=[],
-            totals=aggregate.aggregate([]),
+            totals=resources.aggregate([]),
             warnings=["shared service 'foo' has no registered provider"],
         )
         self.assertIn("# Warnings", text)
@@ -91,7 +92,7 @@ class TestRenderJson(unittest.TestCase):
                 "cpus_float": 4.0,
             }
         ]
-        totals = aggregate.aggregate(rows)
+        totals = resources.aggregate(rows)
         payload = json.loads(
             render.render_json("web-app-peertube", rows, totals, warnings=["w"])
         )

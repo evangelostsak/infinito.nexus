@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from cli.meta.roles.applications.ressources import aggregate as cli
+from utils.roles.applications.services import resources as cli
 
 
 class TestAggregate(unittest.TestCase):

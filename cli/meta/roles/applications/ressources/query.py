@@ -7,7 +7,11 @@ import operator
 import re
 from typing import TYPE_CHECKING, Any
 
-from .parse import _parse_cpus, _parse_int, _parse_mem_bytes
+from utils.roles.applications.services.resources import (
+    _parse_cpus,
+    _parse_int,
+    _parse_mem_bytes,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
