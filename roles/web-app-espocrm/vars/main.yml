@@ -6,10 +6,7 @@ entity_name: "{{ application_id | get_entity_name }}"
 # Database
 
 # Webserver
-webserver_websocket_location: "/ws"
 websocket_port: "{{ lookup('config', application_id, 'services.espocrm.ports.local.websocket') }}"
-webserver_client_max_body_size: "100m"
-webserver_vhost_flavour: "ws_generic"
 
 # Espocrm
 

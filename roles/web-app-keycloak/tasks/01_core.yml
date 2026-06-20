@@ -13,6 +13,7 @@
     name: sys-stk-full
   vars:
     compose_handlers_flush: true
+    webserver_extra_configuration: "{{ lookup('template', 'nginx/helper_iframes.conf.j2') }}"
 
 - name: "Load Login routines for '{{ application_id }}'"
   include_tasks: 04_login.yml

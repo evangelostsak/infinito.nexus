@@ -34,6 +34,7 @@
   vars:
     compose_handlers_flush: true
     webserver_vhost_flavour: "basic"
+    webserver_extra_configuration: "client_max_body_size 31M;"
     domain: "{{ MAILU_HOSTNAME }}"
 
 - name: "Flush Docker Compose handlers"

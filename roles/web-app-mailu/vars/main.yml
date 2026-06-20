@@ -2,7 +2,6 @@
 # General
 application_id: "web-app-mailu"
 http_port: "{{ lookup('config', application_id, 'services.mailu.ports.local.http') }}"
-webserver_extra_configuration: "client_max_body_size 31M;"
 # Database Configuration
 database_password: "{{ lookup('config', application_id, 'credentials.database_password') }}"
 # Host Directories

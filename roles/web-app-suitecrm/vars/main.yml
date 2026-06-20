@@ -7,7 +7,6 @@ domain: "{{ lookup('domain',application_id) }}"
 # Database
 
 # Webserver
-webserver_client_max_body_size: "100m"
 
 # General
 SUITECRM_WELL_SOFTWARE_NAME: "{{ SOFTWARE_DOMAIN | replace('.', '-') }}"

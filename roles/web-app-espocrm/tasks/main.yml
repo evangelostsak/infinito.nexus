@@ -4,6 +4,8 @@
     name: sys-stk-full
   vars:
     compose_handlers_flush: false
+    webserver_websocket_location: "/ws"
+    webserver_vhost_flavour: "ws_generic"
 
 - name: "Deploy '{{ ESPOCRM_ENTRYPOINT_SCRIPT_HOST_ABS }}'"
   copy:

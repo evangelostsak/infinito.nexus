@@ -6,6 +6,7 @@
     name: sys-stk-full
   vars:
     compose_handlers_flush: false
+    webserver_extra_configuration: "client_max_body_size 512M;"
 
 # Keep the custom entrypoint on disk before the first compose up. If this is
 # moved below the flush, Pixelfed can boot once with the upstream entrypoint and

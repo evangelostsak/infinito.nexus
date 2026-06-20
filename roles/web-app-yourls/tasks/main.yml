@@ -5,6 +5,7 @@
   vars:
     application_id: web-app-yourls
     compose_handlers_flush: false
+    webserver_extra_configuration: "{{ lookup('template', 'redirect.conf.j2') }}"
 
 - name: "Stage trusted-header SSO build-context files for {{ application_id }}"
   ansible.builtin.copy:

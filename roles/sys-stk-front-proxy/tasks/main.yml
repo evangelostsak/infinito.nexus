@@ -58,6 +58,8 @@
         ) > 0
         else "roles/sys-svc-proxy/templates/vhost/%s.conf.j2" | format(webserver_vhost_flavour)
       }}
+  vars:
+    webserver_vhost_flavour: basic
 
 - name: "Deploy NGINX config: '{{ front_proxy_domain }}' -> '{{ front_proxy_domain_conf_dst_resolved }}'"
   ansible.builtin.template:
@@ -67,6 +69,9 @@
     application_id: "{{ front_proxy_application_id }}"
     domain: "{{ front_proxy_domain }}"
     http_port: "{{ front_proxy_http_port }}"
+    webserver_extra_configuration: ""
+    webserver_websocket_location: ""
+    webserver_client_max_body_size: "{{ lookup('config', front_proxy_application_id, 'server.client_max_body_size', '100m') }}"
   register: nginx_conf
   notify: restart openresty
 

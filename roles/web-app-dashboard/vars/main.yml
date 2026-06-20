@@ -4,9 +4,6 @@ application_id: "web-app-dashboard"
 DASHBOARD_APPLICATION_ID: "web-app-dashboard"
 http_port: "{{ lookup('config', DASHBOARD_APPLICATION_ID, 'services.dashboard.ports.local.http') }}"
 
-## Webserver
-webserver_extra_configuration: "{{ lookup('template', 'nginx/sso.html.conf.j2') }}"
-
 # Dashboard
 
 ## Simpleicons

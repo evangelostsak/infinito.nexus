@@ -4,6 +4,8 @@
     name: sys-stk-full
   vars:
     compose_handlers_flush: false
+    webserver_vhost_flavour: "ws_generic"
+    webserver_websocket_location: "/websocket"
 
 - name: "Create Odoo addons directory"
   file:

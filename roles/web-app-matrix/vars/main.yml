@@ -2,7 +2,6 @@
 application_id: "web-app-matrix"
 
 location_upload: "~ ^/_matrix/media/v3/"
-webserver_client_max_body_size: "{{ lookup('config', application_id, 'server.client_max_body_size') }}"
 
 MATRIX_SERVER_NAME: "{{ lookup('config', application_id, 'services.matrix.server_name') }}"
 MATRIX_ADMINISTRATOR_USERNAME: "{{ lookup('users', 'administrator').username }}"

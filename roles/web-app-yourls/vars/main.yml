@@ -3,9 +3,6 @@
 application_id: "web-app-yourls"
 entity_name: "{{ application_id | get_entity_name }}"
 
-# Webserver
-webserver_extra_configuration: "{{ lookup('template', 'redirect.conf.j2') }}"
-
 # Yourls
 YOURLS_USER: "{{ lookup('config', application_id, 'users.administrator.username') }}"
 YOURLS_PASSWORD: "{{ lookup('config', application_id, 'credentials.administrator_password') }}"
