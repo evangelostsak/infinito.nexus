@@ -24,6 +24,7 @@ openwebui:
   min_storage: 5GB
   offline_mode: false
   hf_hub_offline: false
+  enable_api_keys: true
   cpus: 2.0
   mem_reservation: 1g
   mem_limit: 4g

@@ -7,11 +7,8 @@
 # extra rounds.
 # See docs/contributing/artefact/files/role/variants.md for the file format.
 
-# variant 0: shrink the official ollama image to alpine/ollama and
-# keep the model preload list empty so GitHub Actions runners can
-# complete the deploy within their disk and time budget.
-
 - services:
     ollama:
-      preload_models: []
+      preload_models:
+        - smollm2:135m
       image: alpine/ollama
