@@ -85,8 +85,6 @@ test("integration integration_openproject: two-way OAuth coupling provisioned an
       authMethod,
       "integration_openproject must be wired for the OAuth2 authorization method once the bidirectional coupling is provisioned"
     ).toBe("oauth2");
-
-    if (popup) await popup.close().catch(() => {});
   } finally {
     await page.close().catch(() => {});
     await context.close().catch(() => {});
