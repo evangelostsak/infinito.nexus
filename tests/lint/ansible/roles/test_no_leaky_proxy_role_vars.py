@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING
 
 from utils.annotations.message import in_github_actions, warning
 from utils.cache.files import read_text
+from utils.roles.mapping import ROLE_FILE_VARS_MAIN
 
 from . import PROJECT_ROOT
 
@@ -63,7 +64,7 @@ def _collect_findings(root: Path) -> list[LeakyVarFinding]:
     for role_dir in sorted(roles_dir.iterdir()):
         if not role_dir.is_dir():
             continue
-        vars_path = role_dir / "vars" / "main.yml"
+        vars_path = role_dir / ROLE_FILE_VARS_MAIN
         if not vars_path.is_file():
             continue
         try:
