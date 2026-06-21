@@ -16,14 +16,17 @@ Roles that need to express more than ``MAX_VARIANTS`` distinct
 configurations SHOULD prune the matrix to the highest-value subset
 (e.g. drop redundant LDAP/OIDC permutations) or move the extra
 combinations into a dedicated test fixture rather than the deploy
-matrix.
+matrix. A role that genuinely needs more rounds may opt out by adding
+a ``# nocheck: variant-limit`` comment to its ``meta/variants.yml``.
 """
 
 from __future__ import annotations
 
+import re
 import unittest
 from typing import TYPE_CHECKING
 
+from utils.cache.files import read_text
 from utils.cache.yaml import load_yaml_any
 from utils.roles.mapping import (
     ROLE_FILE_META_VARIANTS,
@@ -39,6 +42,14 @@ if TYPE_CHECKING:
 ROLES_DIR = PROJECT_ROOT / "roles"
 
 MAX_VARIANTS = 3
+_NOCHECK_RE = re.compile(r"#\s*nocheck:\s*variant-limit\b")
+
+
+def _has_nocheck(path: Path) -> bool:
+    try:
+        return bool(_NOCHECK_RE.search(read_text(str(path))))
+    except OSError:
+        return False
 
 
 def _load_yaml(path: Path) -> object:
@@ -64,11 +75,12 @@ class TestVariantsLimit(unittest.TestCase):
                 continue
 
             count = len(variants)
-            if count > MAX_VARIANTS:
+            if count > MAX_VARIANTS and not _has_nocheck(variants_path):
                 offenders.append(
                     f"{role_name}: meta/variants.yml has {count} entries, "
                     f"but the matrix-deploy cap is {MAX_VARIANTS}. Prune "
-                    f"the variant list down to {MAX_VARIANTS} or fewer."
+                    f"the variant list down to {MAX_VARIANTS} or fewer, or add "
+                    f"'# nocheck: variant-limit' if the extra rounds are justified."
                 )
 
         if offenders:
