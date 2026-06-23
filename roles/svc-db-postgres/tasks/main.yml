@@ -12,3 +12,5 @@
 - name: "Initialize dedicated database"
   include_tasks: 02_init.yml
   when: database_init | bool
+  vars:
+    application_id: svc-db-postgres

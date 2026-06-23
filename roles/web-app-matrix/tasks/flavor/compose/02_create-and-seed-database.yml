@@ -4,21 +4,29 @@
 # - database_username
 # - database_password
 
+- name: "Freeze database consumer id + provider role before provider include"
+  ansible.builtin.set_fact:
+    _matrix_db_consumer_id: "{{ application_id }}"
+    _matrix_db_provider_role: "{{ lookup('database', application_id, 'id') }}"
+  changed_when: false
+
 - name: "Create DB/user for '{{ database_name }}' in central DB"
   include_role:
-    name: "{{ lookup('database', application_id, 'id') }}"
+    name: "{{ _matrix_db_provider_role }}"
+    public: false
   vars:
     database_init: true
-    database_consumer_id: "{{ application_id }}"
-    database_type: "{{ lookup('database', application_id, 'type') }}"
-  when: lookup('database', application_id, 'shared') | bool
+    compose_repository_pull: false
+    database_consumer_id: "{{ _matrix_db_consumer_id }}"
+    database_type: "{{ lookup('database', _matrix_db_consumer_id, 'type') }}"
+  when: lookup('database', _matrix_db_consumer_id, 'shared') | bool
 
 - name: "Seed database entry to backup routine"
   include_tasks: "{{ playbook_dir }}/roles/svc-bkp-container-2-local/tasks/04_seed-database-to-backup.yml"
   vars:
-    database_consumer_id: "{{ application_id }}"
-    database_type: "{{ lookup('database', application_id, 'type') }}"
-    database_instance: "{{ lookup('database', application_id, 'instance') }}"
+    database_consumer_id: "{{ _matrix_db_consumer_id }}"
+    database_type: "{{ lookup('database', _matrix_db_consumer_id, 'type') }}"
+    database_instance: "{{ lookup('database', _matrix_db_consumer_id, 'instance') }}"
     database_host: "{{ MATRIX_POSTGRES_HOST }}"
     database_port: "{{ MATRIX_POSTGRES_PORT }}"
     database_name: "{{ database_name }}"
