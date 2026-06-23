@@ -1,5 +1,6 @@
 const { expect } = require("@playwright/test");
 const { decodeDotenvQuotedValue, performKeycloakLoginForm } = require("./personas");
+const { isServiceEnabled } = require("./service-gating");
 
 const env = {
   odooBaseUrl: decodeDotenvQuotedValue(process.env.ODOO_BASE_URL || ""),
@@ -33,13 +34,30 @@ async function clickOdooSsoButton(locator) {
   }
 }
 
+async function nativeLoginToOdoo(page, expectedBaseUrl, webClient) {
+  await page.goto(`${expectedBaseUrl}/web/login`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await page.locator('input[name="login"]').fill(env.adminUsername);
+  await page.locator('input[name="password"]').fill(env.adminPassword);
+  await page.locator('.oe_login_form button[type="submit"], form button[type="submit"]').first().click();
+  await page.goto(`${expectedBaseUrl}/odoo`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await expect(
+    webClient,
+    "native (non-SSO) administrator login must land on the authenticated Odoo web client"
+  ).toBeVisible({ timeout: 60_000 });
+}
+
 async function loginToOdoo(page) {
   const expectedBaseUrl = baseUrl();
+  const webClient = page.locator(".o_web_client, .o_main_navbar, .o_action_manager").first();
+
+  if (!isServiceEnabled("sso")) {
+    await nativeLoginToOdoo(page, expectedBaseUrl, webClient);
+    return;
+  }
+
   const notLoginUrl = new RegExp(
     `^${expectedBaseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?!/web/login)`
   );
-  const webClient = page.locator(".o_web_client, .o_main_navbar, .o_action_manager").first();
-
   // The OAuth (implicit token) round-trip can land back on Odoo without a fully
   // established session, so a URL check alone is a false positive. Also, when a
   // realm session already exists, the SSO click bounces straight back to an
