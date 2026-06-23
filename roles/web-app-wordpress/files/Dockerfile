@@ -5,7 +5,7 @@ FROM ${WORDPRESS_IMAGE}:${WORDPRESS_VERSION}
 # Install msmtp and update system
 RUN rm -rf /var/lib/apt/lists/* && \
     apt-get update && \
-    apt-get install -y msmtp msmtp-mta && \
+    apt-get install -y ca-certificates msmtp msmtp-mta && \
     rm -rf /var/lib/apt/lists/*
 
 # Install WP CLI
