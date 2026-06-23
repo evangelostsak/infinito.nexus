@@ -14,8 +14,6 @@ RUN rm -rf /var/lib/apt/lists/* && \
 WORKDIR /app
 RUN git clone --depth=1 --branch "${BRIDGY_REF}" "${BRIDGY_REPO_URL}" ./
 
-RUN sed -i '/brevity/ s/@new-tlds//' requirements.txt
-
 # Python deps
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
