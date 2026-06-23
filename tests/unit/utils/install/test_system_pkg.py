@@ -35,8 +35,12 @@ class TestInstallPackageCandidates(unittest.TestCase):
         with mock.patch.object(system_pkg, "run_privileged") as priv:
             system_pkg.install_package_candidates("apt-get", ["shfmt"])
         commands = [c.args[0] for c in priv.call_args_list]
-        self.assertEqual(commands[0][:2], ["apt-get", "update"])
-        self.assertEqual(commands[1][:2], ["apt-get", "install"])
+        self.assertEqual(commands[0][0], "apt-get")
+        self.assertIn("update", commands[0])
+        self.assertEqual(commands[1][0], "apt-get")
+        self.assertIn("install", commands[1])
+        self.assertIn("DPkg::Lock::Timeout=600", commands[0])
+        self.assertIn("DPkg::Lock::Timeout=600", commands[1])
 
     def test_raises_when_all_candidates_fail(self) -> None:
         err = subprocess.CalledProcessError(returncode=1, cmd=["pacman"])

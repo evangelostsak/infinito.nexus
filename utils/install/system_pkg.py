@@ -20,7 +20,7 @@ def detect_package_manager() -> str:
 
 def _prepare_manager(manager: str) -> None:
     if manager == "apt-get":
-        run_privileged(["apt-get", "update"])
+        run_privileged(["apt-get", "-o", "DPkg::Lock::Timeout=600", "update"])
     elif manager == "dnf":
         with contextlib.suppress(subprocess.CalledProcessError):
             run_privileged(["dnf", "-y", "install", "dnf-plugins-core"])
@@ -40,7 +40,15 @@ def _install_one(manager: str, package: str) -> bool:
             run_privileged(["pacman", "-Syu", "--noconfirm", "--needed", package])
         elif manager == "apt-get":
             run_privileged(
-                ["apt-get", "install", "-y", "--no-install-recommends", package]
+                [
+                    "apt-get",
+                    "-o",
+                    "DPkg::Lock::Timeout=600",
+                    "install",
+                    "-y",
+                    "--no-install-recommends",
+                    package,
+                ]
             )
         elif manager == "dnf":
             run_privileged(["dnf", "-y", "install", package])
