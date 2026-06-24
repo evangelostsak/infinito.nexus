@@ -221,7 +221,7 @@ talk:
 whiteboard:
   name: nextcloud-whiteboard
   image: ghcr.io/nextcloud-releases/whiteboard
-  version: latest
+  version: v1.5.9
   backup:
     no_stop_required: true
   cpus: "1"
