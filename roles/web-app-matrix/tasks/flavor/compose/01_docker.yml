@@ -73,6 +73,13 @@
   async: "{{ ASYNC_TIME if ASYNC_ENABLED | bool else omit }}"
   poll: "{{ ASYNC_POLL if ASYNC_ENABLED | bool else omit }}"
 
+- name: "Restart synapse so it loads the freshly generated bridge appservice registrations"
+  command:
+    cmd: "{{ BIN_COMPOSE }} restart synapse"
+    chdir: "{{ lookup('container', application_id, 'directories.instance') }}"
+  changed_when: true
+  when: MATRIX_BRIDGES | length > 0
+
 - name: wait for Synapse client/versions endpoint
   uri_retry:
     url: "http://127.0.0.1:{{ lookup('config', application_id, 'services.synapse.ports.local.http') }}/_matrix/client/versions"
