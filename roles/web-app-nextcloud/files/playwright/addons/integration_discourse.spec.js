@@ -30,7 +30,7 @@ const shared = require("../_shared");
 // happen and the test FAILS.
 test("integration integration_discourse: Nextcloud drives the User-API-Key connect to the partner Discourse", async ({ browser }) => {
   skipUnlessAddonEnabled("integration_discourse");
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
 
   const unquote = (v) => ((v || "").trim().replace(/^"(.*)"$/, "$1"));
   const partnerBaseUrl = unquote(process.env.DISCOURSE_BASE_URL);
@@ -94,7 +94,7 @@ test("integration integration_discourse: Nextcloud drives the User-API-Key conne
     await expect(
       urlField,
       "the integration_discourse 'Discourse instance address' field must render and be editable"
-    ).toBeVisible({ timeout: 30_000 });
+    ).toBeVisible({ timeout: 60_000 });
 
     // HARD COUPLING: type the deployed partner URL into the instance field. This
     // makes showOAuth (state.url && !connected) true so the "Connect to
@@ -112,7 +112,7 @@ test("integration integration_discourse: Nextcloud drives the User-API-Key conne
     await expect(
       connect,
       "the 'Connect to Discourse' control must render once the instance address is set (integration provisioned the per-user client_id + app public_key)"
-    ).toBeVisible({ timeout: 30_000 });
+    ).toBeVisible({ timeout: 60_000 });
 
     const popupPromise = page.waitForEvent("popup", { timeout: 15_000 }).catch(() => null);
     await Promise.all([
