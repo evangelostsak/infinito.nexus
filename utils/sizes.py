@@ -44,7 +44,9 @@ def to_bytes(val):
     if isinstance(val, (int, float)):
         return int(val)
     if not isinstance(val, str):
-        raise AnsibleFilterError(f"to_bytes: unsupported size type: {type(val).__name__}")
+        raise AnsibleFilterError(
+            f"to_bytes: unsupported size type: {type(val).__name__}"
+        )
     m = _SIZE_RE.match(val)
     if not m:
         raise AnsibleFilterError(f"to_bytes: unrecognized size string: {val!r}")
