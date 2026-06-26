@@ -136,7 +136,7 @@ whiteboard:
   min_storage: 1GB
 # nocheck: playwright-service-flag: infrastructural sub-component (collaborative editing)
 onlyoffice:
-  bond: 1
+  bond: 0.5
   enabled: "{{ 'web-svc-onlyoffice' in group_names }}"
   shared: "{{ 'web-svc-onlyoffice' in group_names }}"
 # nocheck: playwright-service-flag: infrastructural sub-component (collaborative editing)

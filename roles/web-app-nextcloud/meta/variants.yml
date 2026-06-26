@@ -39,8 +39,8 @@
       enabled: true
       shared: true
     onlyoffice:
-      enabled: true
-      shared: true
+      enabled: false
+      shared: false
     collabora:
       enabled: true
       shared: true
@@ -359,8 +359,8 @@
     talk_recording:
       enabled: false
     onlyoffice:
-      enabled: false
-      shared: false
+      enabled: true
+      shared: true
     collabora:
       enabled: false
       shared: false
