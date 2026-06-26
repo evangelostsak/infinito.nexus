@@ -180,8 +180,8 @@
       enabled: false
       shared: false
     ldap:
-      enabled: false
-      shared: false
+      enabled: true
+      shared: true
     dashboard:
       enabled: false
       shared: false
@@ -192,7 +192,7 @@
       enabled: false
       shared: false
     mariadb:
-      shared: false
+      shared: true
     talk:
       enabled: false
       shared: false
@@ -260,8 +260,8 @@
       enabled: false
       shared: false
     ldap:
-      enabled: false
-      shared: false
+      enabled: true
+      shared: true
     dashboard:
       enabled: false
       shared: false
@@ -272,7 +272,7 @@
       enabled: false
       shared: false
     mariadb:
-      shared: false
+      shared: true
     talk:
       enabled: false
       shared: false
@@ -340,8 +340,8 @@
       enabled: false
       shared: false
     ldap:
-      enabled: false
-      shared: false
+      enabled: true
+      shared: true
     dashboard:
       enabled: false
       shared: false
@@ -352,7 +352,7 @@
       enabled: false
       shared: false
     mariadb:
-      shared: false
+      shared: true
     talk:
       enabled: false
       shared: false
@@ -420,8 +420,8 @@
       enabled: false
       shared: false
     ldap:
-      enabled: false
-      shared: false
+      enabled: true
+      shared: true
     dashboard:
       enabled: false
       shared: false
@@ -432,7 +432,7 @@
       enabled: false
       shared: false
     mariadb:
-      shared: false
+      shared: true
     talk:
       enabled: false
       shared: false
@@ -500,8 +500,8 @@
       enabled: false
       shared: false
     ldap:
-      enabled: false
-      shared: false
+      enabled: true
+      shared: true
     dashboard:
       enabled: false
       shared: false
@@ -512,7 +512,7 @@
       enabled: false
       shared: false
     mariadb:
-      shared: false
+      shared: true
     talk:
       enabled: false
       shared: false
