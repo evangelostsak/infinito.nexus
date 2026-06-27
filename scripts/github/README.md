@@ -8,6 +8,7 @@ This directory holds the shell helpers that GitHub Actions workflows under [`.gi
 |---|---|
 | [runner/](runner/) | Host-runner hygiene around image builds and deploys (disk, swap, Docker daemon, diagnostics). |
 | [cancel/](cancel/) | Cancellation of in-progress workflow runs on PR-close and branch-delete events. |
+| [cleanup/](cleanup/) | Scheduled repository maintenance that prunes stale GitHub resources. |
 | [resolve/](resolve/) | Derivation of structured workflow inputs and outputs from repository state. |
 | [sync/](sync/) | Ref synchronization before workflow jobs derive CI scope from git history. |
 | [update/](update/) | The scheduled `Update: Versions` pipeline (version bumps and PR open/refresh). |
