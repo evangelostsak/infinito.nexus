@@ -14,6 +14,10 @@ Every external CI trigger MUST route through one of the entry workflows. Each en
 - [entry-push-latest.yml](../../../../.github/workflows/entry-push-latest.yml): calls the orchestrator for pushes on the supported branch prefixes and additionally invokes the release workflow on version tags. For the contributor-facing release procedure see [release.md](../../actions/release.md).
 - [entry-manual.yml](../../../../.github/workflows/entry-manual.yml): dispatches the orchestrator manually for a chosen distro set and whitelist.
 
+The push entry synchronizes the current repository's `main` branch from the configured source repository before CI policy and deploy discovery run.
+The default source is `infinito-nexus/core`, and `CI_SYNC_MAIN_SOURCE_REPOSITORY` MAY override or disable the sync as documented in [configuration.md](../../tools/github/actions/configuration.md).
+This sync **force-overwrites** the local `main`, so on a synced repository you MUST NOT work directly in `main`; use a `feature/**`, `fix/**`, or `hotfix/**` branch and treat `main` as a read-only mirror.
+
 ## PR Scope Detection 🔎
 
 Before the full pipeline runs, CI detects the scope of the PR based on the changed files and the branch prefix (see [branch.md](branch.md)).
