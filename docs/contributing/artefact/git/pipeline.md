@@ -86,6 +86,36 @@ The PR-scope short-circuits in [scope.sh](../../../../scripts/meta/resolve/pr/sc
 
 The reverse closure is implemented in [affected resolver](../../../../cli/meta/roles/applications/resolution/affected/__main__.py) and invoked from [affected_roles.sh](../../../../scripts/meta/resolve/diff/affected_roles.sh). The workflow glue lives in [effective_whitelist.sh](../../../../scripts/github/resolve/effective_whitelist.sh). [test-deploy-local.yml](../../../../.github/workflows/test-deploy-local.yml) MUST NOT apply this resolution. Local dispatch keeps the explicit whitelist semantics.
 
+#### Subset label 🧩
+
+The manual whitelist (`entry-manual.yml`, `workflow_dispatch`) is only reachable by maintainers on the upstream repository; **fork contributors cannot dispatch it**. The `🧩 Subset` label closes that gap: it lets a PR pin CI to an explicit role list declared in the PR body, so a fork PR can run the same narrowed matrix a maintainer would have dispatched manually.
+
+The mechanism is **opt-in and fully backwards-compatible**. Without the `🧩 Subset` label nothing changes: the diff-driven precedence above applies exactly as before. The label is what activates the subset; the role list alone does nothing.
+
+The `detect-affected-roles` job in [entry-pull-request-change.yml](../../../../.github/workflows/entry-pull-request-change.yml) always calls the single dispatcher [pr_affected_roles.sh](../../../../scripts/github/resolve/pr_affected_roles.sh), which branches on the label: with `🧩 Subset` it runs [subset_roles.py](../../../../scripts/meta/resolve/pr/subset_roles.py) **instead of** the diff resolver, otherwise it falls through to the unchanged diff path. The subset script reads the PR body and expects a fenced YAML block with a `roles:` list, conventionally under a `## Roles` heading:
+
+````markdown
+## Roles
+
+```yaml
+roles:
+  - web-app-nextcloud
+  - web-app-matomo
+  - sys-version
+```
+````
+
+The resolved list becomes the `whitelist` output (with `roles_only=true`), which flows through the orchestrator into the deploy tests as precedence rung 2 above (explicit whitelist wins over the diff). The first fenced block whose YAML carries a `roles:` key is used, so the heading text is not significant.
+
+Unlike the diff resolver (which fail-safe widens to `__ALL__` on any problem), the subset path is **strict** and fails the run with a clear message when:
+
+- the YAML is invalid,
+- no `roles:` block is found,
+- the `roles:` list is empty, or
+- any listed id is not an existing `roles/<id>` directory.
+
+This prevents a mistyped subset from silently deploying the wrong set. The `🧩 Subset` label, like `🛡️ Trusted`, must exist in the repository's label set and is applied through the PR labels UI; both the `pull_request` and `pull_request_target` events carry a `labeled` trigger, so adding it starts a fresh run that observes the subset. Because applying labels requires triage/write access, in practice a maintainer applies it after the contributor has filled in the `## Roles` block.
+
 ### 10. Installation Tests 📦
 
 The install-test workflows listed in the `Infrastructure tests` table of [workflows.md](../../tools/github/actions/workflows.md) run in parallel once `code-quality-gate` is green. All of them MUST pass `test-install-gate`.
