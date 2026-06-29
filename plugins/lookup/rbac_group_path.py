@@ -38,12 +38,6 @@ from ansible.plugins.lookup import LookupBase
 
 from utils.cache.applications import get_merged_applications
 
-try:
-    from ansible.utils.display import Display
-except Exception:  # pragma: no cover
-    Display = None
-
-
 _IMPLICIT_ADMIN_ROLE = "administrator"
 _TENANCY_AXIS_NONE = "none"
 _TENANCY_AXIS_DOMAIN = "domain"
