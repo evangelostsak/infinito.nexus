@@ -1,0 +1,21 @@
+---
+- name: "🗄 Ensure the KV v2 secrets engine is mounted at '{{ OPENBAO_KV_MOUNT }}'"
+  ansible.builtin.shell: > # nocheck: container-exec-resolver  runtime-resolved CID, delegated to the hosting node
+    container exec {{ OPENBAO_LOCAL_CID | quote }}
+    sh -c 'bao secrets list -format=json | grep -q "\"{{ OPENBAO_KV_MOUNT }}/\"" ||
+    bao secrets enable -path={{ OPENBAO_KV_MOUNT | quote }} -version=2 kv'
+  register: openbao_kv_mount
+  changed_when: openbao_kv_mount.rc == 0
+
+- name: "📜 Write the human RBAC policies"
+  ansible.builtin.shell: > # nocheck: container-exec-resolver  runtime-resolved CID, delegated to the hosting node
+    container exec {{ OPENBAO_LOCAL_CID | quote }}
+    bao policy write {{ item | quote }} {{ OPENBAO_POLICY_DIR_DOCKER }}/{{ item }}.hcl
+  loop: "{{ OPENBAO_RBAC_ROLES }}"
+  changed_when: true
+
+- name: "📜 Refresh the ansible-admin policy"
+  ansible.builtin.shell: > # nocheck: container-exec-resolver  runtime-resolved CID, delegated to the hosting node
+    container exec {{ OPENBAO_LOCAL_CID | quote }}
+    bao policy write ansible-admin {{ OPENBAO_POLICY_DIR_DOCKER }}/ansible-admin.hcl
+  changed_when: true
