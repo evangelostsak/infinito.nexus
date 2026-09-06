@@ -1,0 +1,35 @@
+ui = true
+
+log_level = "{{ OPENBAO_LOG_LEVEL }}"
+
+# Exception: raft and mlock are mutually exclusive upstream.
+disable_mlock = true
+
+storage "raft" {
+  path    = "{{ OPENBAO_DATA_DOCKER }}"
+  node_id = "{{ OPENBAO_NAME }}-1"
+}
+
+listener "tcp" {
+  address     = "0.0.0.0:{{ container_port }}"
+  tls_disable = true
+
+  telemetry {
+    unauthenticated_metrics_access = true
+  }
+}
+
+seal "static" {
+  current_key_id = "{{ OPENBAO_SEAL_KEY_ID }}"
+  current_key    = "env://OPENBAO_SEAL_KEY"
+}
+
+telemetry {
+  prometheus_retention_time = "24h"
+  disable_hostname          = true
+}
+
+api_addr = "{{ OPENBAO_BASE_URL }}"
+
+# Exception: loopback, not the container name — swarm renames every task, and a single-replica raft node only advertises to itself.
+cluster_addr = "http://127.0.0.1:{{ container_port | int + 1 }}"
