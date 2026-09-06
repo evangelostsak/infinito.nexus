@@ -1,0 +1,45 @@
+---
+- name: "🏛 Ensure the PKI secrets engine is mounted at '{{ OPENBAO_PKI_MOUNT }}'"
+  ansible.builtin.shell: > # nocheck: container-exec-resolver  runtime-resolved CID, delegated to the hosting node
+    container exec {{ OPENBAO_LOCAL_CID | quote }}
+    sh -c 'bao secrets list -format=json | grep -q "\"{{ OPENBAO_PKI_MOUNT }}/\"" ||
+    bao secrets enable -path={{ OPENBAO_PKI_MOUNT | quote }} pki'
+  register: openbao_pki_mount
+  changed_when: openbao_pki_mount.rc == 0
+
+- name: "🔍 Check whether the internal root CA already exists"
+  ansible.builtin.shell: > # nocheck: container-exec-resolver  runtime-resolved CID, delegated to the hosting node
+    container exec {{ OPENBAO_LOCAL_CID | quote }}
+    sh -c 'bao read -field=certificate {{ OPENBAO_PKI_MOUNT }}/cert/ca 2>/dev/null | grep -q "BEGIN CERTIFICATE"'
+  register: openbao_pki_ca
+  changed_when: false
+  failed_when: false
+
+- name: "🏛 Generate the internal root CA"
+  ansible.builtin.shell: > # nocheck: container-exec-resolver  runtime-resolved CID, delegated to the hosting node
+    container exec {{ OPENBAO_LOCAL_CID | quote }}
+    bao write -field=certificate {{ OPENBAO_PKI_MOUNT }}/root/generate/internal
+    common_name={{ ('Infinito.Nexus Internal CA (' ~ DOMAIN_PRIMARY ~ ')') | quote }}
+    issuer_name=infinito-root
+    ttl=87600h
+  changed_when: true
+  when: openbao_pki_ca.rc != 0
+
+- name: "🔗 Configure the CA and CRL distribution URLs"
+  ansible.builtin.shell: > # nocheck: container-exec-resolver  runtime-resolved CID, delegated to the hosting node
+    container exec {{ OPENBAO_LOCAL_CID | quote }}
+    bao write {{ OPENBAO_PKI_MOUNT }}/config/urls
+    issuing_certificates={{ (OPENBAO_BASE_URL ~ '/v1/' ~ OPENBAO_PKI_MOUNT ~ '/ca') | quote }}
+    crl_distribution_points={{ (OPENBAO_BASE_URL ~ '/v1/' ~ OPENBAO_PKI_MOUNT ~ '/crl') | quote }}
+  changed_when: true
+
+- name: "📇 Configure the issuing role '{{ OPENBAO_PKI_ISSUING_ROLE }}'"
+  ansible.builtin.shell: > # nocheck: container-exec-resolver  runtime-resolved CID, delegated to the hosting node
+    container exec {{ OPENBAO_LOCAL_CID | quote }}
+    bao write {{ OPENBAO_PKI_MOUNT }}/roles/{{ OPENBAO_PKI_ISSUING_ROLE | quote }}
+    allowed_domains={{ DOMAIN_PRIMARY | quote }}
+    allow_subdomains=true
+    allow_bare_domains=true
+    max_ttl=2160h
+    ttl=720h
+  changed_when: true
