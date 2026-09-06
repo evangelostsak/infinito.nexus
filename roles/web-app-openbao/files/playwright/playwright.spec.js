@@ -1,0 +1,8 @@
+require("./test-baseline");
+require("./test-guest-persona");
+require("./test-biber-persona");
+require("./test-administrator-persona");
+require("./test-oidc-login");
+require("./test-ldap-login");
+require("./test-rbac-denial");
+require("./test-seal-status");
