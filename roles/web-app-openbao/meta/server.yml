@@ -1,0 +1,8 @@
+---
+# Exception: OpenBao answers `/` with a 307 into its UI, which the health checker does not expect by default.
+status_codes:
+  default:
+    - 200
+    - 301
+    - 302
+    - 307
