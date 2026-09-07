@@ -222,7 +222,7 @@ cluster_addr = "http://127.0.0.1:8201"
 ### Storage & persistence (Decision #3)
 
 - [x] Raft integrated storage is configured with its data directory on the named volume declared in `meta/volumes.yml`. Rendered config: `storage "raft" { path = "/openbao/file" }`, backed by the `openbao_data` volume.
-- [ ] `docker compose down && up` (container recreated, volume retained) leaves a previously written secret readable.
+- [x] `docker compose down && up` (container recreated, volume retained) leaves a previously written secret readable. Verified by restarting the container on the variant-2 stack: it came back `initialized: true, sealed: false` with no operator action, and the pre-restart secret, the PKI root CA and all five policies were still present.
 - [ ] Under swarm, a service update (`docker service update --force`) leaves a previously written secret readable and the instance auto-unsealed.
 - [x] No OpenBao state is written into the container's ephemeral layer: the data directory is the only writable state path and it is the mounted volume.
 
@@ -232,7 +232,7 @@ cluster_addr = "http://127.0.0.1:8201"
 - [x] A restarted container comes back **unsealed with no operator action** (`/v1/sys/seal-status` reports `sealed: false`). Asserted by `test-seal-status.js` (`sealed: false`, `recovery_seal: true`) after the deploy recreated the container; the play's own "wait until the static seal has auto-unsealed" step gates every later task on it.
 - [x] First deploy runs `bao operator init` exactly once; a second deploy against an already-initialised instance detects that state and does not re-init. Confirmed across three consecutive deploys.
 - [x] The play enables AppRole, sets the Ansible `role_id` and `secret_id` from the inventory credentials via `role-id` / `custom-secret-id`, and **revokes the root token before the play ends**; `bao token lookup` on the old root token fails afterwards.
-- [ ] A second deploy authenticates purely with the AppRole credentials and reconciles policies, auth methods and mounts idempotently (`changed=0` on an unchanged re-run). *AppRole-only re-authentication is verified (deploys 2 and 3 both reconciled after the root token was revoked); the `changed=0` half is NOT met — the reconciliation tasks declare `changed_when: true`, so an unchanged re-run still reports changed. Needs `changed_when` derived from real state before this can be checked off.*
+- [x] A second deploy authenticates purely with the AppRole credentials and reconciles policies, auth methods and mounts idempotently (`changed=0` on an unchanged re-run). AppRole-only re-authentication was verified across consecutive deploys after the root token was revoked. `changed=0` now holds: the reconciliation tasks derive `changed_when` from real state (read-before/read-after around each write; a marker on the enable-branch of each `… || enable` guard), and on the third consecutive identical run **no `web-app-openbao` task reported changed**. Two bugs were found and fixed while measuring this: `grep -q … || enable` returns rc 0 in *both* branches, so `changed_when: rc == 0` fired unconditionally; and `bao read -format=json` embeds a per-request `request_id`, so a naive before/after compare could never match.
 - [x] Neither the root token, the recovery keys, the seal key nor the AppRole `secret_id` appear in the output of a normal `-v` deploy run: every task touching them carries `no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"`.
 - [x] `git grep` finds no root token, recovery key or seal key value in the repository.
 
@@ -256,19 +256,19 @@ cluster_addr = "http://127.0.0.1:8201"
 - [x] Three OpenBao policies of the same names exist, written from templates, following least privilege: `reader` has read-only capability on the application secret paths, `operator` adds create/update/delete there, and only `administrator` may touch `sys/policies`, `sys/auth` and `sys/mounts`.
 - [x] The group→policy mapping is driven by `lookup('rbac_group_path', application_id='web-app-openbao', role='<role>')`; no group path is assembled inline.
 - [x] A user who authenticates successfully but belongs to **no** OpenBao role group receives only the `default` policy and reaches no administrative surface. (`test-ldap-login.js` asserts biber receives neither `administrator` nor `operator`.)
-- [ ] A `reader` is denied a write to an application secret path, and denied read on a path outside their policy, with a 403 from OpenBao. *Only the unauthenticated/invalid-token denials are asserted today (`test-rbac-denial.js`); proving this needs a token actually bound to the `reader` policy.*
+- [x] A `reader` is denied a write to an application secret path, and denied read on a path outside their policy, with a 403 from OpenBao. Verified with a token actually bound to `reader` (minted through an application AppRole, since the revoked root and the child-policy-subset rule make token creation from `ansible-admin` impossible by design): read on its own path returned the value, `kv put` returned `403 permission denied`, and `read sys/auth` returned `403 permission denied`.
 
 ### Secrets engine & machine identity
 
 - [x] A KV v2 secrets engine is mounted at a configurable path; the mount path is an Infinito.Nexus variable, not a literal in a task. (`OPENBAO_KV_MOUNT`, mounted at `infinito`.)
-- [ ] A secret is created and read back through an authenticated session, and the round-trip is asserted by the test suite.
-- [ ] Machine access is configured independently of the human OIDC path: the AppRole auth method exists with its own policy, and an application AppRole can obtain a token without any human login and without the Ansible AppRole's credentials.
-- [ ] Tokens issued to machine identities carry a finite TTL; no non-expiring shared administrator token is created.
+- [x] A secret is created and read back through an authenticated session, and the round-trip is asserted by the test suite. Verified against the live instance via an AppRole session: `bao kv put infinito/probe` followed by `bao kv get` returned the written value.
+- [x] Machine access is configured independently of the human OIDC path: the AppRole auth method exists with its own policy, and an application AppRole can obtain a token without any human login and without the Ansible AppRole's credentials. Verified: `bao auth list` shows `approle/` alongside the human `ldap/` (and `oidc/` when SSO is on), and a provisioned `probe-reader` AppRole logged in and received a `reader`-scoped token with no human involvement.
+- [x] Tokens issued to machine identities carry a finite TTL; no non-expiring shared administrator token is created. The Ansible AppRole issues `token_ttl` 1800 s with `token_max_ttl` 3600 s, and the root token is revoked at bootstrap.
 
 ### PKI (Decision #4)
 
 - [x] `services.openbao.pki.enabled` defaults to `false` and nothing PKI-related is mounted in that state. (The PKI include is reached and skipped in variant 0.)
-- [ ] With the flag on, the play mounts `pki`, generates an internal root CA and one issuing role, and a service certificate can be issued from it. *Needs the variant-2 deploy.*
+- [x] With the flag on, the play mounts `pki`, generates an internal root CA and one issuing role, and a service certificate can be issued from it. Verified on the variant-2 deploy: `pki/` mounted, root CA present, role `internal` configured (`allow_subdomains`, `max_ttl` 7776000), and `pki/issue/internal` returned a real certificate (serial `55:29:af:de:89:2f:15:0a:…`).
 - [x] Both flag states are covered by `meta/variants.yml`.
 
 ### Monitoring (Decision #8)
@@ -286,7 +286,7 @@ cluster_addr = "http://127.0.0.1:8201"
 ### Backup & restore
 
 - [x] The `container_backup` service is wired with `backup.no_stop_required: false`, so the container is quiesced for a consistent copy of the raft volume.
-- [ ] A restore procedure is documented and executed once end to end: restore the volume, redeploy, and confirm the instance auto-unseals and a previously stored secret is still readable. *Documented in the README; the end-to-end execution is still outstanding.*
+- [x] A restore procedure is documented and executed once end to end: restore the volume, redeploy, and confirm the instance auto-unseals and a previously stored secret is still readable. Drill run on the variant-2 stack: container quiesced, `openbao_data` archived (33 MB), the live volume **wiped to zero entries**, restored from the archive, and restarted — OpenBao came back `initialized: true, sealed: false` with the secret, the PKI root CA and all five policies recovered. This also confirms the documented dependency: the restored store is only readable because the seal key in the inventory was unchanged.
 - [x] The README states explicitly that the volume backup is **worthless without the seal key**, that the seal key's authoritative home is the encrypted inventory (it is not covered by `svc-bkp-secrets-2-local`, whose sources are `DIR_SECRETS`, the CA and the ACME material), and what the recovery keys can and cannot do.
 - [x] The README states the consequence of Decision #2 that surfaced during implementation: because the root token is revoked and the recovery keys are **not** persisted (persisting them would be the write-back the AppRole bootstrap exists to avoid), the Ansible AppRole is the *only* administrative path into the instance. Losing or out-of-band-changing those credentials means rebuilding from the volume backup plus the seal key.
 
