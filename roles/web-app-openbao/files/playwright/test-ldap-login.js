@@ -1,6 +1,7 @@
 const { test, expect } = require("@playwright/test");
 const { normalizeBaseUrl, decodeDotenvQuotedValue } = require("./personas");
 const { skipUnlessServiceEnabled } = require("./service-gating");
+const { resolveTimeout } = require("./timeouts");
 
 const baseUrl = normalizeBaseUrl(process.env.OPENBAO_BASE_URL || "");
 const adminUsername = decodeDotenvQuotedValue(process.env.ADMIN_USERNAME || "");
@@ -15,7 +16,7 @@ test("ldap: the administrator logs in and receives the administrator policy", as
 
   const response = await request.post(
     `${baseUrl}/v1/auth/ldap/login/${encodeURIComponent(adminUsername)}`,
-    { data: { password: adminPassword }, failOnStatusCode: false },
+    { data: { password: adminPassword }, failOnStatusCode: false, timeout: resolveTimeout(30_000) },
   );
   expect(
     response.status(),
@@ -34,7 +35,7 @@ test("ldap: a user in no OpenBao role group gets no privileged policy", async ({
 
   const response = await request.post(
     `${baseUrl}/v1/auth/ldap/login/${encodeURIComponent(biberUsername)}`,
-    { data: { password: biberPassword }, failOnStatusCode: false },
+    { data: { password: biberPassword }, failOnStatusCode: false, timeout: resolveTimeout(30_000) },
   );
 
   // Exception: rejection and admission-with-`default` both satisfy the contract; only a
