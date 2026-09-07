@@ -3,19 +3,30 @@
   ansible.builtin.shell: > # nocheck: container-exec-resolver  runtime-resolved CID, delegated to the hosting node
     container exec {{ OPENBAO_LOCAL_CID | quote }}
     sh -c 'bao secrets list -format=json | grep -q "\"{{ OPENBAO_KV_MOUNT }}/\"" ||
-    bao secrets enable -path={{ OPENBAO_KV_MOUNT | quote }} -version=2 kv'
+    { bao secrets enable -path={{ OPENBAO_KV_MOUNT | quote }} -version=2 kv && echo OPENBAO_CHANGED; }'
   register: openbao_kv_mount
-  changed_when: openbao_kv_mount.rc == 0
+  changed_when: "'OPENBAO_CHANGED' in openbao_kv_mount.stdout"
 
+# Exception: `bao policy read` reformats the HCL, so the rendered file cannot be diffed against
+# it. Comparing the server's own read-back before and after the write reports whether the write
+# actually altered state. `set -e` keeps a failed write a task failure rather than a false change.
 - name: "📜 Write the human RBAC policies"
   ansible.builtin.shell: > # nocheck: container-exec-resolver  runtime-resolved CID, delegated to the hosting node
     container exec {{ OPENBAO_LOCAL_CID | quote }}
-    bao policy write {{ item | quote }} {{ OPENBAO_POLICY_DIR_DOCKER }}/{{ item }}.hcl
+    sh -c 'set -e; before=$(bao policy read {{ item | quote }} 2>/dev/null || true);
+    bao policy write {{ item | quote }} {{ OPENBAO_POLICY_DIR_DOCKER }}/{{ item }}.hcl >/dev/null;
+    after=$(bao policy read {{ item | quote }});
+    [ "$before" = "$after" ] || echo OPENBAO_CHANGED'
   loop: "{{ OPENBAO_RBAC_ROLES }}"
-  changed_when: true
+  register: openbao_policy_write
+  changed_when: "'OPENBAO_CHANGED' in openbao_policy_write.stdout"
 
 - name: "📜 Refresh the ansible-admin policy"
   ansible.builtin.shell: > # nocheck: container-exec-resolver  runtime-resolved CID, delegated to the hosting node
     container exec {{ OPENBAO_LOCAL_CID | quote }}
-    bao policy write ansible-admin {{ OPENBAO_POLICY_DIR_DOCKER }}/ansible-admin.hcl
-  changed_when: true
+    sh -c 'set -e; before=$(bao policy read ansible-admin 2>/dev/null || true);
+    bao policy write ansible-admin {{ OPENBAO_POLICY_DIR_DOCKER }}/ansible-admin.hcl >/dev/null;
+    after=$(bao policy read ansible-admin);
+    [ "$before" = "$after" ] || echo OPENBAO_CHANGED'
+  register: openbao_admin_policy_write
+  changed_when: "'OPENBAO_CHANGED' in openbao_admin_policy_write.stdout"
