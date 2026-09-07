@@ -104,5 +104,6 @@
   ansible.builtin.shell: > # nocheck: container-exec-resolver  runtime-resolved CID, delegated to the hosting node
     container exec {{ OPENBAO_LOCAL_CID | quote }}
     sh -c 'bao token revoke -self >/dev/null 2>&1; rm -f ~/.bao-token'
-  changed_when: true
+  # Exception: teardown of this run's own short-lived token, not configuration drift.
+  changed_when: false
   delegate_to: "{{ OPENBAO_HOST_NODE }}"
