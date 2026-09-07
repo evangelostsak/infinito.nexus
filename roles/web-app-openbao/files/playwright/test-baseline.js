@@ -1,5 +1,6 @@
 const { test, expect } = require("@playwright/test");
 const { normalizeBaseUrl, decodeDotenvQuotedValue, gotoOnion } = require("./personas");
+const { resolveTimeout } = require("./timeouts");
 
 const baseUrl = normalizeBaseUrl(process.env.OPENBAO_BASE_URL || "");
 const canonicalDomain = decodeDotenvQuotedValue(process.env.CANONICAL_DOMAIN || "");
@@ -26,7 +27,10 @@ test("baseline: OpenBao responds on the canonical domain and serves its UI", asy
 });
 
 test("baseline: the API reports an initialised, unsealed node", async ({ request }) => {
-  const response = await request.get(`${baseUrl}/v1/sys/health`, { failOnStatusCode: false });
+  const response = await request.get(`${baseUrl}/v1/sys/health`, {
+    failOnStatusCode: false,
+    timeout: resolveTimeout(30_000),
+  });
   // 200 = initialised, unsealed, active. 503 = sealed, 501 = uninitialised.
   expect(
     response.status(),
