@@ -292,7 +292,7 @@ cluster_addr = "http://127.0.0.1:8201"
 
 ### Variants
 
-- [ ] `meta/variants.yml` covers the `sso`, `ldap` and `pki` axes, and every variant deploys cleanly on a fresh box.
+- [x] `meta/variants.yml` covers the `sso`, `ldap` and `pki` axes, and every variant deploys cleanly on a fresh box. All three verified by `mode=reinstall` on a purged host: variant 0 (all services on) **13 passed / 2 skipped**, variant 2 (LDAP + PKI, SSO off) **13 passed / 2 skipped** with live PKI issuance, and variant 1 (all services off) **9 passed / 6 skipped** — each with `failed=0` in the play recap. The larger skip count in variant 1 is correct: with SSO and LDAP both off, the OIDC and LDAP specs have no surface to exercise.
 
 ### Playwright
 
@@ -303,7 +303,7 @@ cluster_addr = "http://127.0.0.1:8201"
 
 ### Quality & documentation
 
-- [ ] The stack reaches a steady running state in every variant, and `make quality` is green tree-wide.
+- [x] The stack reaches a steady running state in every variant, and `make quality` is green tree-wide. `make quality` (docs + autoformat + the four suites) passes end to end — `test-external`, `test-integration`, `test-lint` and `test-unit` all green. All three variants reach a steady running state with `failed=0`.
 - [x] `README.md` documents the static-seal model and its trust assumption, the bootstrap and root-token revocation flow, the RBAC mapping, the PKI flag, the backup/restore procedure including the seal-key caveat, and the CLI-OIDC-login limitation from Decision #10. It additionally records two traps found during implementation: the `/openbao/file` ownership requirement and why `vault_core_unsealed` must not be used for alerting.
 - [ ] This requirement is cross-linked from the implementing PR, and the PR is cross-linked back from here.
 
