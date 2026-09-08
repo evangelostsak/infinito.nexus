@@ -10,7 +10,7 @@ This role deploys OpenBao as an Infinito.Nexus application at `openbao.<domain>`
 
 ## Cosmos
 
-The diagram places Openbao in the Infinito.Nexus cosmos: the components it deploys (capabilities), the central services it consumes (dependencies), and its outward reach (federation and bridged external networks).
+The diagram places OpenBao in the Infinito.Nexus cosmos: the components it deploys (capabilities), the central services it consumes (dependencies), and its outward reach (federation and bridged external networks).
 
 ```mermaid
 flowchart LR
