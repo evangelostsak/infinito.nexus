@@ -243,7 +243,7 @@ cluster_addr = "http://127.0.0.1:8201"
 - [x] `auth/oidc/config` is written from `OIDC.CLIENT.*` values only — no hardcoded realm name, issuer URL, endpoint or claim string anywhere in the role.
 - [x] The user identifier is templated from `{{ OIDC.ATTRIBUTES.USERNAME }}`; the literal `preferred_username` does not appear in the role.
 - [x] A user logs in at `https://openbao.{{ DOMAIN_PRIMARY }}/` through the Keycloak chain and lands authenticated in the OpenBao UI. (`test-oidc-login.js`, 6.5 s.)
-- [ ] Logout terminates the OpenBao session and integrates with the `logout` service when enabled.
+- [ ] Logout terminates the OpenBao session and integrates with the `logout` service when enabled. *The integration half is done and verified: the deploy activates the logout proxy for the openbao vhost, injects the universal-logout code with its CSP hash, and includes openbao in `LOGOUT_DOMAINS`. The termination half is **not** asserted, and an attempt to assert it surfaced a finding now recorded in the README — navigating to `/ui/vault/logout` leaves the session intact (the UI returns to `/ui/vault/secrets`, since the Ember app restores its token from browser storage). Proving termination needs the UI's own logout control driven from an authenticated session, which the persona blocks make awkward; the assertion was reverted rather than left failing.*
 
 ### LDAP (Decision #5)
 
