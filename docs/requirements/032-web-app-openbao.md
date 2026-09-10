@@ -4,7 +4,8 @@
 
 As an Infinito.Nexus administrator, I want [OpenBao](https://github.com/openbao/openbao) deployed as a `web-app-openbao` role with Keycloak OIDC login, group-mapped policies, persistent storage, automatic unsealing, backup and monitoring, so that infrastructure secrets, application credentials, certificates and tokens can be stored and retrieved centrally without distributing static secrets across systems.
 
-Upstream story: [OpenProject #628](https://project.infinito.nexus/) — *Integrate OpenBao into Infinito.Nexus*.
+Upstream story: [OpenProject #628](https://project.infinito.nexus/work_packages/628) — *Integrate OpenBao into Infinito.Nexus*.
+Implementing PR: [infinito-nexus/core#611](https://github.com/infinito-nexus/core/pull/611).
 
 ## Background
 
@@ -305,7 +306,7 @@ cluster_addr = "http://127.0.0.1:8201"
 
 - [x] The stack reaches a steady running state in every variant, and `make quality` is green tree-wide. `make quality` (docs + autoformat + the four suites) passes end to end — `test-external`, `test-integration`, `test-lint` and `test-unit` all green. All three variants reach a steady running state with `failed=0`.
 - [x] `README.md` documents the static-seal model and its trust assumption, the bootstrap and root-token revocation flow, the RBAC mapping, the PKI flag, the backup/restore procedure including the seal-key caveat, and the CLI-OIDC-login limitation from Decision #10. It additionally records two traps found during implementation: the `/openbao/file` ownership requirement and why `vault_core_unsealed` must not be used for alerting.
-- [ ] This requirement is cross-linked from the implementing PR, and the PR is cross-linked back from here.
+- [x] This requirement is cross-linked from the implementing PR, and the PR is cross-linked back from here. Implementing PR: [infinito-nexus/core#611](https://github.com/infinito-nexus/core/pull/611).
 
 ## Validation Apps
 
