@@ -57,6 +57,30 @@ users:
     roles: []
     tokens: {}
     authorized_keys: []
+  baooperator:
+    username: "baooperator"
+    firstname: "Bao"
+    lastname: "Operator"
+    email: "baooperator@infinito.example"
+    password: "AnotherUnsecurePassword!2"
+    uid: 10002
+    gid: 10002
+    roles:
+      - operator
+    tokens: {}
+    authorized_keys: []
+  baoreader:
+    username: "baoreader"
+    firstname: "Bao"
+    lastname: "Reader"
+    email: "baoreader@infinito.example"
+    password: "AnotherUnsecurePassword!3"
+    uid: 10003
+    gid: 10003
+    roles:
+      - reader
+    tokens: {}
+    authorized_keys: []
 SIZE_PERCENT_CLEANUP_DISC_SPACE: 99 # Exception: set this high because the DinD CI environment in the GitHub workflow can already sit at ~92% disk usage.
 
 WORKSTATION_USER: biber
