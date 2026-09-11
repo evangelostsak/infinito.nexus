@@ -31,8 +31,6 @@ test("rbac: an invalid token is refused on a privileged path", async ({ request 
   ).toContain(response.status());
 });
 
-// Exception: the listener serves metrics unauthenticated for the internal scrape, so the
-// proxy must never expose them publicly.
 test("metrics: /v1/sys/metrics is not served through the public proxy", async ({ request }) => {
   const response = await request.get(`${baseUrl}/v1/sys/metrics?format=prometheus`, {
     failOnStatusCode: false,
