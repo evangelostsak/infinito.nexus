@@ -1,12 +1,2 @@
 ---
 administrator: {}
-baooperator:
-  description: OpenBao RBAC coverage account holding only the operator role
-  username: baooperator
-  roles:
-    - operator
-baoreader:
-  description: OpenBao RBAC coverage account holding only the reader role
-  username: baoreader
-  roles:
-    - reader
