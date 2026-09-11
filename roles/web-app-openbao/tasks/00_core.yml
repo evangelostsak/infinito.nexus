@@ -1,6 +1,4 @@
 ---
-# Exception: the config templates notify `compose-up`, so they MUST be rendered after
-# sys-stk-backend has produced compose.yml and before the handler flush.
 - include_tasks: utils/once/flag.yml
 
 - name: "🧩 load docker for {{ application_id }}"
