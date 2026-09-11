@@ -7,9 +7,6 @@
   register: openbao_kv_mount
   changed_when: "'OPENBAO_CHANGED' in openbao_kv_mount.stdout"
 
-# Exception: `bao policy read` reformats the HCL, so the rendered file cannot be diffed against
-# it. Comparing the server's own read-back before and after the write reports whether the write
-# actually altered state. `set -e` keeps a failed write a task failure rather than a false change.
 - name: "📜 Write the human RBAC policies"
   ansible.builtin.shell: > # nocheck: container-exec-resolver  runtime-resolved CID, delegated to the hosting node
     container exec {{ OPENBAO_LOCAL_CID | quote }}
