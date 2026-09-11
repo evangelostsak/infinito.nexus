@@ -1,2 +1,16 @@
 ---
 administrator: {}
+baooperator:
+  description: OpenBao RBAC coverage account holding only the operator role
+  username: baooperator
+  roles:
+    - operator
+  password: "{{ (applications | default({}, true)).get('web-app-openbao', {}).get('secrets', {}).get('credentials', {}).get('rbac_operator_password') | default(42
+    | strong_password, true) }}"
+baoreader:
+  description: OpenBao RBAC coverage account holding only the reader role
+  username: baoreader
+  roles:
+    - reader
+  password: "{{ (applications | default({}, true)).get('web-app-openbao', {}).get('secrets', {}).get('credentials', {}).get('rbac_reader_password') | default(42
+    | strong_password, true) }}"
