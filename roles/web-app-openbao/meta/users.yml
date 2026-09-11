@@ -1,14 +1,2 @@
 ---
 administrator: {}
-baooperator:
-  description: OpenBao RBAC coverage account holding only the operator role
-  username: baooperator
-  roles:
-    - operator
-  password: "{{ ansible_become_password }}"
-baoreader:
-  description: OpenBao RBAC coverage account holding only the reader role
-  username: baoreader
-  roles:
-    - reader
-  password: "{{ ansible_become_password }}"
