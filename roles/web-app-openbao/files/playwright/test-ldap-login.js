@@ -38,8 +38,6 @@ test("ldap: a user in no OpenBao role group gets no privileged policy", async ({
     { data: { password: biberPassword }, failOnStatusCode: false, timeout: resolveTimeout(30_000) },
   );
 
-  // Exception: rejection and admission-with-`default` both satisfy the contract; only a
-  // privileged policy is a failure.
   if (response.status() === 200) {
     const body = await response.json();
     const policies = body.auth.policies || [];
