@@ -14,7 +14,6 @@
   changed_when: false
   retries: 30
   delay: 5
-  # Exception: exit 2 means sealed and exit 1 means not yet initialised; both prove the API answers.
   until: openbao_status_raw.rc in [0, 2] or 'not yet initialized' in openbao_status_raw.stderr
   failed_when: false
   delegate_to: "{{ OPENBAO_HOST_NODE }}"
@@ -104,6 +103,5 @@
   ansible.builtin.shell: > # nocheck: container-exec-resolver  runtime-resolved CID, delegated to the hosting node
     container exec {{ OPENBAO_LOCAL_CID | quote }}
     sh -c 'bao token revoke -self >/dev/null 2>&1; rm -f ~/.bao-token'
-  # Exception: teardown of this run's own short-lived token, not configuration drift.
   changed_when: false
   delegate_to: "{{ OPENBAO_HOST_NODE }}"
