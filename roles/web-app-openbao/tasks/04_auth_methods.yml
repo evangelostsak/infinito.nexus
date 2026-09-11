@@ -22,8 +22,6 @@
       args:
         stdin: "{{ OPENBAO_OIDC_CLIENT_SECRET }}"
         stdin_add_newline: false
-      # Exception: the write always runs so a rotated client secret lands, but OpenBao redacts
-      # the secret on read, so a real change cannot be detected and none is claimed.
       changed_when: false
       delegate_to: "{{ OPENBAO_HOST_NODE }}"
       no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
@@ -74,8 +72,6 @@
       args:
         stdin: "{{ LDAP.BIND_CREDENTIAL }}"
         stdin_add_newline: false
-      # Exception: as with the OIDC config, the bind password is write-only, so the write always
-      # runs to carry a rotation but claims no change it cannot observe.
       changed_when: false
       delegate_to: "{{ OPENBAO_HOST_NODE }}"
       no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
