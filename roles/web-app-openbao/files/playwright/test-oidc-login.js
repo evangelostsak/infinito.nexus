@@ -19,8 +19,6 @@ const CALLBACK_PATH = "/ui/vault/auth/oidc/oidc/callback";
 
 test.use({ ignoreHTTPSErrors: true });
 
-// Exception: a failed auth_url request renders as "Invalid role", indistinguishable from a
-// misconfigured role, so probe it from the page to separate a browser problem from a server one.
 test("oidc: the browser can reach the auth_url endpoint the login form depends on", async ({ page }) => {
   skipUnlessServiceEnabled("sso");
   await page.context().clearCookies();
@@ -52,12 +50,9 @@ test("oidc: the browser can reach the auth_url endpoint the login form depends o
 
 test("oidc: the administrator signs in through Keycloak and lands in the OpenBao UI", async ({ page }) => {
   skipUnlessServiceEnabled("sso");
-  // Exception: the default per-test budget is smaller than this flow's own onion-scaled waits.
   test.setTimeout(resolveTimeout(240_000));
   await page.context().clearCookies();
 
-  // Exception: the provider is a second hidden service needing its own Tor circuit; building it
-  // inside the popup's navigation timeout makes this flaky (5.1 min cold vs 5.3 s warm).
   if (issuerUrl) {
     const warmup = await page.context().newPage();
     await gotoOnion(warmup, issuerUrl, { waitUntil: "domcontentloaded" }).catch(() => {});
@@ -96,8 +91,6 @@ test("oidc: the administrator signs in through Keycloak and lands in the OpenBao
     )
     .toBe(200);
 
-  // Exception: clicking before the component's own debounced role fetch settles opens no popup
-  // at all, and nothing in the DOM distinguishes the two states — hence short retries.
   let popup = null;
   for (let attempt = 1; attempt <= 4 && !popup; attempt += 1) {
     const popupPromise = page
