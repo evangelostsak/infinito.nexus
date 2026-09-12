@@ -11,6 +11,9 @@
     ldap:
       enabled: true
       shared: true
+    lam: # nocheck: variants-services-match
+      enabled: true
+      shared: true
     logout:
       enabled: true
       shared: true
