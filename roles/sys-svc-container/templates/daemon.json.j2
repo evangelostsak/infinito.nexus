@@ -22,7 +22,7 @@
   "log-driver": "json-file",
   "log-opts": {"max-size": "10m", "max-file": "2"}
 {% if DOCKER_IN_CONTAINER | bool %},
-  "storage-driver": "{{ SYS_SVC_CONTAINER_STORAGE_DRIVER }}"
+  "storage-driver": "fuse-overlayfs"
 {% endif %}
 {% if SYS_DOCKER_DAEMONM_MTU is defined and SYS_DOCKER_DAEMONM_MTU | int > 0 %},
   "mtu": {{ SYS_DOCKER_DAEMONM_MTU | int }}

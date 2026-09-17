@@ -2,9 +2,6 @@
 SYS_SVC_DOCKER_DIR: "/etc/docker/"
 SYS_SVC_DOCKER_DAEMON: "{{ [SYS_SVC_DOCKER_DIR, 'daemon.json' ] | path_join }}"
 
-# Override (e.g. vfs) where fuse-overlayfs copy-up breaks under nesting.
-SYS_SVC_CONTAINER_STORAGE_DRIVER: "fuse-overlayfs"
-
 SYS_SVC_DOCKER_AUTOMTU_TARGETS: >-
   {{ ['registry-1.docker.io', 'github.com'] + NETWORK_PUBLIC_DNS_RESOLVERS }}
 
