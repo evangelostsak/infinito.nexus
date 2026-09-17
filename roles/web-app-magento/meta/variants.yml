@@ -5,6 +5,8 @@
 # variant pinning every dynamic services.yml flag to true so the
 # matrix exercises the in-group_names branch of web-app-magento.
 - services:
+    container_backup:
+      enabled: true
     dashboard:
       enabled: true
       shared: true
@@ -29,7 +31,14 @@
     seaweedfs:
       enabled: true
       shared: true
+    redis:
+      shared: true
+    tor:
+      enabled: true
 - services:
+    container_backup:
+      enabled: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
     dashboard:
       enabled: false
       shared: false
@@ -54,3 +63,7 @@
     seaweedfs:
       enabled: false
       shared: false
+    redis:
+      shared: false # nocheck: variants-static-override backup shared stays literally true
+    tor:
+      enabled: true

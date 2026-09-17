@@ -1,38 +1,34 @@
-  matrix-mdad:
-    container_name: matrix-mdad
+{% set service_name = MATRIX_MDAD_SERVICE_KEY %}
+  {{ MATRIX_MDAD_SERVICE_KEY }}:
+{% include 'roles/sys-svc-container/templates/deploy.yml.j2' %}
+    {{ lookup('compose_only', 'container_name', MATRIX_MDAD_CONTAINER) }}
     build:
-      context: {{ application_id | abs_role_path_by_application_id }}/files/flavor/ansible/runner
+      context: {{ MATRIX_MDAD_RUNNER_BUILD_DIR }}
       args:
         MATRIX_MDAD_RUNNER_BASE_IMAGE: {{ MATRIX_MDAD_RUNNER_BASE_IMAGE }}
         MATRIX_MDAD_RUNNER_BASE_VERSION: {{ MATRIX_MDAD_RUNNER_BASE_VERSION }}
         MATRIX_MDAD_RUNNER_DOCKER_CLI_IMAGE: {{ MATRIX_MDAD_RUNNER_DOCKER_CLI_IMAGE }}
         MATRIX_MDAD_RUNNER_DOCKER_CLI_VERSION: {{ MATRIX_MDAD_RUNNER_DOCKER_CLI_VERSION }}
-    image: {{ MATRIX_MDAD_RUNNER_IMAGE }}
-    restart: {{ DOCKER_RESTART_POLICY }}
+    image: "{{ MATRIX_MDAD_RUNNER_IMAGE }}"  # nocheck: container-image-lookup
+    {{ lookup('compose_only', 'restart', DOCKER_RESTART_POLICY) }}
+    {{ lookup('container_healthcheck', service_name) | indent(4) }}
     privileged: true
-    cgroup: host
+    {{ lookup('compose_only', 'cgroup', 'host') }}
     stop_signal: SIGRTMIN+3
     environment:
       MATRIX_MDAD_PLAYBOOK_TAGS: "{{ MATRIX_MDAD_PLAYBOOK_TAGS }}"
-{% set _objstore = lookup('objstore', application_id) %}
-    networks:
-      default: {}
-{% if lookup('database', application_id, 'enabled') and lookup('database', application_id, 'shared') %}
-      postgres: {}
+{% if MATRIX_OIDC_ENABLED and MATRIX_OIDC_HOST_IS_ONION %}
+      MATRIX_OIDC_ONION_HOST: "{{ MATRIX_OIDC_HOST }}"
 {% endif %}
-{% if MATRIX_LDAP_ENABLED %}
-      openldap: {}
-{% endif %}
-{% if _objstore.enabled and _objstore.shared and application_id != _objstore.id %}
-      {{ _objstore.network }}: {}
-{% endif %}
+    {{ lookup('container_networks') | indent(4) }}
     volumes:
       - {{ MATRIX_MDAD_DIR }}:/mdad
-      - matrix_mdad_docker:/var/lib/docker
-      - matrix_mdad_state:/var/lib/matrix-mdad
-      - matrix_mdad_matrix:/matrix
-{% if (TLS_MODE | lower) == 'self_signed' %}
+      - {{ lookup('volume', application_id, 'matrix_mdad_docker').name }}:{{ lookup('volume', 'web-app-matrix', 'matrix_mdad_docker').target }}
+      - {{ lookup('volume', application_id, 'matrix_mdad_state').name }}:{{ lookup('volume', 'web-app-matrix', 'matrix_mdad_state').target }}
+      - {{ lookup('volume', application_id, 'matrix_mdad_matrix').name }}:{{ lookup('volume', 'web-app-matrix', 'matrix_mdad_matrix').target }}
+{% if MATRIX_CA_INJECTED | bool %}
       - {{ CA_TRUST.cert_host }}:{{ CA_TRUST.cert_host }}:ro
+      - {{ CA_TRUST.bundle_host }}:{{ CA_TRUST.bundle_host }}:ro
 {% endif %}
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
     tmpfs:

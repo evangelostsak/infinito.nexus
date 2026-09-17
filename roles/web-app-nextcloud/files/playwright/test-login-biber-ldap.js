@@ -1,4 +1,5 @@
 const { test, expect } = require("@playwright/test");
+const { resolveTimeout } = require("./timeouts");
 
 exports.register = function (shared) {
   test("biber: nextcloud ldap login and logout (native form, ldap backing)", async ({ browser }) => {
@@ -16,12 +17,7 @@ exports.register = function (shared) {
     const biberPage = await biberContext.newPage();
 
     try {
-      // `loginToStandaloneNextcloudWithRetry` retries once after a
-      // 5 s pause — the LDAP-first-login caveat (see
-      // roles/web-app-nextcloud/docs/LDAP.md) means biber's NC account
-      // is materialised lazily on first successful login, so the very
-      // first attempt for a non-admin persona can stall.
-      await shared.loginToStandaloneNextcloudWithRetry(
+      await shared.loginToStandaloneNextcloud(
         biberPage,
         shared.env.biberUsername,
         shared.env.biberPassword,
@@ -30,7 +26,7 @@ exports.register = function (shared) {
       const shellState = await shared.waitForVisibleCandidate(
         biberPage,
         shared.getNextcloudShellCandidates(biberPage),
-        60_000,
+        resolveTimeout(60_000),
         "Timed out waiting for a signed-in Nextcloud shell for biber (native+LDAP)",
       );
       await expect(shellState.locator).toBeVisible();
@@ -38,7 +34,7 @@ exports.register = function (shared) {
       await shared.logoutStandaloneNextcloud(biberPage);
 
       const loginUrl = new URL("login", shared.env.nextcloudBaseUrl).toString();
-      await biberPage.goto(loginUrl, { waitUntil: "domcontentloaded", timeout: 60_000 }).catch(() => {});
+      await biberPage.goto(loginUrl, { waitUntil: "domcontentloaded", timeout: resolveTimeout(60_000) }).catch(() => {});
       const shellAfterLogout = await shared.findFirstVisibleCandidate(shared.getNextcloudShellCandidates(biberPage));
       expect(
         shellAfterLogout,

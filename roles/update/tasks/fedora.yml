@@ -1,6 +1,14 @@
 ---
-- name: "update (dnf) | refresh dnf cache and upgrade all installed packages"
-  ansible.builtin.dnf:
+- name: "🔁 update (dnf) | make dnf retry transient mirror/egress failures natively"
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/dnf/dnf.conf
+    regexp: "^retries="
+    line: "retries=10"
+    insertafter: "^\\[main\\]"
+
+- name: "🔄 update (dnf) | refresh dnf cache and upgrade all installed packages"
+  ansible.builtin.dnf: # nocheck: dynamic-package - full-system upgrade, not a package install
     name: "*"
     state: latest
     update_cache: true

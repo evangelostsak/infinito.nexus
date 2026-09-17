@@ -1,0 +1,40 @@
+---
+- name: "🔍 Resolve {{ application_id }} hosting node + container id"
+  ansible.builtin.include_tasks: "{{ lookup('path_absolute', 'roles/sys-svc-compose/tasks/utils/swarm/resolve_host_cid.yml') }}"
+  vars:
+    resolve_service_key: "{{ entity_name }}"
+    resolve_output_prefix: OLLAMA
+    resolve_compose_cid: "{{ OLLAMA_CONTAINER }}"
+
+- name: ⬇️ Pre-pull Ollama models
+  ansible.builtin.shell: > # nocheck: container-exec-resolver  runtime-resolved CID, delegated to the hosting node
+    container exec -i {{ OLLAMA_LOCAL_CID | quote }} ollama pull {{ model }}
+  register: pull_result
+  loop: "{{ OLLAMA_PRELOAD_MODELS }}"
+  loop_control:
+    loop_var: model
+  # rationale: async; model pulls run overlapped, results reaped below before playwright
+  async: "{{ OLLAMA_PRELOAD_ASYNC_TIME if ASYNC_ENABLED | bool else omit }}"
+  poll: "{{ ASYNC_POLL if ASYNC_ENABLED | bool else omit }}"
+  retries: "{{ 0 if ASYNC_ENABLED | bool else 5 }}"
+  delay: 15
+  until: >
+    (pull_result.rc | default(0)) == 0 or
+    ('up to date' in (pull_result.stdout | default('')))
+  changed_when: false
+  failed_when: >-
+    (pull_result.failed | default(false))
+    and 'up to date' not in ((pull_result.stdout | default('')) ~ (pull_result.stderr | default('')))
+  delegate_to: "{{ OLLAMA_HOST_NODE }}"
+
+- name: "⏳ Reap the Ollama model pulls"
+  ansible.builtin.include_tasks:
+    file: utils/async/reap.yml
+    apply:
+      delegate_to: "{{ OLLAMA_HOST_NODE }}"
+  vars:
+    async_reap_jobs: "{{ pull_result.results | default([]) }}"
+    async_reap_label: "Ollama model pre-pull"
+    async_reap_tolerate:
+      - "up to date"
+    ASYNC_TIME: "{{ OLLAMA_PRELOAD_ASYNC_TIME }}"

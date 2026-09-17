@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -99,18 +100,9 @@ returns:
 _READ_ONLY_PREFIXES = ("SELECT ", "SHOW ", "EXPLAIN ", "WITH ", "VALUES ")
 _REQUIRED_CONFIG_KEYS = ("type", "container", "username", "name", "password")
 
-# Match psycopg-style placeholders: %(identifier)s. The identifier must
-# be a valid Python identifier so we don't chew through legitimate
-# `%(` byte sequences inside SQL string literals.
 _NAMED_ARG_RE = re.compile(r"%\(([A-Za-z_][A-Za-z0-9_]*)\)s")
 
 
-# Per-engine command-line + escape dialect. Each entry is consumed by
-# `_build_cmd()` and `_escape_value()`. Adding a new backend = one
-# entry here; the rest of the module is engine-agnostic.
-# `binaries`: ordered preferred→fallback; only retried on rc=127 +
-# "executable file not found" for the exact binary we tried (handles
-# MariaDB ≥11 images that dropped the `mysql` symlink).
 _ENGINES: dict[str, dict[str, object]] = {
     "postgres": {
         "binaries": ("psql",),
@@ -170,9 +162,24 @@ def _build_cmd(
     return cmd, env_passthrough
 
 
+def _resolve_exec_target(config: dict) -> str:
+    address = str(config.get("address") or "").strip()
+    container = str(config["container"])
+    if not address or address == container or not address.startswith('"$('):
+        return container
+    inner = (
+        address[1:-1] if address.startswith('"') and address.endswith('"') else address
+    )
+    if inner.startswith("$(") and inner.endswith(")"):
+        inner = inner[2:-1]
+    argv = shlex.split(inner)
+    if not argv:
+        return container
+    proc = subprocess.run(argv, text=True, capture_output=True, check=False)
+    return (proc.stdout or "").strip() or container
+
+
 def _binary_missing(proc: subprocess.CompletedProcess[str], binary: str) -> bool:
-    # Match narrowly on the OCI message naming the exact binary we tried —
-    # otherwise an engine-side rc=127 would silently mask real failures.
     if proc.returncode != 127:
         return False
     combined = (proc.stdout or "") + (proc.stderr or "")
@@ -191,7 +198,6 @@ def _escape_value(value: Any, db_type: str) -> str:
     if value is None:
         return "NULL"
     if isinstance(value, bool):
-        # bool is a subclass of int; check before the int branch below.
         return str(engine["bool_true"] if value else engine["bool_false"])
     if isinstance(value, (int, float)):
         return repr(value)
@@ -326,11 +332,14 @@ def main() -> None:
     expect_rows = bool(module.params["expect_rows"])
     binaries = list(_ENGINES[db_type]["binaries"])  # type: ignore[index]
 
+    exec_config = dict(config)
+    exec_config["container"] = _resolve_exec_target(config)
+
     proc = None
     cmd: list[str] = []
     for index, binary in enumerate(binaries):
         cmd, env_passthrough = _build_cmd(
-            config, expect_rows=expect_rows, binary=binary
+            exec_config, expect_rows=expect_rows, binary=binary
         )
         env = dict(os.environ)
         env.update(env_passthrough)

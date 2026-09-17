@@ -28,6 +28,8 @@ silently dropped during sync. This filter therefore:
   referring parent, building the required hierarchy.
 """
 
+from utils.roles.rbac.scoped import granted_roles
+
 _ENTRY_KIND_GROUP = "group"
 _TENANCY_AXIS_NONE = "none"
 _TENANCY_AXIS_DOMAIN = "domain"
@@ -40,20 +42,19 @@ _IMPLICIT_ADMIN_DESC = "administrator"
 def _resolve_tenants(application_config, application_id):
     """Return the list of tenant identifiers for a tenant-aware app."""
     tenancy = (application_config.get("rbac") or {}).get("tenancy") or {}
-    source = tenancy.get("source", "server.domains.canonical")
-    if source != "server.domains.canonical":
+    source = tenancy.get("source", "domains.canonical")
+    if source != "domains.canonical":
         raise ValueError(
             f"build_ldap_role_entries: application '{application_id}' "
             f"declares rbac.tenancy.source='{source}', but only "
-            f"'server.domains.canonical' is implemented."
+            f"'domains.canonical' is implemented."
         )
-    server = application_config.get("server") or {}
-    domains = server.get("domains") or {}
+    domains = application_config.get("domains") or {}
     canonical = domains.get("canonical") or []
     if not canonical:
         raise ValueError(
             f"build_ldap_role_entries: tenant-aware application "
-            f"'{application_id}' has no server.domains.canonical entries."
+            f"'{application_id}' has no domains.canonical entries."
         )
     tenants = []
     for d in canonical:
@@ -187,8 +188,7 @@ def build_ldap_role_entries(applications, users, ldap, group_names=None):
             member_dns = []
             member_uids = []
             for username, user_config in (users or {}).items():
-                user_roles = (user_config or {}).get("roles", []) or []
-                if role_name in user_roles:
+                if role_name in granted_roles(user_config or {}, application_id):
                     user_dn = f"{ldap_user_attr}={username},{user_dn_base}"
                     member_dns.append(user_dn)
                     member_uids.append(username)
@@ -208,7 +208,6 @@ def build_ldap_role_entries(applications, users, ldap, group_names=None):
                         (role_cn, role_dn, role_name, member_uids, member_dns)
                     )
 
-        # Tenant containers reference per-tenant role groups.
         for tenant in tenants:
             tenant_cn = f"{application_id}-{tenant}"
             tenant_dn = f"cn={tenant_cn},{role_dn_base}"
@@ -222,7 +221,6 @@ def build_ldap_role_entries(applications, users, ldap, group_names=None):
             )
             app_child_dns.append(tenant_dn)
 
-        # Emit parent-first: app container → tenant containers → role groups.
         result[app_container_dn] = _container_entry(
             cn=app_container_cn,
             dn=app_container_dn,

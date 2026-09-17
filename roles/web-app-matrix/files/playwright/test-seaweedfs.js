@@ -16,7 +16,8 @@
 //   signInViaElement, and the SEAWEEDFS_* keys consumed by
 //   runSeaweedfsStorageCheck.
 
-const { test, expect } = require("@playwright/test");
+const { test, expect } = require("./onion-test");
+const { resolveTimeout, isOnionTarget } = require("./timeouts");
 const { skipUnlessServiceEnabled } = require("./service-gating");
 const { runSeaweedfsStorageCheck } = require("./personas");
 const shared = require("./_shared");
@@ -29,12 +30,14 @@ const AVATAR_PNG = Buffer.from(
 test.use({ ignoreHTTPSErrors: true });
 
 test("seaweedfs: an uploaded Matrix avatar is stored in the SeaweedFS bucket", async ({ page, browser }) => {
+  test.skip(isOnionTarget(), "SeaweedFS filer UI is not a Tor surface on an onion node (headless backend)");
   skipUnlessServiceEnabled("seaweedfs");
+  skipUnlessServiceEnabled("seaweedfs_frontend");
   test.skip(
     !(process.env.MATRIX_FLAVOR || "").toLowerCase().includes("ansible"),
     "Matrix media is offloaded to SeaweedFS only in the ansible flavor; the compose flavor stores media on local disk, so the bucket never grows.",
   );
-  test.setTimeout(600_000);
+  test.setTimeout(resolveTimeout(600_000));
 
   await runSeaweedfsStorageCheck(page, browser, {
     label: "a Matrix profile avatar upload",
@@ -56,9 +59,16 @@ test("seaweedfs: an uploaded Matrix avatar is stored in the SeaweedFS bucket", a
       await expect(
         fileInput,
         "Element user settings must expose a file input to set a profile avatar",
-      ).toBeAttached({ timeout: 60_000 });
+      ).toBeAttached({ timeout: resolveTimeout(60_000) });
 
       const marker = `infinito-storage-check-${Date.now()}.png`;
+      const upload = appPage.waitForResponse(
+        (response) =>
+          /\/_matrix\/media\/(v3|r0)\/upload/.test(response.url()) &&
+          response.request().method() === "POST",
+        { timeout: resolveTimeout(120_000) },
+      );
+
       await fileInput.setInputFiles({
         name: marker,
         mimeType: "image/png",
@@ -68,9 +78,20 @@ test("seaweedfs: an uploaded Matrix avatar is stored in the SeaweedFS bucket", a
       const saveButton = appPage
         .getByRole("button", { name: /^(save|apply|upload|confirm)$/i })
         .first();
-      if (await saveButton.isVisible({ timeout: 10_000 }).catch(() => false)) {
+      if (await saveButton.waitFor({ state: "visible", timeout: resolveTimeout(30_000) }).then(() => true).catch(() => false)) {
         await saveButton.click().catch(() => {});
       }
+
+      const response = await upload.catch(() => null);
+      expect(
+        response,
+        "Element never POSTed the avatar to /_matrix/media/*/upload, so nothing could reach the bucket; " +
+          "the settings flow did not complete rather than the object store failing",
+      ).not.toBeNull();
+      expect(
+        response.status(),
+        `Synapse rejected the avatar upload with HTTP ${response.status()}`,
+      ).toBeLessThan(300);
     },
   });
 });

@@ -16,14 +16,19 @@ Pulls only. Pushes are not intercepted.
 
 | Format | Repo names | Upstream |
 |---|---|---|
-| `apt` | `apt-debian`, `apt-debian-security`, `apt-ubuntu`, `apt-ubuntu-security` | `deb.debian.org`, `archive.ubuntu.com`, `security.ubuntu.com` |
+| `apt` | `apt-debian`, `apt-debian-security`, `apt-ubuntu`, `apt-ubuntu-security` | `deb.debian.org`; both Ubuntu repos take the first entry of `INFINITO_APT_UBUNTU_MIRRORS` |
+| `apt` (mirrors) | `apt-debian-mirror`, `apt-debian-security-mirror`, `apt-ubuntu-mirror`, `apt-ubuntu-security-mirror` | `ftp.debian.org`, `security.debian.org`; both Ubuntu repos take the second entry of `INFINITO_APT_UBUNTU_MIRRORS` |
 | `pypi` | `pypi-proxy` | `pypi.org` (incl. `files.pythonhosted.org`) |
 | `npm` | `npm-proxy` | `registry.npmjs.org` |
 | `rubygems` | `gem-proxy` | `rubygems.org` |
 | `go` | `go-proxy` | `proxy.golang.org` |
 | `helm` | `helm-bitnami` | `charts.bitnami.com/bitnami` |
-| `yum` | `yum-rocky`, `yum-fedora` | `download.rockylinux.org`, `dl.fedoraproject.org` |
+| `yum` | `yum-rocky`, `yum-fedora` | `download.rockylinux.org`, `download.fedoraproject.org` |
 | `raw` | `raw-githubusercontent`, `raw-codeload-github`, `raw-packagist`, `raw-alpine` | `raw.githubusercontent.com`, `codeload.github.com`, `repo.packagist.org`, `dl-cdn.alpinelinux.org` |
+
+A proxy repo that holds a cached copy serves it when its remote is unreachable, regardless of `metadataMaxAge` (measured). `autoBlock` is therefore off: while a remote is auto-blocked Nexus answers `404 Remote Auto Blocked` instead of falling back to that cached copy. The mirror repos below only come into play when nothing is cached either.
+
+Every apt suite exists twice, once per upstream mirror. Nexus has no group repository type for `apt` (only maven, raw, docker, yum, npm, pypi, rubygems, go and friends), so the failover lives in the frontend: a request that the primary repo answers with `502`/`503`/`504` is re-run against the `-mirror` repo, which proxies a different host. `404` deliberately does not retry, because a missing file is missing on both mirrors and apt probes for missing files often. The frontend waits at most 8 s for a primary before it re-runs the request against the mirror; the `-mirror` locations keep the global 300 s.
 
 Bootstrap is idempotent and runs from [package.sh](../../../scripts/docker/cache/package.sh) once the stack is healthy.
 
@@ -33,19 +38,19 @@ Bootstrap is idempotent and runs from [package.sh](../../../scripts/docker/cache
 
 Two listener layers:
 
-- HTTPS (port 443): per-hostname server certs signed by a dedicated CA. Used by the `infinito` runner (Ansible-driven `pip install`, `gem install`, `composer install`, `curl https://…`). The runner trusts the CA via [package-frontend-ca.sh](../../../scripts/docker/cache/package-frontend-ca.sh).
+- HTTPS (port 443): per-hostname server certs signed by a dedicated CA. Used by the `infinito` runner (Ansible-driven `pip install`, `gem install`, `composer install`, `curl https://…`). The runner trusts the CA via [package-frontend-ca.sh](../../../scripts/docker/cache/package-frontend/ca.sh).
 - HTTP (port 80): plain mirrors for `deb.debian.org`, `archive.ubuntu.com`, `security.ubuntu.com`, `dl-cdn.alpinelinux.org`. Used by inner-`dockerd` Dockerfile builds via `build.extra_hosts` DNS-hijack. No CA-trust required in the build container.
 
-Cert generation runs in a throw-away alpine container driven by [package-frontend-certs.sh](../../../scripts/docker/cache/package-frontend-certs.sh) before the frontend starts.
+Cert generation runs in a throw-away alpine container driven by [package-frontend-certs.sh](../../../scripts/docker/cache/package-frontend/certs.sh) before the frontend starts.
 
 ## Activation 🎚️
 
-The `cache` decision is exposed via `Profile.registry_cache_active()` in [profile.py](../../../cli/administration/deploy/development/profile.py). When active:
+The `cache` decision is exposed via `Profile.cache_stack_enabled()` in [profile.py](../../../cli/administration/deploy/development/profile.py). When active:
 
 - [compose/cache.override.yml](../../../compose/cache.override.yml) is layered on top of the base [compose.yml](../../../compose.yml) by [compose.py](../../../cli/administration/deploy/development/compose.py) and [down.py](../../../cli/administration/deploy/development/down.py) via [common.py](../../../cli/administration/deploy/development/common.py)`compose_file_args`.
 - The cache services are added.
 - The runner's `infinito` service receives:
-  - bind-mounts for the registry-cache CA, the package-cache client snippets (`pip.conf`, `npmrc`, `apt.list`), and the frontend CA file
+  - bind-mounts for the registry-cache CA, the package-cache client snippets (`pip.conf`, `npmrc`, `apt/${INFINITO_DISTRO}.list`), and the frontend CA file
   - `extra_hosts` entries DNS-hijacking the HTTPS upstream hostnames to the frontend's static IP
   - `INFINITO_CACHE_PACKAGE_FRONTEND_IP` env var for the inner compose wrapper
 - Cert generation, Nexus repo bootstrap, and runner trust-store install run from [compose.py](../../../cli/administration/deploy/development/compose.py).
@@ -59,7 +64,7 @@ CI signals (`GITHUB_ACTIONS=true`, `INFINITO_RUNNING_ON_GITHUB=true`, `CI=true`)
 | Traffic | Mechanism | Cached |
 |---|---|---|
 | Image pulls (any registry, inner `dockerd`) | `registry-cache` MITM via `HTTP_PROXY` env on `dockerd` | ✓ |
-| `apt-get install` (Ansible task in runner) | `apt.list` URL-rewrite to `package-cache:8081` | ✓ |
+| `apt-get install` (Ansible task in runner) | `apt/${INFINITO_DISTRO}.list` URL-rewrite to `package-cache:8081` | ✓ |
 | `pip install` (Ansible task in runner) | `pip.conf` URL-rewrite | ✓ |
 | `npm install` (Ansible task in runner) | `.npmrc` URL-rewrite | ✓ |
 | `gem`, `composer`, `go`, `curl https://…` (Ansible task in runner) | DNS-hijack + frontend HTTPS + runner CA-trust | ✓ |
@@ -73,7 +78,7 @@ The HTTPS-only inner-build gap requires per-image CA-trust bootstrap, which is o
 
 ## Compose Wrapper Auto-Detection 🪄
 
-The runner's `compose` wrapper at [roles/sys-svc-compose/files/compose.py](../../../roles/sys-svc-compose/files/compose.py) auto-detects compose files when invoked from per-app directories under `/opt/compose/<app>/`:
+The runner's `compose` wrapper at [roles/sys-svc-compose/files/python/compose.py](../../../roles/sys-svc-compose/files/python/compose.py) auto-detects compose files when invoked from per-app directories under `/opt/compose/<app>/`:
 
 | File | When |
 |---|---|
@@ -82,7 +87,7 @@ The runner's `compose` wrapper at [roles/sys-svc-compose/files/compose.py](../..
 | `compose.ca.override.yml` | when present (TLS self-signed CA-inject runs) |
 | `compose.cache.override.yml` | generated on the fly when `INFINITO_CACHE_PACKAGE_FRONTEND_IP` is set; emits `build.extra_hosts` for every service that has a `build:` key |
 
-[pull.py](../../../roles/sys-svc-compose/files/pull.py) delegates to the same wrapper so `pull` and `build --pull` operations see the identical `-f` set.
+[pull.py](../../../roles/sys-svc-compose/files/python/pull.py) delegates to the same wrapper so `pull` and `build --pull` operations see the identical `-f` set.
 
 ## Environment Variables 🌳
 
@@ -100,7 +105,7 @@ Per-variable defaults and purposes are in [compose.yml.md](../artefact/files/com
 | Stop the stack | `make compose-down` |
 | Wipe local cache state | `make clean-cache` |
 | Manually re-bootstrap Nexus repos | `bash scripts/docker/cache/package.sh` (after `make dotenv` or sourcing `scripts/meta/env/load.sh`) |
-| Manually regenerate frontend certs | `bash scripts/docker/cache/package-frontend-certs.sh` |
+| Manually regenerate frontend certs | `bash scripts/docker/cache/package-frontend/certs.sh` |
 | Reload nginx in the frontend | `docker exec infinito-package-cache-frontend nginx -s reload` |
 | Inspect cache hits | `docker logs -f infinito-package-cache` and `docker logs -f infinito-package-cache-frontend` |
 
@@ -111,10 +116,10 @@ Cache state persists under `/var/cache/infinito/core/cache/`. Paths are configur
 When a new package manager or upstream needs caching:
 
 1. Register a Nexus proxy repo in [package.sh](../../../scripts/docker/cache/package.sh).
-2. If the upstream uses HTTPS, add it to `HOSTNAMES` in [package-frontend-certs.sh](../../../scripts/docker/cache/package-frontend-certs.sh) so a leaf cert is issued.
+2. If the upstream uses HTTPS, add it to `HOSTNAMES` in [package-frontend-certs.sh](../../../scripts/docker/cache/package-frontend/certs.sh) so a leaf cert is issued.
 3. Add a server-block in [upstreams.conf](../../../compose/package-cache-frontend/upstreams.conf) that reverse-proxies onto the new Nexus repo path (rewrite if upstream URL prefix differs from the Nexus repo path).
 4. Add an `extra_hosts` entry on the `infinito` service in [compose/cache.override.yml](../../../compose/cache.override.yml) for runner-side traffic.
-5. If the upstream is HTTP-only and inner-`dockerd` builds need it, also add it to `_CACHE_HTTP_HOSTNAMES` in [compose.py](../../../roles/sys-svc-compose/files/compose.py) so the per-app `compose.cache.override.yml` includes it in `build.extra_hosts`.
+5. If the upstream is HTTP-only and inner-`dockerd` builds need it, also add it to `_CACHE_HTTP_HOSTNAMES` in [compose.py](../../../roles/sys-svc-compose/files/python/compose.py) so the per-app `compose.cache.override.yml` includes it in `build.extra_hosts`.
 
 ## Background 📚
 

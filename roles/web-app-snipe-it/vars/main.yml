@@ -1,30 +1,47 @@
 ---
-# General 
 application_id: "web-app-snipe-it"
 entity_name: "{{ application_id | get_entity_name }}"
 
-# Database
-database_password: "{{ lookup('config', application_id, 'credentials.database_password') }}" # nocheck: lookup-config-path
+swarm_stack_converge_retries: 600
 
-# Snipe-IT specific
+database_password: "{{ lookup('config', application_id, 'secrets.credentials.database_password') }}" # nocheck: lookup-config-path
+
 SNIPE_IT_URL: "{{ lookup('tls', application_id, 'url.base') }}"
-SNIPE_IT_VERSION: "{{ lookup('config', application_id, 'services.snipe-it.version') }}"
-SNIPE_IT_IMAGE: "{{ lookup('config', application_id, 'services.snipe-it.image') }}"
 SNIPE_IT_CONTAINER: "{{ lookup('config', application_id, 'services.snipe-it.name') }}"
-SNIPE_IT_VOLUME: "{{ lookup('config', application_id, 'volumes.data') }}"
+SNIPE_IT_IMAGE: "{{ lookup('config', application_id, 'services.snipe-it.image') }}"
+SNIPE_IT_VERSION: "{{ lookup('config', application_id, 'services.snipe-it.version') }}"
 SNIPE_IT_SERVICE: "{{ entity_name }}"
-SNIPE_IT_APP_KEY: "{{ lookup('config', application_id, 'credentials.app_key') }}"
+SNIPE_IT_CONTAINER_ADDRESS: "{{ lookup('container_address', application_id, SNIPE_IT_SERVICE) }}"
+SNIPE_IT_APP_KEY: "{{ lookup('config', application_id, 'secrets.credentials.app_key') }}"
 
-# Authentification
 SNIPE_IT_LDAP_ENABLED: "{{ lookup('config', application_id, 'services.ldap.enabled') }}"
 SNIPE_IT_TLS_ENABLED: "{{ lookup('tls', application_id, 'enabled') | bool }}"
 
-# SSO (trusted-header bridge via oauth2-proxy)
 SNIPE_IT_SSO_ENABLED: "{{ lookup('sso', application_id, 'is_proxy_gated') }}"
 SNIPE_IT_SSO_HEADER_NAME: "HTTP_X_FORWARDED_PREFERRED_USERNAME"
 SNIPE_IT_SSO_LOGOUT_URL: "{{ OIDC.CLIENT.LOGOUT_URL }}"
 
-#LDAP
 SNIPE_IT_LDAP_FILTER_FRAGMENT: "&(objectClass=inetOrgPerson)"
 SNIPE_IT_LDAP_AUTH_FILTER_QUERY: "{{ LDAP.USER.ATTRIBUTES.ID }}="
 SNIPE_IT_LDAP_USER_FIRSTNAME: "{{ LDAP.USER.ATTRIBUTES.FIRSTNAME | lower }}"
+SNIPEIT_MCP_ENABLED: "{{ lookup('config', application_id, 'services.snipeitmcp.enabled') | bool }}"
+SNIPEIT_MCP_SERVICE_KEY: "snipeitmcp"
+SNIPEIT_MCP_CONTAINER: "{{ lookup('config', application_id, 'services.snipeitmcp.name') }}"
+SNIPEIT_MCP_PORT: "{{ lookup('config', application_id, 'services.snipeitmcp.ports.internal.http') }}"
+SNIPEIT_MCP_BEARER: "{{ lookup('config', application_id, 'secrets.credentials.mcp_bearer') }}"
+SNIPEIT_MCP_INSTANCE_DIR: "{{ [lookup('container', application_id, 'directories.instance'), 'mcp'] | path_join }}"
+SNIPEIT_MCP_UPSTREAM_HOST: "{{ lookup('config', application_id, 'services.snipe-it.name') }}"
+SNIPEIT_MCP_UPSTREAM_PORT: "{{ lookup('config', application_id, 'services.snipe-it.ports.internal.http') }}"
+SNIPEIT_MCP_UPSTREAM_URL: "http://{{ SNIPEIT_MCP_UPSTREAM_HOST }}:{{ SNIPEIT_MCP_UPSTREAM_PORT }}"
+SNIPEIT_MCP_CONTRACT:
+  provider: "{{ application_id }}"
+  upstream_url: "{{ SNIPEIT_MCP_UPSTREAM_URL }}"
+  auth_subject: "{{ lookup('config', application_id, 'mcp.auth_subject') }}"
+  mutating_tools_enabled: "{{ lookup('config', application_id, 'mcp.tools.mutating_tools_enabled') | bool }}"
+  tools: "{{ lookup('file', 'mcp/tools.json') | from_json }}"
+  limits: "{{ lookup('config', application_id, 'mcp.limits') }}"
+  schema_sha256: "{{ lookup('config', application_id, 'mcp.tools.schema_sha256') }}"
+SNIPEIT_MCP_ACCOUNT: "{{ lookup('users', 'mcp-web-app-snipe-it') }}"
+SNIPEIT_MCP_UPSTREAM_PASSWORD: "{{ SNIPEIT_MCP_ACCOUNT.password }}"
+SNIPEIT_MCP_UPSTREAM_USER: "{{ SNIPEIT_MCP_ACCOUNT.username }}"
+SNIPEIT_MCP_UPSTREAM_TOKEN_NAME: "mcp-upstream"

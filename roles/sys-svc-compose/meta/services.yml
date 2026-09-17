@@ -1,5 +1,10 @@
 ---
 svc-compose:
   lifecycle: beta
+  repository: https://github.com/kevinveenbirkenbach/docker-compose-down-all.git
+  ref: v1.0.0
   required_by:
-    categories: [web]
+    compose:
+      categories: [web]
+    swarm:
+      categories: [web]

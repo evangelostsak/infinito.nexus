@@ -1,5 +1,5 @@
 """Lint guard: never glue a literal ``http://`` / ``https://`` in front of a
-domain that comes from a ``lookup(...)`` (or from a ``server.domains.canonical``
+domain that comes from a ``lookup(...)`` (or from a ``domains.canonical``
 member access). The protocol must come from the same source as the domain so
 TLS-on / TLS-off / self-signed / public-CA stays consistent across the stack.
 
@@ -20,8 +20,11 @@ different flavor, or the role is moved behind a different proxy.
 
 Allowed
 =======
-* Per-line opt-out via ``# nocheck: literal-protocol-lookup``
-  (case-insensitive). Use this
+* Opt-out via ``# nocheck: literal-protocol-lookup`` (case-insensitive) on the
+  offending line or the one immediately above it. The line above is not a
+  convenience: a value long enough to be flagged is long enough for the YAML
+  formatter to wrap it, and a wrapped value cannot carry a trailing marker at
+  all - the ``#`` would land inside the quoted scalar. Use this
   for legitimate internal cases where the protocol is genuinely fixed —
   Docker-network upstreams that always speak plaintext (``http://<container>:<port>``),
   loopback URLs in CI fixtures, and similar.
@@ -33,7 +36,7 @@ The regex catches three concrete shapes:
 1. ``https?://{{ ... lookup( ... }}``    — Jinja interpolation with a lookup
 2. ``"https?://" ~ lookup(...)``         — Jinja string concatenation with lookup
 3. ``"https?://" ~ ... canonical.<key>`` — concatenation with a
-   ``server.domains.canonical`` member access.
+   ``domains.canonical`` member access.
 
 Plain ``"http://" ~ host ~ ":" ~ port`` style internal URLs (the protocol is
 fixed because the upstream is on a docker network with no TLS) are *not*
@@ -49,26 +52,40 @@ from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from utils.annotations.suppress import suppressed_line_numbers
+from utils.annotations.suppress import is_suppressed_at
 from utils.cache.files import PROJECT_ROOT, iter_project_files, read_text
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-# 1. ``https?://{{ ... lookup( ... }}``
+_RULE = "literal-protocol-lookup"
+
 _INTERP_RE: re.Pattern[str] = re.compile(r"https?://\{\{[^}]*\blookup\s*\(")
-# 2. ``"https?://" ~ lookup(...)`` and ``'https?://' ~ lookup(...)`` (with
-#    optional whitespace and an opening parenthesis around the lookup).
 _CONCAT_LOOKUP_RE: re.Pattern[str] = re.compile(
     r"['\"]https?://['\"]\s*~\s*\(?\s*\blookup\s*\("
 )
-# 3. ``"https?://" ~ ANY.canonical.<key>`` — Jinja concat that drills into a
-#    canonical hostname through attribute access (``.server.domains.canonical.<key>``).
 _CONCAT_CANONICAL_RE: re.Pattern[str] = re.compile(
     r"['\"]https?://['\"]\s*~[^'\"]*\bcanonical\b"
 )
 
 ROLES_DIR = PROJECT_ROOT / "roles"
+
+
+def _suppressed_for_value(lines: list[str], idx: int) -> bool:
+    """Whether the value starting at 1-based *idx* carries the marker.
+
+    A wrapped value keeps its trailing comment on the last line, while the
+    offence is reported on the first, so the continuation lines count too.
+    """
+    if is_suppressed_at(lines, idx, _RULE):
+        return True
+    for following in range(idx + 1, len(lines) + 1):
+        text = lines[following - 1]
+        if not text[:1].isspace():
+            return False
+        if is_suppressed_at(lines, following, _RULE, mode="same-line"):
+            return True
+    return False
 
 
 @lru_cache(maxsize=8192)
@@ -86,11 +103,10 @@ def _file_offenders(path: Path) -> tuple[str, ...]:
         return ()
 
     lines = text.splitlines()
-    noqa_lines = suppressed_line_numbers(lines, "literal-protocol-lookup")
 
     offenders: list[str] = []
     for idx, line in enumerate(lines, start=1):
-        if idx in noqa_lines:
+        if _suppressed_for_value(lines, idx):
             continue
         snippet: str | None = None
         for pattern in (_INTERP_RE, _CONCAT_LOOKUP_RE, _CONCAT_CANONICAL_RE):
@@ -136,9 +152,11 @@ class TestLiteralProtocolWithLookup(unittest.TestCase):
 
         rel = lambda p: p.relative_to(PROJECT_ROOT)  # noqa: E731
         lines = [
-            f"{len(offenders)} file(s) prepend a literal http(s):// to a "
-            f"lookup-derived domain instead of letting the `tls` lookup "
-            f"decide the protocol:",
+            (
+                f"{len(offenders)} file(s) prepend a literal http(s):// to a "
+                f"lookup-derived domain instead of letting the `tls` lookup "
+                f"decide the protocol:"
+            ),
         ]
         for path, issues in sorted(offenders.items()):
             lines.append(f"  - {rel(path)}:")

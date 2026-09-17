@@ -12,6 +12,7 @@ class FilterModule:
         domains_dict,
         include_www=True,
         per_domain_seconds=25,
+        onion_per_domain_seconds=None,
         overhead_seconds=30,
         min_seconds=120,
         max_seconds=3600,
@@ -22,6 +23,9 @@ class FilterModule:
                 (values can be str | list[str] | dict[str,str]) or an already
                 flattened list of domains, or a single domain string.
             include_www (bool): If true, add 'www.<domain>' for non-www entries.
+            per_domain_seconds (int): Budget a clearnet domain contributes.
+            onion_per_domain_seconds (int | None): Budget a '.onion' domain
+                contributes; None gives it per_domain_seconds.
             ...
         """
         try:
@@ -37,7 +41,6 @@ class FilterModule:
                         flat.extend(v.values())
                 return flat
 
-            # Accept dict | list | str
             if isinstance(domains_dict, dict):
                 flat = _flatten_from_dict(domains_dict)
             elif isinstance(domains_dict, list):
@@ -46,7 +49,6 @@ class FilterModule:
                 flat = [domains_dict]
             else:
                 # nocheck (TRY301 below): re-raised verbatim by the
-                # AnsibleFilterError handler — intentional pass-through.
                 raise AnsibleFilterError(  # noqa: TRY301
                     "Expected 'domains_dict' to be dict | list | str."
                 )
@@ -61,9 +63,21 @@ class FilterModule:
                 flat.extend(www_variants)
 
             unique_domains = sorted(set(flat))
-            count = len(unique_domains)
+            onion_count = sum(
+                1 for d in unique_domains if str(d).lower().endswith(".onion")
+            )
+            clearnet_count = len(unique_domains) - onion_count
+            onion_seconds = (
+                per_domain_seconds
+                if onion_per_domain_seconds is None
+                else int(onion_per_domain_seconds)
+            )
 
-            raw = overhead_seconds + per_domain_seconds * count
+            raw = (
+                overhead_seconds
+                + per_domain_seconds * clearnet_count
+                + onion_seconds * onion_count
+            )
             return max(min_seconds, min(max_seconds, int(raw)))
 
         except AnsibleFilterError:

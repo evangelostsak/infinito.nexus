@@ -11,6 +11,8 @@
 # variant 0: canonical Single-Site deploy.
 
 - services:
+    container_backup:
+      enabled: true
     css:
       enabled: true
       shared: true
@@ -18,6 +20,9 @@
       enabled: true
       shared: true
     dashboard:
+      enabled: true
+      shared: true
+    email:
       enabled: true
       shared: true
     logout:
@@ -28,42 +33,73 @@
     matomo:
       enabled: true
       shared: true
+    litellm:
+      enabled: true
+      shared: true
     sso:
       enabled: true
       shared: true
     prometheus:
       enabled: true
       shared: true
-- server:
-    domains:
-      canonical:
-        - blog.{{ DOMAIN_PRIMARY }}
-        - biberblog.{{ DOMAIN_PRIMARY }}
-        - biber.blog.{{ DOMAIN_PRIMARY }}
-  services:
+    tor:
+      enabled: true
+    hermes:
+      enabled: true
+      shared: true
+    openclaw:
+      enabled: true
+      shared: true
+- services:
+    container_backup:
+      enabled: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
     wordpress:
       multisite:
         enabled: true
     css:
       enabled: false
-      shared: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
     discourse:
       enabled: false
-      shared: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
     dashboard:
+      enabled: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
+    email:
       enabled: false
       shared: false
     logout:
       enabled: false
-      shared: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
     mariadb:
-      shared: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
     matomo:
+      enabled: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
+    litellm:
       enabled: false
       shared: false
     sso:
       enabled: false
-      shared: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
     prometheus:
       enabled: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
+    tor:
+      enabled: true
+    hermes:
+      enabled: false
       shared: false
+    openclaw:
+      enabled: false
+      shared: false
+  addons:
+    activitypub:
+      enabled: false
+  server:
+    domains:
+      canonical:
+        - blog.{{ DOMAIN_PRIMARY }}
+        - biberblog.{{ DOMAIN_PRIMARY }}
+        - biber.blog.{{ DOMAIN_PRIMARY }}

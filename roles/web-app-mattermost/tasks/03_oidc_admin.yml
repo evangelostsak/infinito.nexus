@@ -1,0 +1,23 @@
+---
+# include-gated: when: MATTERMOST_OIDC_ENABLED
+- name: "🔎 Mattermost | Check administrator auth service"
+  database_query:
+    config: "{{ lookup('database', application_id) }}"
+    query_file: "{{ role_path }}/files/sql/select/user/authservice.sql"
+    named_args:
+      email: "{{ lookup('users', 'administrator').email }}"
+    expect_rows: true
+    mask_values: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
+  register: mm_admin_authservice
+  changed_when: false
+
+- when: (mm_admin_authservice.rows[0][0] | default('') | trim) != 'gitlab'
+  block:
+    - name: "🔄 Mattermost | Convert administrator to gitlab SSO auth"
+      database_query:
+        config: "{{ lookup('database', application_id) }}"
+        query_file: "{{ role_path }}/files/sql/update/user-to-gitlab-auth.sql"
+        named_args:
+          authdata: "{{ lookup('users', 'administrator').uid }}"
+          email: "{{ lookup('users', 'administrator').email }}"
+        mask_values: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"

@@ -1,13 +1,12 @@
 {% include 'roles/sys-svc-compose/templates/base.yml.j2' %}
 
-  application:
-{% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+  {% set service_name = 'bookwyrm' %}
+  {{ service_name }}:
+    {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
     command: >-
       bash -c '
-        /venv/bin/python manage.py migrate --noinput &&
         /venv/bin/python manage.py compile_themes &&
         /venv/bin/python manage.py collectstatic --noinput &&
-        (/venv/bin/python manage.py initdb || true) &&
         /venv/bin/python -m gunicorn bookwyrm.wsgi:application --bind 0.0.0.0:{{ container_port }}
       '
     {{ lookup('template', 'roles/sys-svc-container/templates/build.yml.j2') | indent(4) }}
@@ -16,32 +15,44 @@
         BOOKWYRM_VERSION:    "{{ BOOKWYRM_VERSION }}"
         BOOKWYRM_REPOSITORY: "{{ BOOKWYRM_REPOSITORY }}"
         BOOKWYRM_REF:        "{{ BOOKWYRM_REF }}"
-    image: "{{ BOOKWYRM_CUSTOM_IMAGE }}"
-    container_name: "{{ BOOKWYRM_CONTAINER }}"
-    hostname: "{{ BOOKWYRM_HOSTNAME }}"
-    ports:
-      - "{{ DOCKER_BIND_HOST }}:{{ lookup('config', application_id, 'services.bookwyrm.ports.local.http') }}:{{ container_port }}"
-    volumes:
-      - 'data:/app/data'
-      - 'media:/app/media'
-{% include 'roles/sys-svc-container/templates/healthcheck/curl.yml.j2' %}
-{{ lookup('container_depends_on', application_id) }}
-{% include 'roles/sys-svc-container/templates/networks.yml.j2' %}
+    {{ lookup('container_image', application_id, 'bookwyrm', version=BOOKWYRM_REF) }}
+    {{ lookup('compose_only', 'container_name', BOOKWYRM_CONTAINER) }}
+    hostname: "{{ container_hostname }}"
+    {{ lookup('container_ports', ['bookwyrm', 'http', DOCKER_BIND_HOST]) | indent(4) }}
+    {{ lookup('container_volumes', service_name) | indent(4) }}
+    {{ lookup('container_healthcheck', service_name) | indent(4) }}
+    {{ lookup('container_depends_on', application_id, extra={
+  'migrate': {'condition': 'service_completed_successfully'},
+}) | indent(4) }}
+    {{ lookup('container_networks') | indent(4) }}
 
-  worker:
-{% include 'roles/sys-svc-container/templates/base.yml.j2' %}
-    image: "{{ BOOKWYRM_CUSTOM_IMAGE }}"
-    container_name: "{{ BOOKWYRM_WORKER_CONTAINER }}"
+  {% set service_name = 'worker' %}
+  {{ service_name }}:
+    {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+    {{ lookup('container_image', application_id, 'worker', version=BOOKWYRM_REF) }}
+    {{ lookup('compose_only', 'container_name', BOOKWYRM_WORKER_CONTAINER) }}
     command: "/venv/bin/celery -A celerywyrm worker -l INFO"
-    pull_policy: never
-    volumes:
-      - 'data:/app/data'
-      - 'media:/app/media'
-{{ lookup('container_depends_on', application_id) }}
-{% include 'roles/sys-svc-container/templates/networks.yml.j2' %}
+    {{ lookup('compose_only', 'pull_policy', 'never') }}
+    {{ lookup('container_volumes', service_name) | indent(4) }}
+    {{ lookup('container_depends_on', application_id, extra={
+  'migrate': {'condition': 'service_completed_successfully'},
+}) | indent(4) }}
+    {{ lookup('container_networks') | indent(4) }}
 
-{{ lookup('applications') | compose_volumes(
-    application_id,
-    extra_volumes={'data': {'name': BOOKWYRM_DATA_VOLUME}, 'media': {'name': BOOKWYRM_MEDIA_VOLUME}}
-) }}
-{% include 'roles/sys-svc-compose/templates/networks.yml.j2' %}
+  {% set service_name = 'migrate' %}
+  {% set docker_restart_policy = 'on-failure' %}
+  {{ service_name }}:
+    {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+    {{ lookup('container_image', application_id, 'migrate', version=BOOKWYRM_REF) }}
+    {{ lookup('compose_only', 'container_name', BOOKWYRM_MIGRATE_CONTAINER) }}
+    command: >-
+      bash -c '
+        /venv/bin/python manage.py migrate --noinput &&
+        /venv/bin/python manage.py initdb
+      '
+    {{ lookup('compose_only', 'pull_policy', 'never') }}
+    {{ lookup('container_depends_on', application_id) | indent(4) }}
+    {{ lookup('container_networks') | indent(4) }}
+
+{{ lookup('compose_volumes') }}
+{{ lookup('compose_networks') }}

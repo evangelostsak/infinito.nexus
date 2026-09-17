@@ -1,7 +1,7 @@
 ---
 galaxy_info:
   author: Kevin Veen-Birkenbach
-  description: Persistent SSH agent setup for GNOME Wayland sessions with SSH configuration pulled from Git.
+  description: Persistent systemd user-service SSH agent for Wayland desktops, with the .ssh config synced from Git
   license: Infinito.Nexus Community License (Non-Commercial)
   company: |
     Kevin Veen-Birkenbach

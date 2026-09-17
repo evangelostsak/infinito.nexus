@@ -12,11 +12,11 @@ The orchestrator in [builder.py](../builder.py) iterates the registry in [__init
 ## File Naming 🏷️
 
 - A handler module name MUST match the lowercase of the variable it owns:
-  - `INFINITO_CONTAINER` -> `infinito_container.py`
-  - `INFINITO_GHCR_MIRROR_PREFIX` -> `infinito_ghcr_mirror_prefix.py`
+  - `INFINITO_CONTAINER` -> `infinito/container.py`
+  - `INFINITO_GHCR_MIRROR_PREFIX` -> `infinito/ghcr_mirror_prefix.py`
 - The `infinito_` prefix in the filename MUST be present iff the owned key carries the `INFINITO_` prefix.
 - Aggregate handlers (one helper call resolves several keys at once) MUST take the singular topic name without a key suffix.
-  Example: `infinito_inventory.py` resolves `INFINITO_INVENTORY_DIR`, `INFINITO_INVENTORY_FILE`, and `INFINITO_INVENTORY_HOST_VARS_FILE` from one `scripts/inventory/resolve.sh` invocation.
+  Example: `infinito/inventory.py` resolves `INFINITO_INVENTORY_DIR`, `INFINITO_INVENTORY_FILE`, and `INFINITO_INVENTORY_HOST_VARS_FILE` from one `scripts/inventory/resolve.sh` invocation.
 - The trivial static passthroughs live in two collector files: `passthrough.py` (always emitted) and `gha_passthrough.py` (emitted only when `ctx.on_gha` is true).
 
 ## Module Shape 📐
@@ -36,8 +36,7 @@ KEY = "INFINITO_..."
 COMMENT = "<single-line per-key comment, mirrors default.env style>"
 
 
-def apply(eb: EnvBuilder, ctx: BuildContext) -> None:
-    ...
+def apply(eb: EnvBuilder, ctx: BuildContext) -> None: ...
 ```
 
 - `KEY` MUST be the owned variable's name.
@@ -50,7 +49,12 @@ def apply(eb: EnvBuilder, ctx: BuildContext) -> None:
 
 - A handler MUST NOT import another handler.
   Cross-handler data flows through `eb.get(...)` / `eb.set(...)` only.
-- A handler MAY import from [parser.py](../parser.py), [runtime.py](../runtime.py), and stdlib.
+- A handler MAY import stdlib, [parser.py](../parser.py), [runtime.py](../runtime.py), and any repo module whose own import closure is stdlib-only.
+  The whole closure MUST import and run on the bare bootstrap python, before any dependency is installed.
+  `utils.cache.files` and [yaml_bootstrap.py](../../yaml_bootstrap.py) qualify; `utils.cache.yaml` does not, because it imports PyYAML.
+  Read SPOT files with `utils.cache.files.read_text` plus `utils.yaml_bootstrap.load_block` or a stdlib line parse.
+  `load_block` accepts block mappings, block lists and string scalars only, and raises `BootstrapYamlError` on everything else, so a SPOT file read this way MUST stay inside that subset.
+  [test_bare_bootstrap.py](../../../tests/integration/meta/env/test_bare_bootstrap.py) enforces this by running the generator with every non-stdlib import blocked.
 - A handler MUST NOT import from [writer.py](../writer.py) or [builder.py](../builder.py) at runtime.
   The `EnvBuilder` and `BuildContext` types MAY be referenced under `TYPE_CHECKING` for annotations only.
 

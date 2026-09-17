@@ -1,0 +1,23 @@
+---
+cdn_out:
+  type: bind
+  source: "{{ lookup('nginx', 'directories.data.cdn') }}"
+  mounts:
+    - service: build
+      target: /out
+
+cdn_pkgsrc:
+  type: bind
+  source: "{{ [ lookup('container', 'web-svc-cdn', 'directories.volumes'), 'pkgsrc' ] | path_join }}"
+  read_only: true
+  mounts:
+    - service: build
+      target: /pkgsrc
+
+cdn_build_script:
+  type: config
+  source: "{{ [ lookup('container', 'web-svc-cdn', 'directories.volumes'), 'build_assets.sh' ] | path_join }}"
+  mode: "0555"
+  mounts:
+    - service: build
+      target: /build_assets.sh

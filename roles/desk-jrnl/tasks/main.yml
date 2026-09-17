@@ -1,6 +1,4 @@
 ---
-- name: install jrnl
-  package:
-    name:
-      - jrnl
-    state: present
+- name: 📦 install jrnl
+  package_install:
+    id: jrnl

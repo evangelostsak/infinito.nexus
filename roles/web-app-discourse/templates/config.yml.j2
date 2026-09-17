@@ -1,3 +1,4 @@
+{# nocheck: comments-valid - vendored upstream Discourse app.yml; all inline docs intentional #}
 templates:
 {% if lookup('database', application_id, 'local') %}
   - "templates/postgres.template.yml"
@@ -62,13 +63,13 @@ env:
   DISCOURSE_DEVELOPER_EMAILS:       {{ lookup('users', 'administrator').email }}
 
   # Set Logo
-  {% if service_provider.platform.logo | bool %}
+{% if service_provider.platform.logo | length > 0 %}
   DISCOURSE_LOGO_URL:       "{{ service_provider.platform.logo  }}"
   DISCOURSE_LOGO_SMALL_URL: "{{ service_provider.platform.logo  }}"
-  {% endif %}
+{% endif %}
 
-  {% set email = lookup('email', application_id) %}
-  {% if email.enabled | bool %}
+{% set email = lookup('email', application_id) %}
+{% if email.enabled | bool %}
   # SMTP ADDRESS, username, and password are required
   # WARNING the char '#' in SMTP password can cause problems!
   DISCOURSE_SMTP_ADDRESS:           {{ email.host }}
@@ -79,7 +80,7 @@ env:
   DISCOURSE_SMTP_FORCE_TLS:         {{ email.tls }}
   DISCOURSE_SMTP_DOMAIN:            {{ email.domain }}
   DISCOURSE_NOTIFICATION_EMAIL:     {{ email['from'] }}
-  {% endif %}
+{% endif %}
 
   # Database Configuration
   DISCOURSE_DB_USERNAME: {{ lookup('database', application_id, 'username') }}
@@ -89,6 +90,10 @@ env:
 
   # Redis Configuration
   DISCOURSE_REDIS_HOST: {{ DISCOURSE_REDIS_HOST }}
+  DISCOURSE_REDIS_PORT: {{ DISCOURSE_REDIS_PORT }}
+{% if DISCOURSE_REDIS_PASSWORD | length > 0 %}
+  DISCOURSE_REDIS_PASSWORD: "{{ DISCOURSE_REDIS_PASSWORD }}"
+{% endif %}
 
   ## If you added the Lets Encrypt template, uncomment below to get a free SSL certificate
   #LETSENCRYPT_ACCOUNT_EMAIL: administrator@veen.world
@@ -132,10 +137,10 @@ hooks:
         cd: $home/plugins
         cmd:
 {% for plugin_name, plugin_config in DISCOURSE_PLUGINS.items() %}
-{% if plugin_config.enabled %}
+{% if plugin_config.enabled and plugin_config.source != 'bundled' %}
           - git clone --depth=1 https://github.com/discourse/{{ plugin_name }}.git
 {% endif %}
-{% endfor %}     
+{% endfor %}
 
 {% if DISCOURSE_LDAP_ENABLED | bool %}
           - git clone --depth=1 --branch {{ DISCOURSE_LDAP_AUTH_PLUGIN_REF }} {{ DISCOURSE_LDAP_AUTH_PLUGIN_REPOSITORY }}
@@ -160,10 +165,10 @@ run:
   - exec: rails r "SiteSetting.username_change_period = 0" # Deactivate changing of username
 
   # OIDC Activation
-  - exec: rails r "SiteSetting.openid_connect_enabled = true"
   - exec: rails r "SiteSetting.openid_connect_discovery_document = '{{OIDC.CLIENT.DISCOVERY_DOCUMENT}}'"
   - exec: rails r "SiteSetting.openid_connect_client_id = '{{ OIDC.CLIENT.ID }}'"         
-  - exec: rails r "SiteSetting.openid_connect_client_secret = '{{ OIDC.CLIENT.SECRET }}'"     
+  - exec: rails r "SiteSetting.openid_connect_client_secret = '{{ OIDC.CLIENT.SECRET }}'"
+  - exec: rails r "SiteSetting.openid_connect_enabled = true"
   - exec: rails r "SiteSetting.openid_connect_rp_initiated_logout_redirect = '{{ DISCOURSE_OIDC_LOGOUT_REDIRECT_URL }}'"
   - exec: rails r "SiteSetting.openid_connect_allow_association_change = false"
   - exec: rails r "SiteSetting.openid_connect_rp_initiated_logout = true"
@@ -220,4 +225,16 @@ run:
 
 docker_args:
   - --network={{ DISCOURSE_NETWORK }}
+{% if DISCOURSE_REDIS_SHARED | bool %}
+  - --network={{ DISCOURSE_REDIS_NETWORK }}
+{% endif %}
+{% if DISCOURSE_DATABASE_IS_SHARED | bool %}
+  - --network={{ DISCOURSE_PG_NETWORK }}
+{% endif %}
+{% if DISCOURSE_LITELLM_ENABLED | bool %}
+  - --network={{ DISCOURSE_LITELLM_NETWORK }}
+{% endif %}
+{% for extra_host in lookup('container_extra_hosts', entries_only=True, wantlist=True) %}
+  - --add-host={{ extra_host }}
+{% endfor %}
   - --name={{ DISCOURSE_CONTAINER }}

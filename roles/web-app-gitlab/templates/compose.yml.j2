@@ -1,30 +1,133 @@
 {% include 'roles/sys-svc-compose/templates/base.yml.j2' %}
+  {% set service_name = GITLAB_WEBSERVICE_SERVICE_NAME %}
+  {{ service_name }}:
+    {{ lookup('compose_only', 'container_name', GITLAB_WEBSERVICE_CONTAINER) }}
+    {{ lookup('container_image', application_id, service_name) }}
+    {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+    environment:
+      CONFIG_TEMPLATE_DIRECTORY: "/var/opt/gitlab/config/templates"
+      CONFIG_DIRECTORY: "/srv/gitlab/config"
+      GITLAB_WEBSERVER: "PUMA"
+      ACTION_CABLE_IN_APP: "true"
+    command: ["/scripts/wait-for-deps", "/scripts/process-wrapper"]
+    {{ lookup('container_healthcheck', service_name) | indent(4) }}
+    {{ lookup('container_depends_on', application_id, extra={
+  GITLAB_MIGRATIONS_SERVICE_NAME: {'condition': 'service_completed_successfully'},
+}) | indent(4) }}
+    {{ lookup('container_volumes', service_name) | indent(4) }}
+    {{ lookup('container_networks', provider_self_alias=False) | indent(4) }}
 
-  gitlab:
-    image: "{{ GITLAB_CUSTOM_IMAGE }}"
-    hostname: '{{ GITLAB_HOSTNAME }}'
-    container_name:  "{{ GITLAB_CONTAINER }}"
-    pull_policy: never
+  {% set service_name = GITLAB_WORKHORSE_SERVICE_NAME %}
+  {{ service_name }}:
+    {{ lookup('compose_only', 'container_name', GITLAB_WORKHORSE_CONTAINER) }}
+    {{ lookup('container_image', application_id, service_name) }}
+    {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+    environment:
+      CONFIG_TEMPLATE_DIRECTORY: "/var/opt/gitlab/config/templates"
+      CONFIG_DIRECTORY: "/srv/gitlab/config"
+      GITLAB_WORKHORSE_AUTH_BACKEND: "http://{{ GITLAB_WEBSERVICE_SERVICE_NAME }}:{{ GITLAB_WEBSERVICE_PORT }}"
+      GITLAB_WORKHORSE_EXTRA_ARGS: "-cableBackend http://{{ GITLAB_WEBSERVICE_SERVICE_NAME }}:{{ GITLAB_WEBSERVICE_PORT }}"
+    command: ["/scripts/start-workhorse"]
+    {{ lookup('container_healthcheck', service_name) | indent(4) }}
+    {{ lookup('container_ports', ['gitlab', 'http', DOCKER_BIND_HOST]) | indent(4) }}
+    {{ lookup('container_depends_on', application_id, extra={
+  GITLAB_WEBSERVICE_SERVICE_NAME: {'condition': 'service_started'},
+  GITLAB_SIDEKIQ_SERVICE_NAME: {'condition': 'service_started'},
+}) | indent(4) }}
+    {{ lookup('container_volumes', service_name) | indent(4) }}
+    {{ lookup('container_networks') | indent(4) }}
+
+  {% set service_name = GITLAB_SIDEKIQ_SERVICE_NAME %}
+  {{ service_name }}:
+    {{ lookup('compose_only', 'container_name', GITLAB_SIDEKIQ_CONTAINER) }}
+    {{ lookup('container_image', application_id, service_name) }}
+    {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+    environment:
+      CONFIG_TEMPLATE_DIRECTORY: "/var/opt/gitlab/config/templates"
+      CONFIG_DIRECTORY: "/srv/gitlab/config"
+    command: ["/scripts/wait-for-deps", "/scripts/process-wrapper"]
+    {{ lookup('container_healthcheck', service_name) | indent(4) }}
+    {{ lookup('container_depends_on', application_id, extra={
+  GITLAB_MIGRATIONS_SERVICE_NAME: {'condition': 'service_completed_successfully'},
+  GITLAB_WEBSERVICE_SERVICE_NAME: {'condition': 'service_started'},
+}) | indent(4) }}
+    {{ lookup('container_volumes', service_name) | indent(4) }}
+    {{ lookup('container_networks', provider_self_alias=False) | indent(4) }}
+
+  {% set service_name = GITLAB_GITALY_SERVICE_NAME %}
+  {{ service_name }}:
+    {{ lookup('compose_only', 'container_name', GITLAB_GITALY_CONTAINER) }}
+    {{ lookup('container_image', application_id, service_name) }}
+    {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+    environment:
+      CONFIG_TEMPLATE_DIRECTORY: "/etc/gitaly/templates"
+    {{ lookup('container_healthcheck', service_name) | indent(4) }}
+    {{ lookup('container_depends_on', application_id) | indent(4) }}
+    {{ lookup('container_volumes', service_name) | indent(4) }}
+    {{ lookup('container_networks', provider_self_alias=False) | indent(4) }}
+
+  {% set service_name = GITLAB_SHELL_SERVICE_NAME %}
+  {{ service_name }}:
+    {{ lookup('compose_only', 'container_name', GITLAB_SHELL_CONTAINER) }}
+    {{ lookup('container_image', application_id, service_name) }}
+    {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+    environment:
+      CONFIG_TEMPLATE_DIRECTORY: "/srv/gitlab-config"
+      CONFIG_DIRECTORY: "/srv/gitlab-shell"
+      SSH_DAEMON: "gitlab-sshd"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/{{ GITLAB_SSHD_PORT }}"]
+      interval: 2m
+      timeout: 5s
+      retries: 3
+      start_period: 10m
+      start_interval: 5s
+    {{ lookup('container_ports', ['gitlab', 'ssh']) | indent(4) }}
+    {{ lookup('container_depends_on', application_id) | indent(4) }}
+    {{ lookup('container_volumes', service_name) | indent(4) }}
+    {{ lookup('container_networks', provider_self_alias=False) | indent(4) }}
+
+  {% set service_name = GITLAB_MIGRATIONS_SERVICE_NAME %}
+  {% set docker_restart_policy = 'on-failure' %}
+  {{ service_name }}:
+    {{ lookup('compose_only', 'container_name', GITLAB_MIGRATIONS_CONTAINER) }}
+    {{ lookup('container_image', application_id, service_name) }}
+    {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+    environment:
+      CONFIG_TEMPLATE_DIRECTORY: "/var/opt/gitlab/config/templates"
+      CONFIG_DIRECTORY: "/srv/gitlab/config"
+      BYPASS_SCHEMA_VERSION: "true"
+    command: ["/scripts/wait-for-deps", "/scripts/db-migrate"]
+    {{ lookup('container_depends_on', application_id) | indent(4) }}
+    {{ lookup('container_volumes', service_name) | indent(4) }}
+    {{ lookup('container_networks', provider_self_alias=False) | indent(4) }}
+
+  {% if GITLAB_MCP_ENABLED | bool %}
+  {% set service_name = 'gitlabmcp' %}
+  {% set docker_compose_env = [GITLAB_MCP_INSTANCE_DIR, 'upstream.env'] | path_join %}
+  {{ service_name }}:
+    {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+    {{ lookup('container_image', application_id, 'gitlabmcp') }}
     build:
-      context: .
+      context: {{ GITLAB_MCP_INSTANCE_DIR }}
       dockerfile: Dockerfile
       args:
-        GITLAB_IMAGE: "{{ GITLAB_IMAGE }}"
-        GITLAB_VERSION: "{{ GITLAB_VERSION }}"
-{% include 'roles/sys-svc-container/templates/base.yml.j2' %}
-    ports:
-      - "{{ DOCKER_BIND_HOST }}:{{ lookup('config', application_id, 'services.gitlab.ports.local.http') }}:80"
-      - "{{lookup('config', application_id, 'services.gitlab.ports.public.ssh')}}:22"
-    volumes:
-      - 'config:/etc/gitlab'
-      - 'logs:/var/log/gitlab'
-      - 'data:/var/opt/gitlab'
-    shm_size: '256m'
-{{ lookup('container_depends_on', application_id) }}
-{% include 'roles/sys-svc-container/templates/networks.yml.j2' %}
+        MCP_ADAPTER_BASE_IMAGE: {{ lookup('config', application_id, 'services.gitlabmcp.image') }}
+        MCP_ADAPTER_BASE_VERSION: "{{ lookup('config', application_id, 'services.gitlabmcp.version') }}"
+    {{ lookup('compose_only', 'container_name', GITLAB_MCP_CONTAINER) }}
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      ADAPTER_CONTRACT: {{ GITLAB_MCP_CONTRACT | to_json | to_json | replace('$', '$$') }}
+      ADAPTER_BEARER: {{ GITLAB_MCP_BEARER | to_json }}
+      ADAPTER_PORT: "{{ GITLAB_MCP_PORT }}"
+    expose:
+      - "{{ GITLAB_MCP_PORT }}"
+    {{ lookup('container_networks', own_network_only=True, provider_self_alias=False) | indent(4) }}
+  {% endif %}
 
-{{ lookup('applications') | compose_volumes(
-    application_id,
-    extra_volumes={'config': {'name': GITLAB_CONF_VOLUME}, 'data': {'name': GITLAB_DATA_VOLUME}, 'logs': {'name': GITLAB_LOGS_VOLUME}}
-) }}
-{% include 'roles/sys-svc-compose/templates/networks.yml.j2' %}
+{{ lookup('compose_volumes') }}
+{{ lookup('compose_networks') }}

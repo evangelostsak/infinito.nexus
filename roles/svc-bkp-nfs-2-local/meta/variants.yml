@@ -1,0 +1,5 @@
+---
+- services:
+    nfs-server:
+      enabled: true
+      shared: true

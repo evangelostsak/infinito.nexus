@@ -1,7 +1,7 @@
 ---
 galaxy_info:
   author: Kevin Veen-Birkenbach
-  description: Fixes incorrect lid switch behavior on Linux laptops by setting up hibernation and configuring systemd.
+  description: Power-aware systemd logind configuration for predictable laptop lid-close behavior across battery, AC, and docked states
   license: Infinito.Nexus Community License (Non-Commercial)
   company: |
     Kevin Veen-Birkenbach

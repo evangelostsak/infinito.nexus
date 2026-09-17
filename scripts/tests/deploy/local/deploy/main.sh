@@ -20,8 +20,6 @@ set -euo pipefail
 #                               apps is set, runs the entity purge
 #                               before the deploy.
 #                               Short Make alias: purge
-#   INFINITO_DEPLOY_TYPE        server | workstation | universal. Short
-#                               Make alias: type.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../../.." && pwd)"
@@ -37,6 +35,26 @@ initialize | reinstall | update) ;;
 	exit 2
 	;;
 esac
+
+TORN_DOWN_MARKER="${REPO_ROOT}/.stack-torn-down"
+if [[ "${MODE}" == "update" ]] && [[ "${PURGE}" != "true" ]] &&
+	[[ -f "${TORN_DOWN_MARKER}" ]]; then
+	cat >&2 <<-EOF
+		ERROR: refusing mode=update against a torn-down stack.
+
+		$(cat "${TORN_DOWN_MARKER}")
+
+		An update deploys onto whatever is running. With the subjects down it
+		fails on a symptom of the teardown - a missing redis, an empty database
+		- and not on whatever broke the run that left them down. Fixing that
+		symptom fixes nothing.
+
+		Re-run with purge=true to clear the entity state first, or with
+		mode=reinstall for a fresh baseline. Both remove ${TORN_DOWN_MARKER}.
+	EOF
+	exit 1
+fi
+rm -f "${TORN_DOWN_MARKER}"
 
 run_pre_purge() {
 	if [[ "${PURGE}" == "true" ]]; then
@@ -72,7 +90,7 @@ elif [[ -n "${apps:-}" ]]; then
 else
 	case "${MODE}" in
 	initialize)
-		echo "=== local full deploy (type=${INFINITO_DEPLOY_TYPE}, distro=${INFINITO_DISTRO}) ==="
+		echo "=== local full deploy (distro=${INFINITO_DISTRO}) ==="
 		target="${SCRIPT_DIR}/apps/initialize/all.sh"
 		;;
 	reinstall)

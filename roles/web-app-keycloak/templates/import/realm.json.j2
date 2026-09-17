@@ -791,6 +791,7 @@
       ]
     },
     {% include "clients/default.json.j2" %}
+{% include "clients/saml.json.j2" %}
   ],
   "clientScopes": [
     {
@@ -1091,7 +1092,7 @@
           "consentRequired": false,
           "config": {
             "introspection.token.claim": "true",
-            "access.token.claim": "true"
+            "access.token.claim": "false"
           }
         }
       ]
@@ -1488,22 +1489,6 @@
           ]
         }
       },
-{#
-      {
-        "name": "Trusted Hosts",
-        "providerId": "trusted-hosts",
-        "subType": "anonymous",
-        "subComponents": {},
-        "config": {
-          "host-sending-registration-request-must-match": [
-            "true"
-          ],
-          "desktop-uris-must-match": [
-            "true"
-          ]
-        }
-      },
-#}
       {
         "name": "Full Scope Disabled",
         "providerId": "scope",

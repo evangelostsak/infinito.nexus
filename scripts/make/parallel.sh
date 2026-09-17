@@ -48,8 +48,6 @@ declare -A target_log=()
 
 start_ts="$(date +%s)"
 
-# Concurrency throttle: launch up to ${jobs} children at a time. When
-# the active count hits the cap, drain via wait -n before spawning more.
 active=0
 to_launch=("$@")
 launch_idx=0
@@ -57,7 +55,6 @@ launch_idx=0
 drain_one() {
 	local pid=""
 	local rc=0
-	# `|| rc=$?` keeps set -e happy when a child exited non-zero.
 	wait -n -p pid || rc=$?
 	local tgt="${pid_to_target[${pid}]}"
 	target_rc["${tgt}"]="${rc}"
@@ -111,5 +108,47 @@ else
 	echo "💥  total $(format_duration "${total}")  (exit=${overall_rc})"
 fi
 echo
+
+failed_targets=()
+for tgt in "$@"; do
+	((target_rc["${tgt}"] == 0)) || failed_targets+=("${tgt}")
+done
+
+if ((${#failed_targets[@]} > 0)); then
+	for tgt in "${failed_targets[@]}"; do
+		echo "──────── output of failed target: ${tgt} ────────"
+		cat "${target_log[${tgt}]}"
+		echo "──────── end of ${tgt} ────────"
+		echo
+	done
+	echo "FAILED TARGETS: ${failed_targets[*]}"
+	echo
+fi
+
+if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+	{
+		echo "## 🚀 Parallel make targets"
+		echo
+		echo "| Target | Status | Duration |"
+		echo "|---|:---:|---:|"
+		for tgt in "$@"; do
+			if ((target_rc[${tgt}] == 0)); then
+				status="✅"
+			else
+				status="❌ exit=${target_rc[${tgt}]}"
+			fi
+			# shellcheck disable=SC2016  # backticks are markdown, not expansion
+			printf '| `%s` | %s | %s |\n' \
+				"${tgt}" "${status}" "$(format_duration "${target_dur[${tgt}]}")"
+		done
+		if ((overall_rc == 0)); then
+			printf '| **total** | ✨ | %s |\n' "$(format_duration "${total}")"
+		else
+			printf '| **total** | 💥 exit=%s | %s |\n' \
+				"${overall_rc}" "$(format_duration "${total}")"
+		fi
+		echo
+	} >>"${GITHUB_STEP_SUMMARY}"
+fi
 
 exit "${overall_rc}"

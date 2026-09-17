@@ -1,0 +1,27 @@
+---
+flags:
+  style-src-attr:
+    unsafe-inline: true # nocheck: csp-unsafe  Reason: historical, TODO: re-verify it is really required and does not open attack surface
+  script-src-elem:
+    unsafe-inline: true # nocheck: csp-unsafe  Reason: historical, TODO: re-verify it is really required and does not open attack surface
+  script-src-attr:
+    unsafe-eval: true # nocheck: csp-unsafe  Reason: historical, TODO: re-verify it is really required and does not open attack surface
+    unsafe-inline: true # nocheck: csp-unsafe  Reason: historical, TODO: re-verify it is really required and does not open attack surface
+whitelist:
+  script-src-elem:
+    - "{{ lookup('domain', 'web-svc-onlyoffice') }}"
+  font-src:
+    - "data:"
+  connect-src:
+    - "{{ lookup('domain', 'web-svc-collabora') }}"
+    - "{{ lookup('domain', 'web-app-nextcloud') }}"
+    - "{{ lookup('domain', 'web-svc-onlyoffice') }}"
+    - "*"
+  frame-src:
+    - "{{ lookup('domain', 'web-svc-collabora') }}"
+    - "{{ lookup('domain', 'web-svc-onlyoffice') }}"
+    - "*"
+  worker-src:
+    - "blob:"
+  media-src:
+    - "*"

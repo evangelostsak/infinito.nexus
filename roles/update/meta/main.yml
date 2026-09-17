@@ -1,11 +1,7 @@
 ---
 galaxy_info:
   author: Kevin Veen-Birkenbach
-  description: >-
-    Refreshes the system package index and upgrades every installed package on
-    the host. Dispatches to a per-package-family task file (arch/debian/fedora)
-    based on ansible_facts['distribution'], with Ubuntu mapped to debian and
-    CentOS mapped to fedora.
+  description: System-maintenance role for refreshing the package index and upgrading installed packages via the OS package manager
   license: Infinito.Nexus Community License (Non-Commercial)
   company: |
     Kevin Veen-Birkenbach

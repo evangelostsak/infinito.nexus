@@ -1,4 +1,6 @@
 <?php
+// nocheck: mirrored-unit-test - reads $argv, requires Friendica's autoloader and
+// queries the live hook table over PDO; a unit test would mock away the entire script
 
 /*
  * Verify a Friendica addon's _install() hooks are present in the
@@ -32,7 +34,12 @@ $addon     = $argv[1];
 $minHooks  = (int) $argv[2];
 
 require '/var/www/html/vendor/autoload.php';
-$cfg = include '/var/www/html/config/local.config.php';
+$cfgFile = getenv('FRIENDICA_CONFIG_FILE');
+if ($cfgFile === false) {
+    fwrite(STDERR, "FRIENDICA_CONFIG_FILE env missing\n");
+    exit(1);
+}
+$cfg = include $cfgFile;
 $db  = $cfg['database'];
 $h   = explode(':', $db['hostname']);
 $dsn = 'mysql:host=' . $h[0] . ';port=' . ($h[1] ?? 3306) . ';dbname=' . $db['database'];

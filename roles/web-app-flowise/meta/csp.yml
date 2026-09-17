@@ -1,0 +1,15 @@
+---
+flags:
+  script-src-elem:
+    unsafe-inline: true # nocheck: csp-unsafe  Reason: historical, TODO: re-verify it is really required and does not open attack surface
+    unsafe-eval: true # nocheck: csp-unsafe  Reason: historical, TODO: re-verify it is really required and does not open attack surface
+whitelist:
+  font-src:
+    - https://fonts.gstatic.com # nocheck: external-cdn,url  TODO: migrate to lookup('asset') or confirm the upstream app loads this CDN itself
+  style-src-elem:
+    - https://fonts.googleapis.com # nocheck: external-cdn,url  TODO: migrate to lookup('asset') or confirm the upstream app loads this CDN itself
+  script-src-elem:
+    - https://fonts.googleapis.com # nocheck: external-cdn,url  TODO: migrate to lookup('asset') or confirm the upstream app loads this CDN itself
+    - https://fonts.gstatic.com # nocheck: external-cdn,url  TODO: migrate to lookup('asset') or confirm the upstream app loads this CDN itself
+    - https://r.wdfl.co # nocheck: url
+  connect-src: []

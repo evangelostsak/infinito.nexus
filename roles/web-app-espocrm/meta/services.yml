@@ -9,6 +9,7 @@ ldap:
   bond: 1
   enabled: "{{ 'svc-db-openldap' in group_names }}"
   shared: "{{ 'svc-db-openldap' in group_names }}"
+  autocreate: true
 logout:
   bond: 1
   enabled: "{{ 'web-svc-logout' in group_names }}"
@@ -30,10 +31,16 @@ mariadb:
   enabled: true # nocheck: dynamic-flag
   shared: "{{ 'svc-db-mariadb' in group_names }}"
 espocrm:
+  modes:
+    compose:
+      enabled: true
+    swarm:
+      enabled: true
   image: espocrm/espocrm
-  version: latest
+  version: "10.0.8"
+  custom: true
   name: espocrm
-  min_storage: 8GB
+  min_storage: 470MB
   cpus: 1.5
   mem_reservation: 1.2g
   mem_limit: 2g
@@ -42,19 +49,35 @@ espocrm:
     from_name: Customer Relationship Management ({{ DOMAIN_PRIMARY }})
   maintenance_mode: false
   ports:
+    internal:
+      http: 80
+      websocket: 8080
     local:
       websocket: 4002
       http: 8040
+  healthcheck:
+    flavor: curl
+    # nocheck: healthcheck-timing-override  boots slower than the ten minute window; the value predates this default and has not been measured against it
+    start_period: 15m
   run_after:
     - web-app-keycloak
     - web-app-mailu
   lifecycle: beta
 daemon:
+  healthcheck:
+    test: ["CMD-SHELL", "test -f /var/www/html/bootstrap.php && php -r \"require '/var/www/html/bootstrap.php'; echo 'OK';\""]
+    retries: 5
+  custom: true
+  # nocheck: single-replica
+  replicas: 1
   cpus: 0.5
   mem_reservation: 0.25g
   mem_limit: 0.5g
   pids_limit: 384
 websocket:
+  custom: true
+  # nocheck: single-replica
+  replicas: 1
   cpus: 0.5
   mem_reservation: 0.25g
   mem_limit: 0.5g
@@ -70,3 +93,16 @@ prometheus:
   bond: 1
   enabled: "{{ 'web-app-prometheus' in group_names }}"
   shared: "{{ 'web-app-prometheus' in group_names }}"
+
+# nocheck: playwright-service-flag
+# nocheck: variants-coverage — sso-variant-tor requires the onion on in every variant, so the false polarity has no variant left to live in
+tor:
+  bond: 0.5
+  enabled: "{{ 'svc-net-tor' in group_names }}"
+  shared: true # nocheck: dynamic-flag
+# nocheck: dynamic-flag
+# nocheck: playwright-service-flag, dynamic-flag infrastructure backup consumer
+container_backup: # nocheck: bond-baseline backup host joins outside the variant topology
+  bond: 1
+  enabled: "{{ 'svc-bkp-volume-2-local' in group_names }}"
+  shared: true

@@ -1,7 +1,7 @@
 ---
 galaxy_info:
   author: Kevin Veen-Birkenbach
-  description: An Ansible role to redirect www subdomains to bare domains (apex). Supports Cloudflare edge redirects or local Nginx redirects.
+  description: NGINX server blocks that permanently redirect www subdomains to their non-www apex domains
   license: Infinito.Nexus Community License (Non-Commercial)
   company: |
     Kevin Veen-Birkenbach

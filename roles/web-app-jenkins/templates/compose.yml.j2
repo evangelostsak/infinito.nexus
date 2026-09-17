@@ -1,25 +1,56 @@
 {% include 'roles/sys-svc-compose/templates/base.yml.j2' %}
-  application:
+  {% set service_name = 'jenkins' %}
+  {{ service_name }}:
     {{ lookup('template', 'roles/sys-svc-container/templates/build.yml.j2') | indent(4) }}
       args:
         JENKINS_IMAGE: "{{ JENKINS_IMAGE }}"
         JENKINS_VERSION: "{{ JENKINS_VERSION }}"
-    image: "{{ JENKINS_CUSTOM_IMAGE }}"
-    container_name: {{ JENKINS_CONTAINER }}
-{% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+    {{ lookup('container_image', application_id, 'jenkins') }}
+    {{ lookup('compose_only', 'container_name', JENKINS_CONTAINER) }}
+    {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
     environment:
       JAVA_OPTS: "-Djenkins.install.runSetupWizard=false"
-      CASC_JENKINS_CONFIG: /var/jenkins_home/casc.yaml
-    ports:
-      - "{{ DOCKER_BIND_HOST }}:{{ lookup('config', application_id, 'services.jenkins.ports.local.http') }}:8080"
-    volumes:
-      - jenkins_data:/var/jenkins_home
-      - {{ JENKINS_CASC_FILE }}:/var/jenkins_home/casc.yaml:ro
-{% include 'roles/sys-svc-container/templates/healthcheck/curl.yml.j2' %}
-{% include 'roles/sys-svc-container/templates/networks.yml.j2' %}
+      CASC_JENKINS_CONFIG: {{ lookup('volume', 'web-app-jenkins', 'casc').target }}
+      {% if JENKINS_MCP_ENABLED | bool %}
+      JENKINS_MCP_TOKEN_FILE: "{{ JENKINS_MCP_TOKEN_FILE }}"
+      JENKINS_MCP_TOKEN_NAME: "{{ JENKINS_MCP_TOKEN_NAME }}"
+      JENKINS_MCP_USERNAME: "{{ JENKINS_MCP_USERNAME }}"
+      {% endif %}
+    {{ lookup('container_ports', ['jenkins', 'http', DOCKER_BIND_HOST]) | indent(4) }}
+    {{ lookup('container_volumes', service_name) | indent(4) }}
+    {{ lookup('container_healthcheck', service_name) | indent(4) }}
+    {{ lookup('container_networks') | indent(4) }}
 
-{{ lookup('applications') | compose_volumes(
-    application_id,
-    extra_volumes={'jenkins_data': {'name': JENKINS_VOLUME}}
-) }}
-{% include 'roles/sys-svc-compose/templates/networks.yml.j2' %}
+  {% if JENKINS_MCP_ENABLED | bool %}
+  {% set service_name = 'jenkinsmcp' %}
+  {% set docker_compose_env = [JENKINS_MCP_INSTANCE_DIR, 'upstream.env'] | path_join %}
+  {{ service_name }}:
+    {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+    {{ lookup('container_image', application_id, 'jenkinsmcp') }}
+    build:
+      context: {{ JENKINS_MCP_INSTANCE_DIR }}
+      dockerfile: Dockerfile
+      args:
+        MCP_ADAPTER_BASE_IMAGE: {{ lookup('config', application_id, 'services.jenkinsmcp.image') }}
+        MCP_ADAPTER_BASE_VERSION: "{{ lookup('config', application_id, 'services.jenkinsmcp.version') }}"
+    {{ lookup('compose_only', 'container_name', JENKINS_MCP_CONTAINER) }}
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      ADAPTER_CONTRACT: {{ JENKINS_MCP_CONTRACT | to_json | to_json | replace('$', '$$') }}
+      ADAPTER_BEARER: {{ JENKINS_MCP_BEARER | to_json }}
+      ADAPTER_PORT: "{{ JENKINS_MCP_PORT }}"
+      ADAPTER_UPSTREAM_AUTH_HEADER: {{ JENKINS_MCP_UPSTREAM_AUTH_HEADER | to_json }}
+      ADAPTER_UPSTREAM_AUTH_FORMAT: {{ JENKINS_MCP_UPSTREAM_AUTH_FORMAT | to_json }}
+    expose:
+      - "{{ JENKINS_MCP_PORT }}"
+    {{ lookup('container_healthcheck', 'jenkinsmcp') | indent(4) }}
+    {{ lookup('container_networks', own_network_only=True, provider_self_alias=False) | indent(4) }}
+    {{ lookup('depends_on', {'jenkins': 'service_healthy'}) }}
+  {% endif %}
+
+{{ lookup('compose_volumes') }}
+{{ lookup('compose_networks') }}

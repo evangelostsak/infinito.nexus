@@ -1,7 +1,9 @@
 """Lint guard: ``roles/<role>/meta/info.yml`` schema.
 
   * the file is OPTIONAL (a role with no descriptive metadata does not
-    grow the file);
+    grow the file), and an otherwise empty one is legal only when it
+    carries ``# nocheck: info-media``, which is the exemption for a role
+    with no upstream homepage or demo video to name;
   * file-root convention: the file's content IS the value of
     ``applications.<role>.info`` — there is NO wrapping ``info:`` key;
   * allowed top-level keys: ``logo``, ``homepage``, ``video``, ``display``;
@@ -23,7 +25,8 @@ from typing import TYPE_CHECKING
 
 import yaml as _yaml
 
-from utils.cache.files import PROJECT_ROOT
+from utils.annotations.suppress import is_suppressed_in_head
+from utils.cache.files import PROJECT_ROOT, read_text
 from utils.cache.yaml import load_yaml_any
 from utils.roles.mapping import ROLE_FILE_META_INFO, ROLE_FILE_META_MAIN
 
@@ -33,6 +36,8 @@ if TYPE_CHECKING:
 ROLES_DIR = PROJECT_ROOT / "roles"
 
 _ALLOWED_INFO_KEYS: frozenset[str] = frozenset({"logo", "homepage", "video", "display"})
+
+_INFO_MEDIA_RULE = "info-media"
 
 _FORBIDDEN_GALAXY_INFO_KEYS: frozenset[str] = frozenset(
     {"logo", "homepage", "video", "display"}
@@ -65,6 +70,8 @@ def _validate_meta_info(path: Path) -> list[str]:
     except _yaml.YAMLError as exc:
         return [f"YAML parse error: {exc}"]
     if parsed in (None, {}):
+        if is_suppressed_in_head(read_text(str(path)).splitlines(), _INFO_MEDIA_RULE):
+            return []
         return ["file is empty (delete the file or add at least one allowed field)"]
     if not isinstance(parsed, dict):
         return [f"top-level must be a mapping; got {type(parsed).__name__}"]
@@ -90,9 +97,6 @@ def _validate_meta_info(path: Path) -> list[str]:
         if not isinstance(logo, dict):
             problems.append("`logo` must be a mapping")
         elif "class" in logo and not isinstance(logo["class"], str):
-            # Empty strings are intentionally allowed — several roles use
-            # `class: ''` as a placeholder for "no icon yet"; the dashboard
-            # consumer falls back to a default when the string is empty.
             problems.append("`logo.class`, when present, must be a string")
 
     for str_field in ("homepage", "video"):
@@ -111,7 +115,7 @@ def _validate_meta_main_no_forbidden(path: Path) -> list[str]:
     try:
         parsed = load_yaml_any(str(path), default_if_missing={})
     except _yaml.YAMLError:
-        return []  # main-galaxy-schema lint reports parse errors separately
+        return []
     if not isinstance(parsed, dict):
         return []
     galaxy_info = parsed.get("galaxy_info")
@@ -163,8 +167,10 @@ class TestMetaMainHasNoMigratedFields(unittest.TestCase):
 
         rel = lambda p: p.relative_to(PROJECT_ROOT)  # noqa: E731
         lines = [
-            f"{len(offenders)} meta/main.yml file(s) still carry "
-            f"forbidden keys under galaxy_info:"
+            (
+                f"{len(offenders)} meta/main.yml file(s) still carry "
+                f"forbidden keys under galaxy_info:"
+            )
         ]
         for path, problems in sorted(offenders.items()):
             lines.append(f"  - {rel(path)}:")

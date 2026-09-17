@@ -1,5 +1,0 @@
----
-credentials:
-  cmk_password:
-    description: Initial password for the Checkmk site administrator (cmkadmin), seeded via CMK_PASSWORD on first container start.
-    algorithm: alphanumeric

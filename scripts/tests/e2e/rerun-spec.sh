@@ -7,6 +7,10 @@
 #     .env file.
 #   - The application under test is still running.
 #
+# The stage base comes from INFINITO_PLAYWRIGHT_STAGE_BASE_DIR (env handler);
+# DiD nodes run this without a generated .env, so the script falls back to
+# the same role-vars SPOT the handler reads.
+#
 # This script intentionally does NOT re-render .env. It restages the
 # role-local Playwright files (spec + companions) from the repo and reruns
 # Playwright via the same container image the deploy-time runner uses.
@@ -29,8 +33,18 @@ role_playwright_dir="$repo_root/roles/$role/files/playwright"
 spec_src="$role_playwright_dir/playwright.spec.js"
 services_yml="$repo_root/roles/test-e2e-playwright/meta/services.yml"
 
-stage_base="${TEST_E2E_PLAYWRIGHT_STAGE_BASE_DIR:-/tmp/test-e2e-playwright}"
-reports_base="${TEST_E2E_PLAYWRIGHT_REPORTS_BASE_DIR:-/var/lib/infinito/logs/test-e2e-playwright}"
+stage_base="${INFINITO_PLAYWRIGHT_STAGE_BASE_DIR:-}"
+if [[ -z "$stage_base" ]]; then
+	stage_base="$(awk '$1 == "TEST_E2E_PLAYWRIGHT_STAGE_BASE_DIR:" {gsub(/"/, "", $2); print $2}' \
+		"$repo_root/roles/test-e2e-playwright/vars/main.yml")"
+fi
+[[ -n "$stage_base" ]] || {
+	echo "TEST_E2E_PLAYWRIGHT_STAGE_BASE_DIR missing in roles/test-e2e-playwright/vars/main.yml (SPOT)" >&2
+	exit 2
+}
+# shellcheck source=/dev/null
+source <(grep -E '^INFINITO_PLAYWRIGHT_REPORTS_BASE_DIR=' "$repo_root/.env")
+reports_base="${INFINITO_PLAYWRIGHT_REPORTS_BASE_DIR:?INFINITO_PLAYWRIGHT_REPORTS_BASE_DIR missing in .env (SPOT)}"
 
 stage_dir="$stage_base/$role"
 reports_dir="$reports_base/$role"
@@ -66,10 +80,11 @@ for role_js in "$role_playwright_dir"/*.js; do
 	[[ -f "$role_js" ]] || continue
 	cp "$role_js" "$stage_dir/tests/$(basename "$role_js")"
 done
-helper_src="$repo_root/roles/test-e2e-playwright/files/service-gating.js"
-if [[ -f "$helper_src" ]]; then
-	cp "$helper_src" "$stage_dir/tests/service-gating.js"
-fi
+for helper_src in "$repo_root/roles/test-e2e-playwright/files"/*.js; do
+	[[ -f "$helper_src" ]] || continue
+	[[ "$(basename "$helper_src")" == "playwright.config.js" ]] && continue
+	cp "$helper_src" "$stage_dir/tests/$(basename "$helper_src")"
+done
 personas_dir="$repo_root/roles/test-e2e-playwright/files/personas"
 if [[ -d "$personas_dir" ]]; then
 	mkdir -p "$stage_dir/tests/personas/utils"
@@ -95,10 +110,25 @@ done
 
 cmd="${TEST_E2E_PLAYWRIGHT_COMMAND:-npm install --no-fund --no-audit && npx playwright test${*:+ $*}}"
 
+if [[ "${TEST_E2E_PLAYWRIGHT_NETWORK_HOST:-}" == "true" ]]; then
+	net_args=(--network host)
+	proxy_host="127.0.0.1"
+else
+	net_args=(--add-host=host.docker.internal:host-gateway)
+	proxy_host="host.docker.internal"
+fi
+
+proxy_env=()
+if grep -qiE '\.onion' "$env_file"; then
+	default_proxy="socks5://${proxy_host}:${INFINITO_TOR_SOCKS_PORT:?INFINITO_TOR_SOCKS_PORT unset (built by the env handler from svc-net-tor services.tor.ports.local.socks)}"
+	proxy_env=(-e "PLAYWRIGHT_PROXY=${PLAYWRIGHT_PROXY:-$default_proxy}")
+fi
+
 exec docker run --rm \
 	--ipc=host --shm-size=1g \
-	--add-host=host.docker.internal:host-gateway \
+	"${net_args[@]}" \
 	--env-file "$env_file" \
+	"${proxy_env[@]}" \
 	-v "$stage_dir:/e2e" \
 	-v "$stage_dir/volume:/volume" \
 	-v "$reports_dir:/reports" \

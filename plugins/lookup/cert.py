@@ -11,10 +11,9 @@ from pathlib import Path
 from typing import Any
 
 from ansible.errors import AnsibleError
+from ansible.plugins.loader import lookup_loader
 from ansible.plugins.lookup import LookupBase
 
-from utils.cache.applications import get_merged_applications
-from utils.cache.domains import get_merged_domains
 from utils.templating.jinja import render_strict
 from utils.tls_common import (
     AVAILABLE_FLAVORS,
@@ -82,8 +81,6 @@ class LookupModule(LookupBase):
     def run(self, terms, variables: dict | None = None, **kwargs):
         variables = variables or {}
 
-        # New API: want-path is the 2nd positional term.
-        # Legacy 'want=' kwarg is ignored (no error) to keep tasks noise-free.
         if not terms or len(terms) not in (1, 2):
             raise AnsibleError(
                 "cert: one or two terms required: (domain|application_id[, want_path])"
@@ -95,16 +92,12 @@ class LookupModule(LookupBase):
 
         want = as_str(terms[1]).strip() if len(terms) == 2 else ""
 
-        domains = get_merged_domains(
-            variables=variables,
-            roles_dir=kwargs.get("roles_dir"),
-            templar=getattr(self, "_templar", None),
-        )
-        applications = get_merged_applications(
-            variables=variables,
-            roles_dir=kwargs.get("roles_dir"),
-            templar=getattr(self, "_templar", None),
-        )
+        domains = lookup_loader.get(
+            "domains", loader=self._loader, templar=getattr(self, "_templar", None)
+        ).run([], variables=variables)[0]
+        applications = lookup_loader.get(
+            "applications", loader=self._loader, templar=getattr(self, "_templar", None)
+        ).run([], variables=variables)[0]
         enabled_default = require(variables, "TLS_ENABLED", (bool, int))
         mode_default = as_str(require(variables, "TLS_MODE", str))
 
@@ -189,10 +182,8 @@ class LookupModule(LookupBase):
                 cert_file = _join(ss_base, cert_id, LE_FULLCHAIN)
                 key_file = _join(ss_base, cert_id, LE_PRIVKEY)
 
-                # STRICT: list[str] only
                 san_domains = _require_current_play_domains_all_strict(variables)
 
-                # Ensure primary domain is always included
                 if primary_domain:
                     san_domains = uniq_preserve([primary_domain, *san_domains])
 

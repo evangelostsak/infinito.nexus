@@ -1,0 +1,88 @@
+name: "🧹 Images: Cleanup GHCR"
+run-name: "🧹 Images: Cleanup GHCR (Private)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      ghcr_namespace:
+        description: "🏛️ GHCR namespace/org (default: repository owner)"
+        required: false
+        type: string
+        default: ""
+      ghcr_prefix:
+        description: "🏷️ Package name prefix to delete (default: mirror)"
+        required: false
+        type: string
+        default: "mirror"
+      visibility:
+        description: "👁️ Visibility filter: only these packages are deleted"
+        required: false
+        type: choice
+        default: "private"
+        options:
+          - private
+          - public
+          - internal
+      dry_run:
+        description: "🧪 Dry-run: list what would be deleted without deleting it"
+        required: false
+        type: boolean
+        default: true
+      token:
+        description: "🔑 Classic PAT with delete:packages. Empty: the default GITHUB_TOKEN"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    name: 🗑️ Delete private GHCR mirror packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: ⬇️ Checkout
+        uses: actions/checkout@v7.0.0
+
+      - name: 🔍 Resolve GHCR namespace and repository
+        id: vars
+        shell: bash
+        run: |
+          set -euo pipefail
+          ghcr_namespace="${{ inputs.ghcr_namespace }}"
+          if [[ -z "${ghcr_namespace}" ]]; then
+            ghcr_namespace="$(scripts/meta/resolve/repository/owner.sh)"
+          fi
+          ghcr_repository="$(scripts/meta/resolve/repository/name.sh)"
+          echo "ghcr_namespace=${ghcr_namespace,,}" >> "$GITHUB_OUTPUT"
+          echo "ghcr_repository=${ghcr_repository}" >> "$GITHUB_OUTPUT"
+
+      - name: 🔧 Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: ▶️ Run mirror cleanup
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ inputs.token != '' && inputs.token || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          EXTRA_ARGS=()
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            EXTRA_ARGS+=( --dry-run )
+          fi
+
+          python -m cli.contributing.mirror.cleanup \
+            --ghcr-namespace "${{ steps.vars.outputs.ghcr_namespace }}" \
+            --ghcr-prefix    "${{ steps.vars.outputs.ghcr_repository }}/${{ inputs.ghcr_prefix }}" \
+            --visibility     "${{ inputs.visibility }}" \
+            "${EXTRA_ARGS[@]}"

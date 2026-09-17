@@ -1,0 +1,15 @@
+---
+flags:
+  script-src-attr:
+    unsafe-eval: true # nocheck: csp-unsafe  Reason: historical, TODO: re-verify it is really required and does not open attack surface
+  script-src-elem:
+    unsafe-inline: true # nocheck: csp-unsafe  Reason: historical, TODO: re-verify it is really required and does not open attack surface
+    unsafe-eval: true # nocheck: csp-unsafe  Reason: historical, TODO: re-verify it is really required and does not open attack surface
+  style-src-attr:
+    unsafe-inline: true # nocheck: csp-unsafe  Reason: historical, TODO: re-verify it is really required and does not open attack surface
+whitelist:
+  connect-src:
+    - "*"
+  script-src-elem:
+    - "{{ lookup('config', 'web-app-matrix', 'domains.canonical.element') }}"
+    - https://cdn.jsdelivr.net # nocheck: external-cdn,url  TODO: migrate to lookup('asset') or confirm the upstream app loads this CDN itself

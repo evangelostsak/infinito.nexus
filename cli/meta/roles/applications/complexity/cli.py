@@ -1,0 +1,416 @@
+"""Argument parsing, sorting/filtering and the ``main`` entry point."""
+
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from typing import TYPE_CHECKING, Any
+
+from utils import PROJECT_ROOT
+from utils.cache.applications import get_variants
+from utils.roles.applications.topics import overridden_providers
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+from .filter import FilterError, compile_predicate
+from .model import (
+    TESTED_LIFECYCLES,
+    ComplexityRow,
+    attach_siblings,
+    compute_complexity_rows,
+    compute_variant_complexity_rows,
+)
+from .render import render_json, render_string, render_table, render_yaml
+
+_SORT_KEYS = {
+    "embeds": lambda r: r.embeds,
+    "consumers": lambda r: r.consumers,
+    "weight": lambda r: r.weight,
+    "name": lambda r: r.name,
+    "random": lambda r: r.random,
+    "variant": lambda r: r.variant if r.variant is not None else -1,
+    "variants": lambda r: r.variants,
+    "id": lambda r: r.id,
+    "covered_by": lambda r: r.covered_by,
+    "lifecycle": lambda r: r.lifecycle,
+    "compose": lambda r: int(r.compose),
+    "swarm": lambda r: int(r.swarm),
+    "host": lambda r: int(r.host),
+    "stack": lambda r: int(r.stack),
+    "test_compose": lambda r: int(r.test_compose),
+    "test_swarm": lambda r: int(r.test_swarm),
+    "test_host": lambda r: int(r.test_host),
+    "integrated": lambda r: int(r.integrated),
+    "clone": lambda r: int(r.clone),
+}
+
+
+def _row_fields(r: ComplexityRow) -> dict[str, Any]:
+    """The ``--filter`` view of a row: scalar fields keyed by name. ``row`` and
+    ``jobs`` are excluded (not assigned until after filtering)."""
+    return {
+        "name": r.name,
+        "lifecycle": r.lifecycle,
+        "dna": r.dna,
+        "clone": r.clone,
+        "embeds": r.embeds,
+        "embeds_direct": r.embeds_direct,
+        "consumers": r.consumers,
+        "consumers_direct": r.consumers_direct,
+        "weight": r.weight,
+        "variants": r.variants,
+        "id": r.id,
+        "covered_by": r.covered_by,
+        "variant": r.variant if r.variant is not None else -1,
+        "siblings": len(r.siblings),
+        "random": r.random,
+        "compose": r.compose,
+        "swarm": r.swarm,
+        "host": r.host,
+        "stack": r.stack,
+        "test_compose": r.test_compose,
+        "test_swarm": r.test_swarm,
+        "test_host": r.test_host,
+        "integrated": r.integrated,
+    }
+
+
+FILTER_FIELDS = frozenset(
+    _row_fields(ComplexityRow("", 0, [], 0, [], 0, [], 0, [], 0, "", []))
+)
+
+_DIRECTIONS = {"asc": False, "desc": True}
+
+DEFAULT_SORT = "asc embeds"
+
+
+def parse_lifecycles(tokens: list[str] | None) -> set[str] | None:
+    """Normalise ``--lifecycles`` tokens into a lowercase set, splitting each on
+    commas and whitespace so ``'alpha,beta'`` and ``'alpha beta'`` are
+    equivalent. ``None`` (flag absent) stays ``None`` so the model falls back to
+    its built-in default envelope."""
+    if not tokens:
+        return None
+    values = {
+        part.strip().lower()
+        for token in tokens
+        for part in re.split(r"[,\s]+", token)
+        if part.strip()
+    }
+    return values or None
+
+
+def parse_sort_spec(spec: str) -> list[tuple[str, bool]]:
+    """Parse a ``--sort`` value into an ordered ``[(column, reverse), ...]``.
+
+    Args:
+        spec: Comma-separated clauses, each a column optionally prefixed or
+            suffixed with a direction, e.g. ``"desc embeds, asc total"``.
+            Direction defaults to ``asc``.
+
+    Returns:
+        Clauses in significance order (first = primary sort key). ``reverse``
+        is True for ``desc``.
+
+    Raises:
+        ValueError: An unknown token, or a clause naming no column.
+    """
+    out: list[tuple[str, bool]] = []
+    for clause in spec.split(","):
+        tokens = clause.split()
+        if not tokens:
+            continue
+        reverse = False
+        column: str | None = None
+        for token in tokens:
+            low = token.lower()
+            if low in _DIRECTIONS:
+                reverse = _DIRECTIONS[low]
+            elif low in _SORT_KEYS:
+                column = low
+            else:
+                raise ValueError(
+                    f"invalid --sort token {token!r}; expected a direction "
+                    f"(asc/desc) or a column ({', '.join(_SORT_KEYS)})"
+                )
+        if column is None:
+            raise ValueError(f"--sort clause {clause!r} names no column")
+        out.append((column, reverse))
+    if not out:
+        raise ValueError("--sort requires at least one column")
+    return out
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="infinito meta roles applications complexity",
+        description=(
+            "For every application role, list its transitively resolved "
+            "shared-service dependencies and the resulting complexity score."
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
+    p.add_argument(
+        "--sort",
+        default=DEFAULT_SORT,
+        metavar="SPEC",
+        help=(
+            "Sort order: comma-separated columns, each optionally prefixed "
+            "with a direction, applied in order so later columns break ties "
+            "of earlier ones. e.g. 'desc embeds, asc weight' sorts by embeds "
+            "descending, then by weight ascending within equal embeds. "
+            "Direction defaults to 'asc'. Columns: 'embeds' (service deps the "
+            "role embeds), 'consumers' (roles that embed this one), "
+            "'weight' (sum of direct + transitive in both directions), "
+            "'name' (alphabetical), 'random' (the per-row nonce), 'variant' / "
+            "'variants' (the variant index / the role's variant count), 'id' "
+            "and 'covered_by' (assigned after the coverage pass, so "
+            "sorting by them reorders within the ties of the more significant "
+            f"keys). Default: {DEFAULT_SORT!r}."
+        ),
+    )
+    p.add_argument(
+        "--variant",
+        action="store_true",
+        help=(
+            "List each role's meta/variants.yml variants individually "
+            "instead of the whole role: one row per variant, its 'embeds' "
+            "recomputed from that variant's enabled+shared service flags. "
+            "The 'variant' column shows the variant index. Roles keep their "
+            "role-level consumer counts."
+        ),
+    )
+    p.add_argument(
+        "--filter",
+        default=None,
+        metavar="EXPR",
+        help=(
+            "Boolean filter expression over row fields. Operators: '%%' "
+            "(contains / set membership), '==' '!=' '<' '>' '<=' '>=', "
+            "combined with 'and' 'or' 'xor' 'not' and parentheses; set "
+            "literals like {alpha,beta} are allowed. Fields: name, "
+            "lifecycle, base, embeds, embeds_direct, consumers, "
+            "consumers_direct, weight, variants, id, covered_by, "
+            "variant, siblings, random, compose, swarm, stack. "
+            "compose/swarm/stack are "
+            "booleans (compare with ==true / ==false). 'stack' is True when the "
+            "role ships its own compose stack template. "
+            "String compares are "
+            "case-"
+            "insensitive. A bare word (no operator) means 'name %% word'. "
+            "e.g. 'lifecycle == beta and weight > 50', "
+            '"lifecycle %% {alpha,pre} or name %% ldap". Scores are '
+            "computed against the full role tree first; only the rendered "
+            "rows are filtered."
+        ),
+    )
+    p.add_argument(
+        "--lifecycles",
+        nargs="+",
+        default=None,
+        metavar="STAGE",
+        help=(
+            "Lifecycle envelope the 'compose'/'swarm' columns treat as "
+            "CI-tested: a role scores True for a mode only if its "
+            "meta/services.yml lifecycle is in this set (and it is invokable "
+            "and not skipped for the mode). Comma- or whitespace-separated, "
+            "e.g. 'beta rc' or 'alpha,beta'. Omitted: the "
+            f"built-in default ({' '.join(sorted(TESTED_LIFECYCLES))})."
+        ),
+    )
+    p.add_argument(
+        "--no-group-names",
+        action="store_true",
+        help=(
+            "Ignore services whose enabled/shared flag is the "
+            "'<role>' in group_names Jinja form. Only literal `true` "
+            "flags count as deps."
+        ),
+    )
+    p.add_argument(
+        "--format",
+        choices=("cli", "json", "yaml", "string"),
+        default="cli",
+        help=(
+            "Output format. 'cli' (default) shows counts only (name, "
+            "embeds, consumers, base, siblings) for a compact terminal "
+            "view. 'json' / 'yaml' emit the full payload including the "
+            "resolved service, consumer and sibling role lists. 'string' "
+            "prints only the role names, one per line (feed into `make "
+            "roundtrip apps=...`)."
+        ),
+    )
+    p.add_argument(
+        "-s",
+        "--symbol",
+        action="store_true",
+        help=(
+            "Compact emoji view of the 'cli' table: emoji-only headers, "
+            "true/false as ✅/❌, and lifecycle stages as symbols. No effect on "
+            "the json/yaml/string formats."
+        ),
+    )
+    p.add_argument(
+        "-L",
+        "--level",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "Limit recursion depth: 1 = direct deps only, 2 = direct + "
+            "their direct, ... Default: unbounded (full closure)."
+        ),
+    )
+    return p
+
+
+def _apply_sort(rows: list[ComplexityRow], sort_spec: list[tuple[str, bool]]) -> None:
+    """Stable multi-key sort in place: ``name`` as the deterministic least-
+    significant fallback, then each spec clause from least to most significant.
+    Run once before ``_mark_covered`` (where the ``id``/``covered_by`` keys are
+    still unset and sort as a no-op) and once after (where they order rows by
+    the just-computed coverage)."""
+    rows.sort(key=_SORT_KEYS["name"])
+    for column, reverse in reversed(sort_spec):
+        rows.sort(key=_SORT_KEYS[column], reverse=reverse)
+
+
+def _mark_covered(
+    rows: list[ComplexityRow],
+    overridden: Mapping[tuple[str, int], set[str]] | None = None,
+    variant_counts: Mapping[str, int] | None = None,
+) -> list[ComplexityRow]:
+    """Assign each sorted row its numeric ``id`` (its position in sort order)
+    and its ``covered_by`` via a greedy set-cover: the first row is green, and
+    every later row's ``covered_by`` is the (1-based) ``id`` of the first
+    already-green predecessor OF A DIFFERENT ROLE that actually embeds this row
+    (its role name is in the predecessor's transitive ``services``); a row with
+    no such predecessor becomes green itself, leaving ``covered_by`` at the
+    sentinel ``0`` (no real ``id`` is 0). Because ``services`` is the
+    transitive closure, embedding the row pulls its whole subtree, so the
+    coverer's deploy genuinely brings this row up. Two variants of the same
+    role never cover each other (a role never embeds itself).
+
+    Coverage is variant-aware: only a row's variant-0 (or whole-role) form can
+    be covered, because a coverer only ever brings a provider up at variant 0.
+    Which coverers do that is not a property of the coverer alone. A job's
+    round index is the primary role's own variant index, and
+    ``inventory.planner.plan_dev_inventory_matrix`` hands each pulled-in
+    dependency ``round_index if round_index < its variant count else 0``. So a
+    variant N row covers a provider exactly when N lands past that provider's
+    last variant and falls back to 0 - which is why ``variant_counts`` is
+    needed here: N alone does not say it.
+
+    A variant that dictates a provider's own config is not evidence about that
+    provider in any variant: the deploy ran a configuration the provider does
+    not declare. ``overridden`` maps ``(role, variant)`` to the providers it
+    overrides, and such a pair never covers those providers.
+
+    Args:
+        rows: the complexity rows, in ranking order.
+        overridden: ``{(role, variant): {provider role, ...}}``, or None when
+            no variant dictates anything.
+        variant_counts: ``{role: how many variants it declares}``. A role
+            missing from it counts as one, which is the whole-role case.
+    """
+    demands = overridden or {}
+    counts = variant_counts or {}
+
+    def pulls_at_zero(coverer_variant: int | None, provider: str) -> bool:
+        index = coverer_variant or 0
+        return index == 0 or index >= counts.get(provider, 1)
+
+    green: list[tuple[int, str, int | None, set[str]]] = []
+    out: list[ComplexityRow] = []
+    for index, row in enumerate(rows, start=1):
+        coverable = row.variant in (None, 0)
+        coverer = (
+            next(
+                (
+                    gid
+                    for gid, gname, gvariant, gset in green
+                    if gname != row.name
+                    and row.name in gset
+                    and row.name not in demands.get((gname, gvariant or 0), ())
+                    and pulls_at_zero(gvariant, row.name)
+                ),
+                None,
+            )
+            if coverable
+            else None
+        )
+        if coverer is None:
+            green.append((index, row.name, row.variant, set(row.services)))
+        out.append(row._replace(id=index, covered_by=coverer or 0))
+    return out
+
+
+def main(argv: list[str] | None = None) -> int:
+    p = build_parser()
+    args = p.parse_args(argv)
+
+    if args.level is not None and args.level < 1:
+        p.error("--level/-L must be >= 1")
+
+    try:
+        sort_spec = parse_sort_spec(args.sort)
+    except ValueError as exc:
+        p.error(str(exc))
+        return 2
+
+    roles_dir = PROJECT_ROOT / "roles"
+    if not roles_dir.is_dir():
+        print(f"Error: roles directory not found: {roles_dir}", file=sys.stderr)
+        return 1
+
+    lifecycles = parse_lifecycles(args.lifecycles)
+
+    if args.variant:
+        rows = compute_variant_complexity_rows(
+            roles_dir,
+            include_group_names=not args.no_group_names,
+            max_level=args.level,
+            lifecycles=lifecycles,
+        )
+    else:
+        rows = compute_complexity_rows(
+            roles_dir,
+            include_group_names=not args.no_group_names,
+            max_level=args.level,
+            lifecycles=lifecycles,
+        )
+
+    if args.filter:
+        try:
+            predicate = compile_predicate(args.filter, FILTER_FIELDS)
+        except FilterError as exc:
+            p.error(f"--filter: {exc}")
+        rows = [r for r in rows if predicate(_row_fields(r))]
+        rows = attach_siblings(rows)
+
+    _apply_sort(rows, sort_spec)
+    rows = _mark_covered(
+        rows,
+        overridden_providers(roles_dir),
+        {
+            role: max(1, len(entries or [{}]))
+            for role, entries in get_variants(roles_dir=roles_dir).items()
+        },
+    )
+    _apply_sort(rows, sort_spec)
+
+    rows = [r._replace(row=line) for line, r in enumerate(rows, start=1)]
+
+    if args.format == "json":
+        rendered = render_json(rows)
+    elif args.format == "yaml":
+        rendered = render_yaml(rows)
+    elif args.format == "string":
+        rendered = render_string(rows)
+    else:
+        rendered = render_table(rows, symbol=args.symbol)
+    if rendered:
+        print(rendered)
+    return 0

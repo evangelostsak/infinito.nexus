@@ -1,6 +1,6 @@
 #
 # Shared helpers for indexing application domains from
-# applications[app_id].server.domains.{canonical,aliases}.
+# applications[app_id].domains.{canonical,aliases}.
 #
 # Supports canonical/aliases being:
 # - str
@@ -19,6 +19,8 @@ from ansible.errors import AnsibleError
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+_DOMAIN_INDEX_CACHE: dict[tuple, dict[str, str]] = {}
 
 
 def _norm_domain(value: Any) -> str:
@@ -60,17 +62,13 @@ def iter_app_domains(app_conf: Any, include_aliases: bool = True) -> Iterable[st
     Yield all canonical + alias domains from an app config.
 
     Expected structure:
-      applications[app_id].server.domains.canonical
-      applications[app_id].server.domains.aliases
+      applications[app_id].domains.canonical
+      applications[app_id].domains.aliases
     """
     if not isinstance(app_conf, dict):
         return []
 
-    server = app_conf.get("server", {})
-    if not isinstance(server, dict):
-        return []
-
-    domains = server.get("domains", {})
+    domains = app_conf.get("domains", {})
     if not isinstance(domains, dict):
         return []
 
@@ -89,9 +87,19 @@ def build_domain_index(
     """
     Build a case-insensitive domain -> application_id index.
     If the same domain appears in multiple apps (case-insensitive), raises an error.
+
+    Cached keyed on (applications fingerprint, include_aliases); the result is
+    returned as-is, so callers MUST treat it as read-only.
     """
     if not isinstance(applications, dict):
         raise AnsibleError("application_domain_index: applications must be a dict")
+
+    from utils.cache.base import _fingerprint_mapping
+
+    cache_key = (_fingerprint_mapping(applications), bool(include_aliases))
+    cached = _DOMAIN_INDEX_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
 
     index: dict[str, str] = {}
     collisions: dict[str, set[str]] = {}
@@ -116,7 +124,12 @@ def build_domain_index(
             + "; ".join(parts)
         )
 
+    _DOMAIN_INDEX_CACHE[cache_key] = index
     return index
+
+
+def _reset() -> None:
+    _DOMAIN_INDEX_CACHE.clear()
 
 
 def resolve_app_id_for_domain(
@@ -125,7 +138,7 @@ def resolve_app_id_for_domain(
 ) -> str | None:
     """
     Resolve application_id for a given domain (canonical or alias) by scanning
-    applications[*].server.domains.
+    applications[*].domains.
 
     Returns None if not found.
     """

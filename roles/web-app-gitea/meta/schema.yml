@@ -1,6 +1,0 @@
----
-credentials:
-  native_metrics_token:
-    description: Bearer token authorizing scrape requests to Gitea's /metrics endpoint.
-    algorithm: token
-    validation: non_empty_string

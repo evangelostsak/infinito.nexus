@@ -1,26 +1,50 @@
 {% include 'roles/sys-svc-compose/templates/base.yml.j2' %}
-  application:
+  {% set service_name = 'pretix' %}
+  {{ service_name }}:
     {{ lookup('template', 'roles/sys-svc-container/templates/build.yml.j2') | indent(4) }}
       args:
         PRETIX_IMAGE: "{{ PRETIX_IMAGE }}"
         PRETIX_VERSION: "{{ PRETIX_VERSION }}"
         PRETIX_OIDC_PLUGIN_VERSION: "{{ PRETIX_OIDC_PLUGIN_VERSION }}"
-    image: "{{ PRETIX_IMAGE_CUSTOM }}"
-    container_name: "{{ PRETIX_CONTAINER }}"
+    {{ lookup('container_image', application_id, 'pretix') }}
+    {{ lookup('compose_only', 'container_name', PRETIX_CONTAINER) }}
     hostname: '{{ PRETIX_HOSTNAME}}'
     command: ["all"]
-    ports:
-      - "{{ DOCKER_BIND_HOST }}:{{ lookup('config', application_id, 'services.pretix.ports.local.http') }}:{{ container_port }}"
-    volumes:
-      - 'data:/data'
-      - 'config:/etc/pretix'
-{% include 'roles/sys-svc-container/templates/healthcheck/curl.yml.j2' %}
-{% include 'roles/sys-svc-container/templates/base.yml.j2' %}
-{{ lookup('container_depends_on', application_id) }}
-{% include 'roles/sys-svc-container/templates/networks.yml.j2' %}
+    {{ lookup('container_ports', ['pretix', 'http', DOCKER_BIND_HOST]) | indent(4) }}
+    {{ lookup('container_volumes', service_name) | indent(4) }}
+    {{ lookup('container_healthcheck', service_name) | indent(4) }}
+    {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+    {{ lookup('container_depends_on', application_id) | indent(4) }}
+    {{ lookup('container_networks') | indent(4) }}
 
-{{ lookup('applications') | compose_volumes(
-    application_id,
-    extra_volumes={'config': {'name': PRETIX_CONFIG_VOLUME}, 'data': {'name': PRETIX_DATA_VOLUME}}
-) }}
-{% include 'roles/sys-svc-compose/templates/networks.yml.j2' %}
+  {% if PRETIX_MCP_ENABLED | bool %}
+  {% set service_name = PRETIX_MCP_SERVICE_KEY %}
+  {{ service_name }}:
+    {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
+    {{ lookup('container_image', application_id, 'pretixmcp') }}
+    build:
+      context: {{ PRETIX_MCP_INSTANCE_DIR }}
+      dockerfile: Dockerfile
+      args:
+        MCP_ADAPTER_BASE_IMAGE: {{ lookup('config', application_id, 'services.pretixmcp.image') }}
+        MCP_ADAPTER_BASE_VERSION: "{{ lookup('config', application_id, 'services.pretixmcp.version') }}"
+    {{ lookup('compose_only', 'container_name', PRETIX_MCP_CONTAINER) }}
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      ADAPTER_CONTRACT: {{ PRETIX_MCP_CONTRACT | to_json | to_json | replace('$', '$$') }}
+      ADAPTER_BEARER: {{ PRETIX_MCP_BEARER | to_json }}
+      ADAPTER_PORT: "{{ PRETIX_MCP_PORT }}"
+      ADAPTER_UPSTREAM_KEY: {{ PRETIX_MCP_UPSTREAM_KEY | to_json }}
+      ADAPTER_UPSTREAM_AUTH_HEADER: {{ PRETIX_MCP_UPSTREAM_AUTH_HEADER | to_json }}
+      ADAPTER_UPSTREAM_AUTH_FORMAT: {{ PRETIX_MCP_UPSTREAM_AUTH_FORMAT | to_json }}
+    expose:
+      - "{{ PRETIX_MCP_PORT }}"
+    {{ lookup('container_networks', own_network_only=True, provider_self_alias=False) | indent(4) }}
+  {% endif %}
+
+{{ lookup('compose_volumes') }}
+{{ lookup('compose_networks') }}

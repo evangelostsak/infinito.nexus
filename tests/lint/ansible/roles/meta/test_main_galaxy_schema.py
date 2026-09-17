@@ -21,9 +21,9 @@ project-owned files (``meta/services.yml.<entity>``), not in the Galaxy slot.
 On top of the generic schema this lint also enforces two project-wide
 canonical exact-values to stop drift: ``galaxy_info.company`` is one
 specific block-scalar string (Kevin Veen-Birkenbach /
-https://www.veen.world) and ``galaxy_info.platforms`` is one specific
-5-distro list (ArchLinux/Debian/EL/Fedora/Ubuntu, each ``versions:
-[all]``). Both fields had accumulated ~10 variants each (quoting style,
+https://www.veen.world) and ``galaxy_info.platforms`` is the platform list
+built from the ``meta/distros.yml`` SPOT (ArchLinux/Debian/EL/Fedora/Ubuntu,
+each ``versions: [all]``). Both fields had accumulated ~10 variants each (quoting style,
 Unicode hyphen, typos, ``Linux``/``GenericLinux``/``Any`` platform names)
 before standardisation. The two-line company form keeps the parsed value
 under Galaxy's 50-character limit on ``company`` so galaxy-importer
@@ -51,6 +51,7 @@ import yaml as _yaml
 
 from utils.cache.files import PROJECT_ROOT
 from utils.cache.yaml import load_yaml_any
+from utils.distros import galaxy_platforms
 from utils.roles.mapping import ROLE_FILE_META_MAIN
 
 if TYPE_CHECKING:
@@ -59,7 +60,6 @@ if TYPE_CHECKING:
 ROLES_DIR = PROJECT_ROOT / "roles"
 
 
-# Ansible Galaxy spec — top-level keys allowed in meta/main.yml.
 _ALLOWED_TOPLEVEL: frozenset[str] = frozenset(
     {
         "galaxy_info",
@@ -70,7 +70,6 @@ _ALLOWED_TOPLEVEL: frozenset[str] = frozenset(
     }
 )
 
-# Ansible Galaxy spec — sub-keys allowed under galaxy_info.
 _ALLOWED_GALAXY_INFO: frozenset[str] = frozenset(
     {
         "role_name",
@@ -89,10 +88,6 @@ _ALLOWED_GALAXY_INFO: frozenset[str] = frozenset(
     }
 )
 
-# Hard-required galaxy_info fields. Missing any of these fails the lint.
-# `min_ansible_version` and `platforms` are required by Ansible Galaxy when
-# publishing — Infinito.Nexus does not publish, but enforcing them here keeps
-# every role consistent and prevents new roles landing without the fields.
 _REQUIRED_GALAXY_INFO: frozenset[str] = frozenset(
     {
         "author",
@@ -103,19 +98,9 @@ _REQUIRED_GALAXY_INFO: frozenset[str] = frozenset(
     }
 )
 
-# Project canonical exact-value for `galaxy_info.company`. Block-scalar with
-# a trailing newline (`|` style → 'clip' chomping).
 _CANONICAL_COMPANY: str = "Kevin Veen-Birkenbach\nhttps://www.veen.world\n"
 
-# Project canonical exact-value for `galaxy_info.platforms`. `EL` is the
-# Galaxy umbrella name covering RHEL/CentOS/Rocky/Alma.
-_CANONICAL_PLATFORMS: list[dict[str, Any]] = [
-    {"name": "ArchLinux", "versions": ["all"]},
-    {"name": "Debian", "versions": ["all"]},
-    {"name": "EL", "versions": ["all"]},
-    {"name": "Fedora", "versions": ["all"]},
-    {"name": "Ubuntu", "versions": ["all"]},
-]
+_CANONICAL_PLATFORMS: list[dict[str, Any]] = galaxy_platforms()
 
 
 def _meta_main_paths() -> list[Path]:
@@ -259,8 +244,10 @@ class TestRoleMetaMainGalaxySchema(unittest.TestCase):
 
         rel = lambda p: p.relative_to(PROJECT_ROOT)  # noqa: E731
         lines = [
-            f"{len(offenders)} role meta/main.yml file(s) violate the Ansible "
-            f"Galaxy schema:",
+            (
+                f"{len(offenders)} role meta/main.yml file(s) violate the Ansible "
+                f"Galaxy schema:"
+            ),
         ]
         for path, problems in sorted(offenders.items()):
             lines.append(f"  - {rel(path)}:")

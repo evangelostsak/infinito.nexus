@@ -1,3 +1,6 @@
 ---
-qdrant: qdrant_data
-flowise: flowise_data
+flowise_data:
+  type: volume
+  mounts:
+    - service: flowise
+      target: /root/.flowise

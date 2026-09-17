@@ -1,0 +1,6 @@
+---
+- name: 📦 install epson printer and scanner drivers
+  package_install:
+    id: epson-multiprinter
+
+- include_tasks: utils/once/flag.yml

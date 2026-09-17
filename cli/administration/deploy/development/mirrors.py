@@ -14,22 +14,11 @@ def _require_env(name: str) -> str:
     return str(val).strip()
 
 
-def _require_bool_env(name: str) -> bool:
-    raw = _require_env(name)
-    if raw == "true":
-        return True
-    if raw == "false":
-        return False
-    raise RuntimeError(
-        f"Environment variable {name} must be 'true' or 'false', got {raw!r}"
-    )
+def should_use_mirrors() -> bool:
+    """True iff image references should be rewritten to the GHCR mirror."""
+    from .profile import Profile
 
-
-def should_use_mirrors_on_ci() -> bool:
-    """
-    Mirrors are enabled strictly based on INFINITO_RUNNING_ON_GITHUB.
-    """
-    return _require_bool_env("INFINITO_RUNNING_ON_GITHUB")
+    return Profile().image_mirror_enabled()
 
 
 def _exec_env() -> dict[str, str]:
@@ -68,16 +57,18 @@ def generate_ci_mirrors_file(compose, *, inventory_dir: str) -> str:
     cmd = [
         "bash",
         "-lc",
-        "set -euo pipefail; "
-        f"mkdir -p {shlex.quote(inv_root)}; "
-        '"${PYTHON:-python3}" -m cli.contributing.mirror.resolver '
-        f"--repo-root {shlex.quote(repo_root)} "
-        f"--ghcr-namespace {shlex.quote(ghcr_namespace)} "
-        f"--ghcr-repository {shlex.quote(ghcr_repository)} "
-        f"--ghcr-prefix {shlex.quote(ghcr_prefix)} "
-        f"> {shlex.quote(mirrors_path)}; "
-        f"echo '[init] mirrors generated:' {shlex.quote(mirrors_path)}; "
-        f"wc -l {shlex.quote(mirrors_path)}",
+        (
+            "set -euo pipefail; "
+            f"mkdir -p {shlex.quote(inv_root)}; "
+            '"${PYTHON:-python3}" -m cli.contributing.mirror.resolver '
+            f"--repo-root {shlex.quote(repo_root)} "
+            f"--ghcr-namespace {shlex.quote(ghcr_namespace)} "
+            f"--ghcr-repository {shlex.quote(ghcr_repository)} "
+            f"--ghcr-prefix {shlex.quote(ghcr_prefix)} "
+            f"> {shlex.quote(mirrors_path)}; "
+            f"echo '[init] mirrors generated:' {shlex.quote(mirrors_path)}; "
+            f"wc -l {shlex.quote(mirrors_path)}"
+        ),
     ]
 
     compose.exec(

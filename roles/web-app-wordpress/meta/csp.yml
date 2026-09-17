@@ -1,0 +1,23 @@
+---
+flags:
+  style-src-attr:
+    unsafe-inline: true # nocheck: csp-unsafe  Reason: historical, TODO: re-verify it is really required and does not open attack surface
+  script-src-elem:
+    unsafe-inline: true # nocheck: csp-unsafe  Reason: historical, TODO: re-verify it is really required and does not open attack surface
+  script-src-attr:
+    unsafe-eval: true # nocheck: csp-unsafe  Reason: historical, TODO: re-verify it is really required and does not open attack surface
+whitelist:
+  worker-src:
+    - "blob:"
+  font-src:
+    - "data:"
+    - https://fonts.bunny.net
+  script-src-elem:
+    - https://cdn.gtranslate.net
+    - https://translate.google.com
+    - "{{ lookup('domain', 'web-app-wordpress') }}"
+  style-src-elem:
+    - https://fonts.bunny.net
+  frame-src:
+    - "blob:"
+    - "*"

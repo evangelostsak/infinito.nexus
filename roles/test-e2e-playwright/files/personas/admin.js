@@ -1,15 +1,31 @@
 const { test, expect } = require("@playwright/test");
+const { resolveTimeout } = require("../timeouts");
 const {
   normalizeUrl,
   readEnv,
   safeIsEnabled,
+  gotoOnion,
   performKeycloakLogin,
   clickOidcLoginLink,
   inAppLogout,
   assertUnauthenticatedLanding,
   assertCspInjections,
   runRoleInteraction,
+  hostnameOf,
+  LOGIN_CONTROL_NAME,
 } = require("./utils");
+
+async function readCredentialRejection(page) {
+  const text = await page
+    .locator(
+      "[role='alert']:visible, .alert:visible, .error:visible, .v-alert:visible, [class*='error']:visible",
+    )
+    .first()
+    .innerText({ timeout: resolveTimeout(2_000) })
+    .catch(() => "");
+  const line = text.trim().split("\n")[0].slice(0, 200);
+  return /invalid|incorrect|wrong|failed|denied|do(es)? not match/i.test(line) ? line : "";
+}
 
 async function runAdminFlow(page, opts = {}) {
   if ((process.env.PERSONA_ADMINISTRATOR_BLOCKED || "").toLowerCase() === "true") {
@@ -42,9 +58,10 @@ async function runAdminFlow(page, opts = {}) {
 
   const oidcEnabled = safeIsEnabled("sso");
 
-  await page.goto(`${appBaseUrl}/`, { waitUntil: "domcontentloaded" }).catch(() => {});
+  await gotoOnion(page,`${appBaseUrl}/`, { waitUntil: "domcontentloaded" }).catch(() => {});
 
   let keycloakRoundTripCompleted = false;
+  let authPage = page;
   if (adminUsername && adminPassword) {
     if (oidcEnabled && !page.url().includes("openid-connect/auth")) {
       const strictLogin = page
@@ -55,10 +72,10 @@ async function runAdminFlow(page, opts = {}) {
         .getByRole("link", { name: /log\s*in|sign\s*in|sso|admin/i })
         .or(page.getByRole("button", { name: /log\s*in|sign\s*in|sso|admin/i }))
         .first();
-      await clickOidcLoginLink(page, strictLogin, looseLogin);
+      authPage = (await clickOidcLoginLink(page, strictLogin, looseLogin)) || page;
     }
-    if (page.url().includes("openid-connect/auth")) {
-      await performKeycloakLogin(page, adminUsername, adminPassword, canonicalDomain);
+    if (authPage.url().includes("openid-connect/auth")) {
+      await performKeycloakLogin(authPage, adminUsername, adminPassword, canonicalDomain);
       keycloakRoundTripCompleted = true;
     }
   }
@@ -68,12 +85,16 @@ async function runAdminFlow(page, opts = {}) {
     const base = appBaseUrl.replace(/\/$/, "");
     const tryNativeLogin = async (probeTimeout = 5_000) => {
       const passwordField = page.locator("input[type='password']:visible").first();
-      if (!(await passwordField.isVisible({ timeout: probeTimeout }).catch(() => false))) {
+      const passwordReady = await passwordField
+        .waitFor({ state: "visible", timeout: resolveTimeout(probeTimeout) })
+        .then(() => true)
+        .catch(() => false);
+      if (!passwordReady) {
         return false;
       }
       const usernameField = page
         .locator(
-          "input[name='username']:visible, input[name='email']:visible, input[name='login']:visible, input[type='email']:visible, input[autocomplete='username']:visible",
+          "input[name='username']:visible, input[name='email']:visible, input[name='login']:visible, input[name$='[username]']:visible, input[name$='[email]']:visible, input[type='email']:visible, input[autocomplete='username']:visible",
         )
         .first();
       if (await usernameField.isVisible().catch(() => false)) {
@@ -81,23 +102,23 @@ async function runAdminFlow(page, opts = {}) {
       }
       await passwordField.fill(adminNativePassword || adminPassword).catch(() => {});
       await passwordField.press("Enter").catch(() => {});
-      await page.waitForLoadState("networkidle").catch(() => {});
-      if (await passwordField.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await page.waitForLoadState("networkidle", { timeout: resolveTimeout(15_000) }).catch(() => {});
+      if (await passwordField.isVisible().catch(() => false)) {
         await page
           .getByRole("button", { name: /log\s*in|sign\s*in|login|submit/i })
           .or(page.locator("button[type='submit'], input[type='submit']"))
           .first()
-          .click()
+          .click({ timeout: resolveTimeout(30_000) })
           .catch(() => {});
-        await page.waitForLoadState("networkidle").catch(() => {});
+        await page.waitForLoadState("networkidle", { timeout: resolveTimeout(15_000) }).catch(() => {});
       }
       return true;
     };
 
-    let loginAttempted = await tryNativeLogin(10_000);
+    let loginAttempted = await tryNativeLogin(15_000);
     if (!loginAttempted) {
       for (const loginPath of ["/login", "/admin/", "/admin"]) {
-        await page.goto(`${base}${loginPath}`, { waitUntil: "domcontentloaded" }).catch(() => {});
+        await gotoOnion(page,`${base}${loginPath}`, { waitUntil: "domcontentloaded" }).catch(() => {});
         if (await tryNativeLogin()) {
           loginAttempted = true;
           break;
@@ -108,7 +129,7 @@ async function runAdminFlow(page, opts = {}) {
     const passwordStillVisible = await page
       .locator("input[type='password']:visible")
       .first()
-      .isVisible({ timeout: 2_000 })
+      .isVisible()
       .catch(() => false);
     nativeLoginCompleted =
       loginAttempted &&
@@ -125,7 +146,7 @@ async function runAdminFlow(page, opts = {}) {
       .or(surface.getByRole("link", { name: /(profile|user.?menu|^menu$|signed\s*in)/i }))
       .or(
         surface.locator(
-          "[data-region='user-menu-toggle'], .user-menu-toggle, .usermenu, [aria-label*='user menu' i], [aria-label*='account' i], [data-testid*='user' i], a[href*='logout' i], a[href*='end_session' i], a[href*='end-session' i]",
+          "[data-region='user-menu-toggle'], .user-menu-toggle, .usermenu, [aria-label*='user menu' i], [aria-label*='account' i], [data-testid*='user' i]:not(input):not(textarea):not(select), a[href*='logout' i], a[href*='end_session' i], a[href*='end-session' i]",
         ),
       );
   let adminReachedAuthenticated =
@@ -134,7 +155,8 @@ async function runAdminFlow(page, opts = {}) {
   if (!adminReachedAuthenticated) {
     adminReachedAuthenticated = await adminAuthMarker(page)
       .first()
-      .isVisible({ timeout: 15_000 })
+      .waitFor({ state: "visible", timeout: resolveTimeout(15_000) })
+      .then(() => true)
       .catch(() => false);
   }
   if (!adminReachedAuthenticated) {
@@ -142,7 +164,7 @@ async function runAdminFlow(page, opts = {}) {
       if (frame === page.mainFrame()) continue;
       const fUrl = frame.url();
       if (!fUrl || fUrl === "about:blank") continue;
-      if (await adminAuthMarker(frame).first().isVisible({ timeout: 1_000 }).catch(() => false)) {
+      if (await adminAuthMarker(frame).first().isVisible().catch(() => false)) {
         adminReachedAuthenticated = true;
         break;
       }
@@ -154,7 +176,7 @@ async function runAdminFlow(page, opts = {}) {
       const fUrl = frame.url();
       if (!fUrl || fUrl === "about:blank") continue;
       if (/openid-connect\/auth|\/oauth2\/(?:start|sign_in|callback)/.test(fUrl)) continue;
-      if (canonicalDomain && fUrl.includes(canonicalDomain)) {
+      if (canonicalDomain && hostnameOf(fUrl) === canonicalDomain) {
         adminReachedAuthenticated = true;
         break;
       }
@@ -164,14 +186,38 @@ async function runAdminFlow(page, opts = {}) {
       }
     }
   }
+  if (adminReachedAuthenticated) {
+    const loginControl = page
+      .getByRole("link", { name: LOGIN_CONTROL_NAME })
+      .or(page.getByRole("button", { name: LOGIN_CONTROL_NAME }))
+      .first();
+    const loginStillVisible = await loginControl
+      .waitFor({ state: "hidden", timeout: resolveTimeout(12_000) })
+      .then(() => false)
+      .catch(() => loginControl.isVisible().catch(() => false));
+    if (loginStillVisible) {
+      expect(
+        false,
+        `administrator's OIDC login did NOT establish a session on ${canonicalDomain}: the ` +
+          `round-trip returned to the app but a Login control is still visible — the ` +
+          `code→token exchange did not complete (over Tor this is usually the OIDC ` +
+          `adapter/token timeout in personas/utils/keycloak.js, not a logout problem). ` +
+          `Current URL: ${page.url()}.`,
+      ).toBe(true);
+      return;
+    }
+  }
   if (!adminReachedAuthenticated) {
-    expect(
-      false,
+    const rejection = await readCredentialRejection(page);
+    const rejected =
+      `administrator's credential was rejected by the app on ${canonicalDomain}: "${rejection}". ` +
+      `The password typed here does not match what the app stores, so the role seeds it at install ` +
+      `and never re-applies it: a rotation between the sync and async pass leaves the app behind. `;
+    const unreached =
       `administrator did NOT reach an authenticated surface on ${canonicalDomain}. ` +
-        `Either the role's auth chain is broken or administrator legitimately has no OIDC-driven admin path here, ` +
-        `in which case the role MUST declare \`PERSONA_ADMINISTRATOR_BLOCKED=true\` in templates/playwright.env.j2. ` +
-        `Current URL: ${page.url()}.`,
-    ).toBe(true);
+      `Either the role's auth chain is broken or administrator legitimately has no OIDC-driven admin path here, ` +
+      `in which case the role MUST declare \`PERSONA_ADMINISTRATOR_BLOCKED=true\` in templates/playwright.env.j2. `;
+    expect(false, `${rejection ? rejected : unreached}Current URL: ${page.url()}.`).toBe(true);
     return;
   }
 

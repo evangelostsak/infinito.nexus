@@ -2,20 +2,28 @@
 # Matrix-deploy variant overrides for web-svc-cdn.
 # See docs/contributing/artefact/files/role/variants.md for the file format.
 
-# variant pinning every dynamic services.yml flag to true so the
-# matrix exercises the in-group_names branch of web-svc-cdn.
-
+# variant 0 exercises the internal build-mirror flavor with every dynamic
+# services.yml flag on; variant 1 the external front-proxy-only flavor with
+# them off.
 - services:
+    cdn:
+      flavor: internal
     matomo:
       enabled: true
       shared: true
     prometheus:
       enabled: true
       shared: true
+    tor:
+      enabled: true
 - services:
+    cdn:
+      flavor: external
     matomo:
       enabled: false
       shared: false
     prometheus:
       enabled: false
       shared: false
+    tor:
+      enabled: true

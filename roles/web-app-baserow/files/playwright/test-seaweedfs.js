@@ -7,6 +7,7 @@
 // check proves that the configured bucket gained an object.
 
 const { test, expect } = require("@playwright/test");
+const { resolveTimeout, isOnionTarget } = require("./timeouts");
 const { skipUnlessServiceEnabled } = require("./service-gating");
 const {
   runSeaweedfsStorageCheck,
@@ -23,6 +24,21 @@ async function readJson(response, label) {
   return body ? JSON.parse(body) : null;
 }
 
+async function postWhileTableLocked(appPage, url, options, label) {
+  const deadline = Date.now() + 60_000;
+  for (;;) {
+    const response = await appPage.request.post(url, options);
+    if (response.status() !== 409) {
+      return readJson(response, label);
+    }
+    const body = await response.text();
+    if (!body.includes("ERROR_FAILED_TO_LOCK_TABLE_DUE_TO_CONFLICT") || Date.now() > deadline) {
+      expect(false, `${label} failed with 409: ${body}`).toBe(true);
+    }
+    await appPage.waitForTimeout(resolveTimeout(500));
+  }
+}
+
 async function getBaserowSession(appPage, baseUrl, adminUsername, adminPassword) {
   await appPage.context().clearCookies();
   await appPage.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
@@ -32,9 +48,9 @@ async function getBaserowSession(appPage, baseUrl, adminUsername, adminPassword)
   }
 
   await expect
-    .poll(() => appPage.url(), { timeout: 90_000, message: `expected redirect back to ${baseUrl}` })
+    .poll(() => appPage.url(), { timeout: resolveTimeout(90_000), message: `expected redirect back to ${baseUrl}` })
     .toContain(baseUrl.replace(/^https?:\/\//, ""));
-  await appPage.waitForLoadState("networkidle", { timeout: 60_000 }).catch(() => {});
+  await appPage.waitForLoadState("networkidle", { timeout: resolveTimeout(60_000) }).catch(() => {});
 
   const tokenResponse = await appPage.request.get(`${baseUrl}/api/infinito/sso/token/`);
   const tokenData = await readJson(tokenResponse, "trusted-header token request");
@@ -74,11 +90,10 @@ async function createBaserowFileRow(appPage, baseUrl, accessToken) {
     "table creation",
   );
 
-  const fileField = await readJson(
-    await appPage.request.post(`${baseUrl}/api/database/fields/table/${table.id}/`, {
-      headers: jsonHeaders,
-      data: { name: "Attachment", type: "file" },
-    }),
+  const fileField = await postWhileTableLocked(
+    appPage,
+    `${baseUrl}/api/database/fields/table/${table.id}/`,
+    { headers: jsonHeaders, data: { name: "Attachment", type: "file" } },
     "file field creation",
   );
 
@@ -108,9 +123,10 @@ async function createBaserowFileRow(appPage, baseUrl, accessToken) {
 }
 
 test("seaweedfs: an uploaded Baserow file-field document is stored in the SeaweedFS bucket", async ({ page, browser }) => {
+  test.skip(isOnionTarget(), "SeaweedFS filer UI is not a Tor surface on an onion node (headless backend)");
   skipUnlessServiceEnabled("seaweedfs");
   skipUnlessServiceEnabled("sso");
-  test.setTimeout(180_000);
+  test.setTimeout(resolveTimeout(180_000));
 
   const baseUrl = normalizeBaseUrl(process.env.BASEROW_BASE_URL || "");
   const adminUsername = decodeDotenvQuotedValue(process.env.ADMIN_USERNAME || "");

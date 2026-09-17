@@ -13,7 +13,7 @@
 # ##############################################################################
 # 0) Ensure base tree exists (suffix + OUs)
 # ##############################################################################
-- name: Ensure LDAP root (suffix) entry exists
+- name: ✅ Ensure LDAP root (suffix) entry exists
   community.general.ldap_entry:
     dn: "{{ LDAP.DN.ROOT }}"
     server_uri: "{{ OPENLDAP_SERVER_URI }}"
@@ -28,7 +28,7 @@
       o: "{{ (LDAP.DN.ROOT | regex_search('dc=([^,]+)', '\\1')) | first | default('infinito') }}"
     state: present
 
-- name: Ensure people OU exists
+- name: ✅ Ensure people OU exists
   community.general.ldap_entry:
     dn: "{{ LDAP.DN.OU.USERS }}"
     server_uri: "{{ OPENLDAP_SERVER_URI }}"
@@ -42,7 +42,7 @@
       description: "Users container"
     state: present
 
-- name: Ensure groups OU exists
+- name: ✅ Ensure groups OU exists
   community.general.ldap_entry:
     dn: "{{ LDAP.DN.OU.GROUPS }}"
     server_uri: "{{ OPENLDAP_SERVER_URI }}"
@@ -56,7 +56,7 @@
       description: "Groups container"
     state: present
 
-- name: Ensure roles OU exists
+- name: ✅ Ensure roles OU exists
   community.general.ldap_entry:
     dn: "{{ LDAP.DN.OU.ROLES }}"
     server_uri: "{{ OPENLDAP_SERVER_URI }}"
@@ -70,10 +70,7 @@
       description: "Container for application access profiles"
     state: present
 
-###############################################################################
-# 1) Snapshot: remember which LDAP users already existed before this run
-###############################################################################
-- name: Check whether LDAP users already exist
+- name: 🔎 Check whether LDAP users already exist
   community.general.ldap_search:
     server_uri: "{{ OPENLDAP_SERVER_URI }}"
     bind_dn: "{{ OPENLDAP_BIND_DN }}"
@@ -91,7 +88,7 @@
   failed_when: false
   no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
 
-- name: Build map of users that existed before this run
+- name: 🔨 Build map of users that existed before this run
   ansible.builtin.set_fact:
     openldap_user_existed_before: >-
       {{
@@ -104,10 +101,7 @@
   loop_control:
     label: "{{ item.item.key }}"
 
-###############################################################################
-# 2) Create the LDAP entry if it does not yet exist
-###############################################################################
-- name: Ensure LDAP users exist
+- name: ✅ Ensure LDAP users exist
   community.general.ldap_entry:
     dn: "{{ LDAP.USER.ATTRIBUTES.ID }}={{ item.key }},{{ LDAP.DN.OU.USERS }}"
     server_uri: "{{ OPENLDAP_SERVER_URI }}"
@@ -124,6 +118,9 @@
       uidNumber: "{{ item.value.uid | int }}"
       gidNumber: "{{ item.value.gid | int }}"
     state: present
+  register: openldap_users_created
+  changed_when: false
+  # rationale: async; user creation runs overlapped, reaped right below before the password task
   async: "{{ ASYNC_TIME if ASYNC_ENABLED | bool else omit }}"
   poll: "{{ ASYNC_POLL if ASYNC_ENABLED | bool else omit }}"
   throttle: 1
@@ -132,17 +129,14 @@
     label: "{{ item.key }}"
   no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
 
-###############################################################################
-# 2b) Set LDAP password:
-# - Default behavior: update on every run (password_update: true/unset)
-# - Opt-out behavior: set only on first creation (password_update: false)
-#
-# Rationale:
-# - Avoid dealing with SSHA generation in Ansible (salted hashes differ each time)
-# - Use LDAP Password Modify extended operation
-# - Server-side hashing is applied (your cn=config sets olcPasswordHash: {SSHA})
-###############################################################################
-- name: Set LDAP user password (per-user update policy)
+- name: "⏳ Reap the LDAP user creation jobs"
+  ansible.builtin.include_tasks: utils/async/reap.yml
+  vars:
+    async_reap_jobs: "{{ openldap_users_created.results | default([]) }}"
+    async_reap_label: "LDAP users"
+    async_reap_tolerate: []
+
+- name: 🔧 Set LDAP user password (per-user update policy)
   community.general.ldap_passwd:
     server_uri: "{{ OPENLDAP_SERVER_URI }}"
     bind_dn: "{{ OPENLDAP_BIND_DN }}"
@@ -158,10 +152,7 @@
       or not ((openldap_user_existed_before | default({})).get(item.key, false) | bool)
   no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
 
-###############################################################################
-# 3) Keep the objectClass list AND the mail attribute up-to-date
-###############################################################################
-- name: Ensure required objectClass values and mail address are present
+- name: ✅ Ensure required objectClass values and mail address are present
   community.general.ldap_attrs:
     dn: "{{ LDAP.USER.ATTRIBUTES.ID }}={{ item.key }},{{ LDAP.DN.OU.USERS }}"
     server_uri: "{{ OPENLDAP_SERVER_URI }}"
@@ -170,7 +161,10 @@
     attributes:
       objectClass: "{{ LDAP.USER.OBJECTS.STRUCTURAL }}"
       mail: "{{ item.value.email }}"
-    state: "{{ 'exact' if MODE_CLEANUP else 'present' }}"
+    state: "{{ 'exact' if MODE_CLEANUP | bool else 'present' }}"
+  register: openldap_users_attrs
+  changed_when: false
+  # rationale: async; attribute updates run overlapped, reaped at the end of this file
   async: "{{ ASYNC_TIME if ASYNC_ENABLED | bool else omit }}"
   poll: "{{ ASYNC_POLL if ASYNC_ENABLED | bool else omit }}"
   throttle: 1
@@ -178,3 +172,10 @@
   loop_control:
     label: "{{ item.key }}"
   no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
+
+- name: "⏳ Reap the LDAP attribute jobs"
+  ansible.builtin.include_tasks: utils/async/reap.yml
+  vars:
+    async_reap_jobs: "{{ openldap_users_attrs.results | default([]) }}"
+    async_reap_label: "LDAP user attributes"
+    async_reap_tolerate: []

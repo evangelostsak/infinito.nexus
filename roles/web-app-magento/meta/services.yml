@@ -1,5 +1,5 @@
 ---
-# nocheck: seaweedfs-playwright — Magento remote storage is wired into bin/magento setup:install at first boot; the role ships no templates/playwright.env.j2 (not Playwright-enabled) so the gated upload scenario cannot run here
+# nocheck: seaweedfs-playwright — Magento remote storage is wired into bin/magento setup:install at first boot and read back through the same PHP process, so the bucket has no persona-reachable upload surface
 logout:
   bond: 1
   enabled: "{{ 'web-svc-logout' in group_names }}"
@@ -14,7 +14,7 @@ sso:
   oauth2:
     origin:
       host: nginx
-      port: "8080"
+      port: "{{ lookup('config', 'web-app-magento', 'services.magento.ports.internal.http') }}"
 dashboard:
   bond: 1
   enabled: "{{ 'web-app-dashboard' in group_names }}"
@@ -29,22 +29,25 @@ email:
   shared: "{{ 'web-app-mailu' in group_names }}"
 php:
   image: markoshust/magento-php
-  version: 8.5-fpm
+  version: 8.4-fpm # nocheck: docker-version — magento/product-community-edition 2.4.8 requires php ~8.2.0||~8.3.0||~8.4.0; dc08bc621 already pinned this down from 8.5 and the image bot reverted it in 1e4f82128, so composer install fails again
   name: magento-php
+  ports:
+    internal:
+      fpm: 9000
   backup:
     no_stop_required: true
-  min_storage: 5GB
+  min_storage: 660MB
   cpus: "0.5"
   mem_reservation: 256m
   mem_limit: 1g
   pids_limit: 512
 nginx:
   image: markoshust/magento-nginx
-  version: latest
+  version: "1.28"
   name: magento-nginx
   backup:
     no_stop_required: true
-  min_storage: 5GB
+  min_storage: 235MB
   cpus: "0.5"
   mem_reservation: 256m
   mem_limit: 1g
@@ -53,13 +56,16 @@ nginx:
 mariadb:
   shared: false
   enabled: true
-  version: "11.4"
+  image: mariadb
+  version: "11.4" # nocheck: docker-version — deliberate pin, predates this change; the bot must not move a database major under Magento without a compatibility check
 # nocheck: shared
 # nocheck: dynamic-flag
 redis:
+  bond: 1
   backup:
     disabled: true
   enabled: true
+  shared: "{{ 'svc-db-redis' in group_names }}"
   cpus: "0.5"
   mem_reservation: 128m
   mem_limit: 512m
@@ -67,11 +73,16 @@ redis:
 # nocheck: shared
 # nocheck: dynamic-flag
 search:
+  healthcheck:
+    flavor: tcp
+  ports:
+    internal:
+      http: 9200
   enabled: true
   image: opensearchproject/opensearch
-  version: latest
+  version: 3.8.0
   name: magento-opensearch
-  min_storage: 10GB
+  min_storage: 1332MB
   cpus: "1.0"
   mem_reservation: 1g
   mem_limit: 2g
@@ -90,15 +101,43 @@ prometheus:
   enabled: "{{ 'web-app-prometheus' in group_names }}"
   shared: "{{ 'web-app-prometheus' in group_names }}"
 magento:
+  # nocheck: default-placement-manager  01_setup.yml bootstraps through `container exec` from IS_STACK_HOST, which can only reach a container the manager itself runs
+  placement: manager
+  composer:
+    repository: https://mirror.mage-os.org/
+    package: magento/project-community-edition
+    version: 2.4.8
+  modes:
+    compose:
+      enabled: true
+    swarm:
+      enabled: true
   ports:
     local:
       sso: 16504
       http: 8052
+    internal:
+      http: 8000
+  proxy:
+    service_key: nginx
   run_after:
     - web-app-keycloak
-  lifecycle: unsupported
+  lifecycle: alpha
   min_storage: 10GB
   cpus: "1.0"
   mem_reservation: 1g
   mem_limit: 2g
   pids_limit: 1024
+
+# nocheck: playwright-service-flag
+# nocheck: variants-coverage — sso-variant-tor requires the onion on in every variant, so the false polarity has no variant left to live in
+tor:
+  bond: 0.5
+  enabled: "{{ 'svc-net-tor' in group_names }}"
+  shared: true # nocheck: dynamic-flag
+# nocheck: dynamic-flag
+# nocheck: playwright-service-flag, dynamic-flag infrastructure backup consumer
+container_backup: # nocheck: bond-baseline backup host joins outside the variant topology
+  bond: 1
+  enabled: "{{ 'svc-bkp-volume-2-local' in group_names }}"
+  shared: true

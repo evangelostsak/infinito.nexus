@@ -1,12 +1,15 @@
 ---
-- name: "apply outbound Email Account (Mailu SMTP; inbound IMAP deferred)"
-  ansible.builtin.shell: |
-    set -euo pipefail
-    container exec -i \
-      -e SITE_NAME -e MAIL_FROM_NAME -e MAIL_FROM_ADDRESS \
-      -e SMTP_HOST -e SMTP_PORT -e SMTP_USER -e SMTP_PASS \
-      {{ ERPNEXT_BACKEND_CONTAINER }} \
-      bash -c 'cd /home/frappe/frappe-bench/sites && /home/frappe/frappe-bench/env/bin/python -' < {{ role_path }}/files/scripts/apply_email_account.py
+- name: "📌 apply outbound Email Account (Mailu SMTP; inbound IMAP deferred)"
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
+  ansible.builtin.shell:
+    cmd: > # nocheck: container-exec-resolver  runtime-resolved CID, delegated to the hosting node
+      container exec -i
+      -e SITE_NAME -e MAIL_FROM_NAME -e MAIL_FROM_ADDRESS
+      -e SMTP_HOST -e SMTP_PORT -e SMTP_USER -e SMTP_PASS
+      {{ ERPNEXT_BACKEND_LOCAL_CID | quote }}
+      {{ ERPNEXT_BENCH_PYTHON }}
+    stdin: "{{ lookup('ansible.builtin.file', role_path ~ '/files/python/apply/email_account.py') }}"
+  delegate_to: "{{ ERPNEXT_BACKEND_HOST_NODE }}"
   environment:
     SITE_NAME: "{{ ERPNEXT_SITE_NAME }}"
     MAIL_FROM_NAME: "{{ ORGANIZATION }} ERPNext"
@@ -18,4 +21,4 @@
   when: ERPNEXT_MAIL.host is defined and (ERPNEXT_MAIL.host | length > 0)
   register: erpnext_email_apply
   changed_when: false
-  timeout: 60
+  timeout: "{{ lookup('timeout', 60) | int }}"

@@ -1,0 +1,160 @@
+name: "💻 Test: Workspace"
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace_track:
+        description: "🧑‍💻 Track per distro: rotate splits compose/swarm, or pin one"
+        type: choice
+        default: rotate
+        options: [rotate, compose, swarm]
+  workflow_call:
+    inputs:
+      workspace_track:
+        type: string
+        default: rotate
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  prepare:
+    name: 🧑‍💻 Workspace Matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+
+    steps:
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v7.0.0
+
+      - name: 🐍 Assign one workspace track per distro
+        id: matrix
+        shell: bash
+        env:
+          WORKSPACE_TRACK: ${{ inputs.workspace_track }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          matrix="$(python3 -m cli.meta.ci.dev_runtime matrix \
+            --mode "${WORKSPACE_TRACK:-rotate}" --run "${RUN_NUMBER:-0}")"
+          echo "matrix=${matrix}" | tee -a "$GITHUB_OUTPUT"
+
+  test-workspace:
+    name: ${{ matrix.icon }} Workspace (${{ matrix.label }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 345
+    needs: prepare
+
+    concurrency:
+      group: infinito-workspace-${{ matrix.image }}-${{ matrix.track }}
+      cancel-in-progress: false
+      queue: max
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.prepare.outputs.matrix) }}
+
+    env:
+      DEV_RUNTIME_IMAGE: ${{ matrix.image }}
+      INFINITO_WORKSPACE_TRACKS: base ${{ matrix.track }}
+      NIX_CONFIG: |
+        access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+      INFINITO_CACHE_REGISTRY_MAX_SIZE: 16g
+      INFINITO_CACHE_REGISTRY_HOST_PATH: /mnt/cache/registry/mirror
+      INFINITO_CACHE_REGISTRY_CA_HOST_PATH: /mnt/cache/registry/ca
+      INFINITO_CACHE_PACKAGE_BLOBSTORE_MAX: 8g
+      INFINITO_CACHE_PACKAGE_HEAP: 1g
+      INFINITO_CACHE_PACKAGE_DIRECT_MEM: 1g
+      INFINITO_CACHE_PACKAGE_HOST_PATH: /mnt/cache/package/data
+
+    steps:
+      - name: 🧹 Free disk space
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false
+
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v7.0.0
+
+      - name: "📥 Load the rescue paths into job env"
+        shell: bash
+        run: |
+          set -euo pipefail
+          make dotenv
+          {
+            grep '^INFINITO_RESCUE_DIAGNOSTICS_BASE=' default.env
+            grep '^INFINITO_DNS53_SAMPLER_LOG=' .env
+            echo "INFINITO_WORKSPACE_SLUG=$(printf '%s' "${DEV_RUNTIME_IMAGE}" | tr '/:' '--')-${{ matrix.track }}"
+          } >> "$GITHUB_ENV"
+
+      - name: "📥 Resolve the workspace distro"
+        shell: bash
+        run: |
+          set -euo pipefail
+          distro="$(python3 -m cli.meta.ci.dev_runtime distro --image "${DEV_RUNTIME_IMAGE}")"
+          echo "INFINITO_DISTRO=${distro}" >> "$GITHUB_ENV"
+
+      - name: ▶️ Run workspace routine
+        shell: bash
+        run: |
+          set -euo pipefail
+          HOST_WORKDIR="$(pwd -P)"
+
+          docker run --rm \
+            -e GITHUB_ACTIONS=true \
+            -e GITHUB_REPOSITORY="${{ github.repository }}" \
+            -e GITHUB_REPOSITORY_OWNER="${{ github.repository_owner }}" \
+            -e GITHUB_SHA="${{ github.sha }}" \
+            -e DEV_RUNTIME_IMAGE \
+            -e INFINITO_WORKSPACE_TRACKS \
+            -e INFINITO_DISTRO \
+            -e INFINITO_IMAGE="infinito-${INFINITO_DISTRO}" \
+            -e INFINITO_PULL_POLICY=never \
+            -e INFINITO_BUILD=1 \
+            -e NIX_CONFIG \
+            -e INFINITO_CACHE_REGISTRY_MAX_SIZE \
+            -e INFINITO_CACHE_REGISTRY_HOST_PATH \
+            -e INFINITO_CACHE_REGISTRY_CA_HOST_PATH \
+            -e INFINITO_CACHE_PACKAGE_BLOBSTORE_MAX \
+            -e INFINITO_CACHE_PACKAGE_HEAP \
+            -e INFINITO_CACHE_PACKAGE_DIRECT_MEM \
+            -e INFINITO_CACHE_PACKAGE_HOST_PATH \
+            --network host \
+            -v "${HOST_WORKDIR}:${HOST_WORKDIR}" \
+            -v "/mnt/docker:/var/lib/docker" \
+            -v "/var/run/docker.sock:/var/run/docker.sock" \
+            -w "${HOST_WORKDIR}" \
+            "${DEV_RUNTIME_IMAGE}" \
+            bash -lc '
+              bash ./scripts/tests/workspace/00_orchestrator.sh
+            '
+
+      - name: 🩺 Capture rescue diagnostics
+        if: failure() || cancelled()
+        timeout-minutes: 15
+        shell: bash
+        run: |
+          set -euo pipefail
+          rescue_dir="${INFINITO_RESCUE_DIAGNOSTICS_BASE:?}/${INFINITO_WORKSPACE_SLUG:?}"
+          INFINITO_RESCUE_DIAGNOSTICS_DIR="${rescue_dir}" \
+            python3 utils/diagnostics/container.py \
+            "${INFINITO_WORKSPACE_SLUG}" "workspace suite failure" || true
+          bash ./scripts/tests/deploy/utils/rescue_index.sh "${rescue_dir}"
+
+      - name: ⬆️ Upload rescue diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: rescue-diagnostics-workspace-${{ env.INFINITO_WORKSPACE_SLUG }}
+          path: ${{ env.INFINITO_RESCUE_DIAGNOSTICS_BASE }}/
+          if-no-files-found: ignore

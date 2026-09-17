@@ -1,6 +1,13 @@
 <?php
+// nocheck: mirrored-unit-test - opens a PDO connection to the Friendica database at the
+// top level to count hook rows; the whole file is the query
 require "/var/www/html/vendor/autoload.php";
-$cfg = include "/var/www/html/config/local.config.php";
+$cfgFile = getenv("FRIENDICA_CONFIG_FILE");
+if ($cfgFile === false) {
+    fwrite(STDERR, "FRIENDICA_CONFIG_FILE env missing\n");
+    exit(1);
+}
+$cfg = include $cfgFile;
 $db  = $cfg["database"];
 $h   = explode(":", $db["hostname"]);
 $dsn = "mysql:host=" . $h[0] . ";port=" . ($h[1] ?? 3306) . ";dbname=" . $db["database"];

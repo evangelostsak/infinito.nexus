@@ -1,2 +1,7 @@
 ---
-models: ollama_models
+# nocheck: embedded-state-on-nfs content-addressed model blobs, written once on pull and read-only after
+ollama_models:
+  type: volume
+  mounts:
+    - service: ollama
+      target: /root/.ollama

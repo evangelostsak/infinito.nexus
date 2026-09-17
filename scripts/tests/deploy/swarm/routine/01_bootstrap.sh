@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# SPOT for the cluster bring-up, one CI step: host-side compose build + up (node
+# image layered on the distro's infinito image, so python + ansible + the CLI are
+# baked -- no per-node .deb bootstrap), then every node concern (systemd wait,
+# IPs, lab DNS, repo unpack) via compose/swarm/playbook.yml over the docker
+# connection. Host-side pre-clean here is only the bind-mount dir + leftover
+# containers; stale root-owned NFS writes are wiped in-node by the play (this
+# often non-root act runner cannot delete them).
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+set -a
+# shellcheck source=scripts/tests/deploy/swarm/utils/topology/base.sh
+. "${SCRIPT_DIR}/../utils/topology/base.sh"
+set +a
+
+# shellcheck source=scripts/meta/env/load.sh
+source "${SCRIPT_DIR}/../../../../../scripts/meta/env/load.sh"
+
+: "${RUNNER_TEMP:?}" "${APP_ID:?}" "${INFINITO_DOMAIN:?}" "${INFINITO_CONTAINER:?}"
+
+if command -v apt-get >/dev/null 2>&1; then
+	APT_TIMEOUT=10m
+	APT_OPTS=(-o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+	if [ "$(id -u)" -eq 0 ]; then
+		timeout -k 30 "${APT_TIMEOUT}" apt-get "${APT_OPTS[@]}" update -qq || true # nocheck: shell-or-true -- grandfathered: worked in practice; TODO: sharpen to catch only the exact tolerated error
+	else
+		sudo -E timeout -k 30 "${APT_TIMEOUT}" apt-get "${APT_OPTS[@]}" update -qq || true # nocheck: shell-or-true -- grandfathered: worked in practice; TODO: sharpen to catch only the exact tolerated error
+	fi
+fi
+
+if docker exec "${INFINITO_CONTAINER}" docker ps --format '{{.Names}}' 2>/dev/null | grep -qx 'tor'; then
+	echo "==> quiescing CI compose tor (competing onion publisher)"
+	docker exec "${INFINITO_CONTAINER}" docker stop tor
+fi
+
+bash "${SCRIPT_DIR}/../utils/unmount/nfs_mounts.sh" "${NFS_SERVER}" >/dev/null 2>&1 || true # nocheck: shell-or-true -- grandfathered: worked in practice; TODO: sharpen to catch only the exact tolerated error
+bash "${SCRIPT_DIR}/../utils/unmount/host_state.sh" "${INFINITO_DIR_VAR_LIB:?}"
+for node in "${MGR}" "${WRK1}" "${WRK2}" "${NFS_SERVER}" "${BACKUP_NODE}"; do
+	docker rm -f "${node}" >/dev/null 2>&1 || true # nocheck: shell-or-true -- grandfathered: worked in practice; TODO: sharpen to catch only the exact tolerated error
+done
+docker volume rm "${SWARM_NAME}_nfs-export" >/dev/null 2>&1 || true # nocheck: shell-or-true -- grandfathered: worked in practice; TODO: sharpen to catch only the exact tolerated error
+
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../../.." && pwd)"
+if [ -z "${INFINITO_IMAGE:-}" ]; then
+	INFINITO_IMAGE="$(bash "${REPO_ROOT}/scripts/meta/resolve/image/local.sh"):${INFINITO_IMAGE_TAG:?}"
+	export INFINITO_IMAGE
+	if ! docker image inspect "${INFINITO_IMAGE}" >/dev/null 2>&1; then
+		echo "==> building local infinito image ${INFINITO_IMAGE} for distro ${INFINITO_DISTRO}"
+		make -C "${REPO_ROOT}" build
+	fi
+fi
+
+COMPOSE_FILE="${SCRIPT_DIR}/../../../../../compose/swarm/compose.yml"
+COMPOSE_ARGS=(-f "${COMPOSE_FILE}")
+CACHE_FRONTEND="infinito-package-cache-frontend"
+REGISTRY_CACHE="infinito-registry-cache"
+CACHE_NET=""
+if docker inspect "${CACHE_FRONTEND}" >/dev/null 2>&1; then
+	CACHE_NET="$(docker inspect "${CACHE_FRONTEND}" --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' | head -n1)"
+	echo "==> package-cache detected on ${CACHE_NET}; wiring swarm nodes to it"
+	registry_ca_src="$(docker inspect "${REGISTRY_CACHE}" \
+		--format '{{range .Mounts}}{{if eq .Destination "/ca"}}{{.Source}}{{end}}{{end}}' 2>/dev/null || true)"
+	if [ -z "${registry_ca_src}" ]; then
+		echo "FAILURE: ${CACHE_FRONTEND} is up but ${REGISTRY_CACHE} exposes no /ca bind; the nodes cannot learn its MITM CA" >&2
+		exit 1
+	fi
+	export INFINITO_CACHE_REGISTRY_CA_HOST_PATH="${registry_ca_src}"
+	echo "==> registry-cache CA source: ${INFINITO_CACHE_REGISTRY_CA_HOST_PATH}"
+	COMPOSE_ARGS+=(-f "${SCRIPT_DIR}/../../../../../compose/swarm/cache.override.yml")
+fi
+
+build_attempts=3
+for attempt in $(seq 1 "${build_attempts}"); do
+	docker compose "${COMPOSE_ARGS[@]}" -p "${SWARM_NAME}" --profile drill build && break
+	if [ "${attempt}" -eq "${build_attempts}" ]; then
+		echo "FAILURE: node image build failed after ${build_attempts} attempts" >&2
+		exit 1
+	fi
+	sleep $((attempt * 5))
+done
+
+docker compose "${COMPOSE_ARGS[@]}" -p "${SWARM_NAME}" --profile drill up -d
+
+if [ -n "${CACHE_NET}" ]; then
+	cache_subnet="$(docker network inspect "${CACHE_NET}" \
+		--format '{{range .IPAM.Config}}{{println .Subnet}}{{end}}' 2>/dev/null |
+		grep -F . | head -n1 || true)"
+	case "${cache_subnet}" in
+	*.0/24) ;;
+	*)
+		echo "FAILURE: ${CACHE_NET} reports IPv4 subnet '${cache_subnet:-<none>}'; the node pinning below only holds for a x.y.z.0/24" >&2
+		exit 1
+		;;
+	esac
+	cache_prefix="${cache_subnet%.0/24}"
+
+	node_octet=$((200 + INFINITO_INSTANCE * 5))
+	if [ "$((node_octet + 4))" -gt 254 ]; then
+		echo "FAILURE: INFINITO_INSTANCE=${INFINITO_INSTANCE} pushes the node band past ${cache_prefix}.254" >&2
+		exit 1
+	fi
+
+	for node in "${MGR}" "${WRK1}" "${WRK2}" "${NFS_SERVER}" "${BACKUP_NODE}"; do
+		if ! connect_err="$(docker network connect --ip "${cache_prefix}.${node_octet}" "${CACHE_NET}" "${node}" 2>&1)"; then
+			case "${connect_err}" in
+			*"already exists in network"* | *"already attached to network"*)
+				echo "==> ${node} already on ${CACHE_NET}; keeping its current address" >&2
+				;;
+			*)
+				echo "FAILURE: cannot pin ${node} to ${cache_prefix}.${node_octet} on ${CACHE_NET}: ${connect_err}" >&2
+				exit 1
+				;;
+			esac
+		fi
+		node_octet=$((node_octet + 1))
+	done
+fi
+
+ansible-playbook \
+	-i "${MGR},${WRK1},${WRK2},${NFS_SERVER},${BACKUP_NODE}," \
+	-c docker \
+	"${SCRIPT_DIR}/../../../../../compose/swarm/playbook.yml"

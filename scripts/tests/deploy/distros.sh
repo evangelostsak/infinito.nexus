@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# SPOT: run one command once per distro, in random order, under a shared time
+# budget. A distro the budget drops BEFORE it starts is reported as skipped; a
+# distro the budget kills MID-RUN fails the job. Every outcome lands in a
+# job-summary table in execution order.
+#
+# Param:
+#   $@                                  command + args to run once per distro
+#   INFINITO_DISTROS                    space-separated distro list
+#   INFINITO_CI_DISTRO_BUDGET_SECONDS   wall-clock budget for the whole run
+#   GITHUB_STEP_SUMMARY                 optional; the markdown table is appended there
+#
+# Exports per iteration:
+#   INFINITO_DISTRO                     the distro under test
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+cd "${REPO_ROOT}"
+
+# shellcheck source=scripts/meta/env/load.sh
+source "scripts/meta/env/load.sh"
+
+: "${INFINITO_DISTROS:?INFINITO_DISTROS is required (e.g. 'arch debian ubuntu fedora centos')}"
+: "${INFINITO_CI_DISTRO_BUDGET_SECONDS:?INFINITO_CI_DISTRO_BUDGET_SECONDS is required (declared in default.env)}"
+
+BUDGET_HEADROOM_PERCENT=15
+
+if (($# == 0)); then
+	echo "[ERROR] a per-distro command is required" >&2
+	exit 2
+fi
+
+if ! [[ "${INFINITO_CI_DISTRO_BUDGET_SECONDS}" =~ ^[0-9]+$ ]]; then
+	echo "[ERROR] INFINITO_CI_DISTRO_BUDGET_SECONDS must be an integer (seconds), got: '${INFINITO_CI_DISTRO_BUDGET_SECONDS}'" >&2
+	exit 2
+fi
+
+read -r -a distro_arr <<<"${INFINITO_DISTROS}"
+mapfile -t distro_arr < <(printf '%s\n' "${distro_arr[@]}" | shuf)
+echo "=== Distro execution order: ${distro_arr[*]} ==="
+
+global_start="$(date +%s)"
+deadline="$((global_start + INFINITO_CI_DISTRO_BUDGET_SECONDS))"
+export INFINITO_CI_DISTRO_DEADLINE_EPOCH="${deadline}"
+echo "=== Global time budget: ${INFINITO_CI_DISTRO_BUDGET_SECONDS}s (deadline epoch=${deadline}) ==="
+
+max_seen=0
+skipped=0
+ran=0
+passed=0
+durations=()
+statuses=()
+seconds=()
+notes=()
+
+for _ in "${distro_arr[@]}"; do
+	statuses+=("skipped")
+	seconds+=("")
+	notes+=("not reached within the budget")
+done
+
+# Renders the per-distro outcome to stdout and, when GITHUB_STEP_SUMMARY is set,
+# appends the same run as a markdown table in execution order.
+render_summary() {
+	local i distro icon
+
+	echo
+	echo "=== Summary ==="
+	echo "ran=${ran} skipped=${skipped}"
+	echo "total_runtime=$(($(date +%s) - global_start))s max_seen_duration=${max_seen}s"
+	echo "budget=${INFINITO_CI_DISTRO_BUDGET_SECONDS}s remaining=$((deadline - $(date +%s)))s"
+	echo "per-distro:"
+	for line in "${durations[@]}"; do
+		echo "  - ${line}"
+	done
+
+	[[ -n "${GITHUB_STEP_SUMMARY:-}" ]] || return 0
+
+	{
+		echo "## 🐧 Distro coverage"
+		echo
+		echo "| # | Distro | Status | Duration | Note |"
+		echo "|--:|---|:--:|--:|---|"
+		for i in "${!distro_arr[@]}"; do
+			distro="${distro_arr[$i]}"
+			case "${statuses[$i]}" in
+			passed) icon="✅ passed" ;;
+			failed) icon="❌ failed" ;;
+			*) icon="🟦 skipped" ;;
+			esac
+			# shellcheck disable=SC2016  # backticks are markdown, not expansion
+			printf '| %s | `%s` | %s | %s | %s |\n' \
+				"$((i + 1))" "${distro}" "${icon}" \
+				"${seconds[$i]:+${seconds[$i]}s}" "${notes[$i]}"
+		done
+		echo
+		echo "${ran}/${#distro_arr[@]} ran, ${skipped} skipped, budget ${INFINITO_CI_DISTRO_BUDGET_SECONDS}s, order randomised per run."
+		echo
+	} >>"${GITHUB_STEP_SUMMARY}"
+}
+
+for i in "${!distro_arr[@]}"; do
+	distro="${distro_arr[$i]}"
+	remaining="$((deadline - $(date +%s)))"
+
+	if ((remaining <= 0)); then
+		echo "[WARN] Global budget exhausted (remaining=${remaining}s). Stopping further distro runs."
+		skipped=$((skipped + ${#distro_arr[@]} - i))
+		notes[i]="budget exhausted"
+		break
+	fi
+
+	needed="$((max_seen * (100 + BUDGET_HEADROOM_PERCENT) / 100))"
+	if ((max_seen > 0 && remaining < needed)); then
+		echo "[WARN] Skipping distro=${distro}: remaining=${remaining}s < ${needed}s (max_seen=${max_seen}s + ${BUDGET_HEADROOM_PERCENT}% headroom)"
+		skipped=$((skipped + 1))
+		notes[i]="remaining ${remaining}s < ${needed}s needed"
+		continue
+	fi
+
+	echo "=== Running distro=${distro}: ${1} ==="
+	echo ">>> Time budget: remaining=${remaining}s max_seen=${max_seen}s"
+
+	export INFINITO_DISTRO="${distro}"
+	source "scripts/meta/env/load.sh"
+
+	distro_start="$(date +%s)"
+
+	set +e
+	timeout -k 60 "${remaining}s" "$@"
+	rc=$?
+	set -e
+
+	dur="$(($(date +%s) - distro_start))"
+	durations+=("${distro}=${dur}s")
+	ran=$((ran + 1))
+	seconds[i]="${dur}"
+	notes[i]=""
+
+	if ((dur > max_seen)); then
+		max_seen="$dur"
+	fi
+
+	echo ">>> Duration: distro=${distro} took ${dur}s (max_seen=${max_seen}s)"
+
+	if [[ $rc -ne 0 ]]; then
+		statuses[i]="failed"
+		if [[ $rc -eq 124 || $rc -eq 137 ]] && ((dur >= remaining)); then
+			notes[i]="rc=${rc} after ${dur}s, with ${remaining}s of the ${INFINITO_CI_DISTRO_BUDGET_SECONDS}s budget left at start"
+		else
+			notes[i]="rc=${rc}"
+		fi
+		skipped=$((skipped + ${#distro_arr[@]} - i - 1))
+		for ((j = i + 1; j < ${#distro_arr[@]}; j++)); do
+			notes[j]="not run: aborted after distro=${distro} failed"
+		done
+		echo "[ERROR] Run failed for distro=${distro}: ${notes[i]}" >&2
+		render_summary
+		exit "$rc"
+	fi
+
+	statuses[i]="passed"
+	passed=$((passed + 1))
+done
+
+render_summary

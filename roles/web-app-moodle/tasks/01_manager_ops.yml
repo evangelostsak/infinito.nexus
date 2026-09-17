@@ -1,0 +1,115 @@
+---
+- name: "📄 Populate Dockerfile build context (entrypoint, config.php, install, php conf)"
+  include_tasks: 02_build_context.yml
+
+- name: "✅ Ensure nginx vhost dir exists in compose dir"
+  ansible.builtin.file:
+    path: "{{ docker_compose.directories.instance | default(lookup('container', application_id, 'directories.instance')) }}"
+    state: directory
+    mode: "0755"
+
+- name: "📄 Render nginx vhost into compose dir"
+  stack_host_template:
+    src: "nginx-moodle.conf.j2"
+    dest: "{{ docker_compose.directories.instance | default(lookup('container', application_id, 'directories.instance')) }}/nginx.conf"
+    mode: "0640"
+  notify: compose-up
+
+- name: 🚿 flush docker service
+  meta: flush_handlers
+
+- name: ⏳ Wait until the Moodle container is healthy
+  ansible.builtin.shell: >
+    container inspect --type container --format '{% raw %}{{.State.Health.Status}}{% endraw %}' {{ MOODLE_CONTAINER_ADDRESS }}
+  register: health_check
+  until: health_check.stdout.strip() == "healthy"
+  retries: 120
+  delay: 5
+
+- name: "▶️ Run Moodle install (idempotent)"
+  shell: >
+    container exec --user {{ MOODLE_RUNTIME_USER }} {{ MOODLE_CONTAINER_ADDRESS }}
+    php {{ MOODLE_CLI_DIR }}/install_database.php
+    --agree-license
+    --adminuser={{ MOODLE_ADMIN_USERNAME | quote }}
+    --adminpass={{ MOODLE_ADMIN_PASSWORD | quote }}
+    --adminemail={{ MOODLE_ADMIN_EMAIL | quote }}
+    --fullname="{{ MOODLE_SITE_TITLE }}"
+    --shortname=Academy
+  register: moodle_install
+  retries: 20
+  delay: 15
+  until: moodle_install.rc != 137
+  changed_when: "'Moodle has been installed' in moodle_install.stdout"
+  failed_when:
+    - moodle_install.rc != 0
+    - "'Moodle is already installed' not in moodle_install.stderr"
+    - "'already installed' not in moodle_install.stdout"
+    - "'Database tables already present' not in moodle_install.stderr"
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
+
+- name: "🔑 Realign the administrator password Moodle persisted at install"
+  when: not (MOODLE_OIDC_ENABLED | bool)
+  # nocheck: password-quote  the token is upstream's CLI filename, not a credential
+  shell: >
+    container exec --user {{ MOODLE_RUNTIME_USER }} {{ MOODLE_CONTAINER_ADDRESS }}
+    php {{ [MOODLE_CLI_DIR, 'reset_password.php'] | path_join }}
+    --username={{ MOODLE_ADMIN_USERNAME | quote }}
+    --password={{ MOODLE_ADMIN_PASSWORD | quote }}
+    --ignore-password-policy
+  register: moodle_admin_password
+  changed_when: moodle_admin_password.rc == 0
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
+
+- name: "🌐 Open Moodle's cURL egress policy for the deployment's own networks"
+  ansible.builtin.shell: >
+    container exec --user {{ MOODLE_RUNTIME_USER }} {{ MOODLE_CONTAINER_ADDRESS }}
+    php {{ [MOODLE_CLI_DIR, 'cfg.php'] | path_join }}
+    --name={{ item.name | quote }}
+    --set={{ item.value | quote }}
+  loop: "{{ MOODLE_EGRESS_SETTINGS }}"
+  loop_control:
+    label: "{{ item.name }}"
+  changed_when: false
+
+- name: "📂 Include ownership settings tasks for moodle"
+  include_tasks: 03_ownership.yml
+
+- name: "🔧 Configure OIDC login for Moodle (variant 0 only)"
+  include_tasks: 04_oidc.yml
+  when: MOODLE_OIDC_ENABLED | bool
+
+- name: "🔧 Configure auth_ldap (sync-only in variant 0, primary login in variant 1)"
+  include_tasks: 05_ldap_sync.yml
+  when: MOODLE_LDAP_ENABLED | bool
+
+- name: "🤖 Bind the native AI surface to the platform gateway"
+  include_tasks: utils/ai_gateway.yml
+  when: MOODLE_LITELLM_ENABLED | bool
+
+- name: "🔌 Provision the MCP server surface"
+  include_tasks: utils/mcp.yml
+  when: MOODLE_MCP_ENABLED | bool
+
+- name: "📧 Verify the relay accepts Moodle's mail"
+  when: lookup('config', application_id, 'services.email.enabled', false) | bool
+  block:
+    - name: "⏳ Wait for the delivery marker the healthcheck writes"
+      ansible.builtin.shell: >
+        container exec {{ MOODLE_CONTAINER_ADDRESS }} test -f {{ lookup('container_mail_marker') }}
+      register: moodle_smoke_mail
+      changed_when: false
+      failed_when: false
+      retries: 30
+      delay: 5
+      until: moodle_smoke_mail.rc == 0
+
+    - name: "🛑 Report a relay that refused every attempt"
+      ansible.builtin.assert:
+        that: moodle_smoke_mail.rc == 0
+        fail_msg: >-
+          Moodle never delivered its startup mail. The healthcheck writes
+          {{ lookup('container_mail_marker') }} only after msmtp exits 0, so the
+          relay refused every attempt. Its reason is in the container's
+          State.Health.Log; liveness itself is unaffected, which is why the
+          stack still converged.

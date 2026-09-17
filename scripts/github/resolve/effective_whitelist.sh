@@ -4,7 +4,13 @@
 # scripts/github/resolve/output_apps.sh, and write it to GITHUB_OUTPUT.
 #
 # Inputs via env:
-#   INPUT_WHITELIST  caller-provided whitelist (space-separated).
+#   INPUT_WHITELIST  caller-provided whitelist (space-separated), as role ids
+#                    or as the display names utils.roles.display renders. A
+#                    token may pin deploy axes onto the role
+#                    (`#variant`, `@mode`, `+tor`, see
+#                    utils.github.variant.selection); the pins are passed
+#                    through untouched, and only the name in front of them is
+#                    the directory this checks for.
 #                    Three cases, in this order of precedence:
 #                      * "__ALL__" (sentinel, case-insensitive): force
 #                        full deploy across the workflow's scope. Skips
@@ -25,6 +31,9 @@ set -euo pipefail
 
 : "${GITHUB_OUTPUT:?Missing GITHUB_OUTPUT}"
 
+# shellcheck source=scripts/meta/env/python.sh
+source scripts/meta/env/python.sh
+
 input="${INPUT_WHITELIST:-}"
 input_trimmed="${input//[[:space:]]/}"
 
@@ -38,6 +47,16 @@ fi
 shopt -u nocasematch
 
 if [[ -n "${input_trimmed}" ]]; then
+	input="$("${PYTHON}" -m utils.roles.display "${input}")"
+	unknown=()
+	for role in ${input}; do
+		[[ -d "roles/${role%%[#@+]*}" ]] || unknown+=("${role}")
+	done
+	if ((${#unknown[@]})); then
+		echo "[ERROR] Unknown role id(s) in the caller-supplied whitelist: ${unknown[*]}" >&2
+		echo "[ERROR] They match no directory under roles/, so they would be dropped silently and never deployed." >&2
+		exit 1
+	fi
 	printf 'whitelist=%s\n' "${input}" >>"${GITHUB_OUTPUT}"
 	echo "Using caller-supplied whitelist: ${input}"
 	exit 0

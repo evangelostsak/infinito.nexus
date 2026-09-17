@@ -1,5 +1,62 @@
 ---
-data: nextcloud_data
-whiteboard_tmp: nextcloud_whiteboard_tmp
-whiteboard_fontcache: nextcloud_whiteboard_fontcache
-talk_recording_tmp: nextcloud_talk_recording_tmp
+data:
+  name: nextcloud_data
+  type: volume
+  mounts:
+    - service: nextcloud
+      target: &var_www_html_target /var/www/html/
+    - service: cron
+      target: *var_www_html_target
+    - service: proxy
+      target: *var_www_html_target
+      read_only: true
+
+whiteboard_tmp:
+  name: nextcloud_whiteboard_tmp
+  type: volume
+  backup: false
+  mounts:
+    - service: whiteboard
+      target: &tmp_target /tmp
+
+whiteboard_fontcache:
+  name: nextcloud_whiteboard_fontcache
+  type: volume
+  backup: false
+  mounts:
+    - service: whiteboard
+      target: /var/cache/fontconfig
+
+talk_recording_tmp:
+  name: nextcloud_talk_recording_tmp
+  type: volume
+  backup: false
+  mounts:
+    - service: talk_recording
+      target: *tmp_target
+
+nginx_conf:
+  type: config
+  source: "{{ [ lookup('container', 'web-app-nextcloud', 'directories.volumes'), 'nginx.conf' ] | path_join }}"
+  mode: "0444"
+  mounts:
+    - service: proxy
+      target: /etc/nginx/nginx.conf
+
+fpm_pool_conf:
+  type: config
+  source: "{{ [ lookup('container', 'web-app-nextcloud', 'directories.volumes'), 'fpm-pool.conf' ] | path_join }}"
+  mode: "0444"
+  mounts:
+    - service: nextcloud
+      target: /usr/local/etc/php-fpm.d/zzz-infinito.conf
+
+infinito_conf:
+  type: bind
+  source: "{{ [ lookup('container', 'web-app-nextcloud', 'directories.volumes'), 'infinito' ] | path_join }}"
+  read_only: true
+  mounts:
+    - service: nextcloud
+      target: &var_www_infinito_target /var/www/infinito/
+    - service: cron
+      target: *var_www_infinito_target

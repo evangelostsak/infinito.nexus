@@ -33,6 +33,20 @@ This role:
 - Runs Playwright in Docker with stable browser settings (`--ipc=host`, `--shm-size=1g`)
 - Stores per-role reports/artifacts under `TEST_E2E_PLAYWRIGHT_REPORTS_BASE_DIR/<application_id>`
 
+## Cosmos
+
+The diagram places Test: E2E Playwright Runner in the Infinito.Nexus cosmos: the components it deploys (capabilities), the central services it consumes (dependencies), and its outward reach (federation and bridged external networks).
+
+```mermaid
+flowchart LR
+    subgraph role [test-e2e-playwright 💻]
+        svc_test_e2e_playwright["test-e2e-playwright"]
+        svc_playwright["playwright"]
+    end
+```
+
+Solid `1:1` edges are fixed relationships; dashed `0..1` edges are conditional (enabled only in matching deployments); red `0..0` edges are turned off in this role. Node markers show the role's deploy modes (💻 host, 🐳 compose, 🐝 swarm); ❌ marks a service that is explicitly turned off, and ⚙️ an Ansible role dependency declared in `meta/main.yml`.
+
 ## Features
 
 - **Automated provisioning:** Configured by Ansible without manual steps.
@@ -85,15 +99,9 @@ Both are used as central defaults for every app role.
 - `TEST_E2E_PLAYWRIGHT_IMAGE_DISTRO` (default: `noble`)
 - `TEST_E2E_PLAYWRIGHT_COMMAND` (default: `npm install --no-fund --no-audit && npx playwright test`)
 
-### Readiness wait
-
-- `test_e2e_playwright_wait_enabled` (default: `true`)
-- `test_e2e_playwright_wait_retries` (default: `30`)
-- `test_e2e_playwright_wait_delay` (default: `5`)
-
 ### Discovery filters
 
-- `test_e2e_playwright_only_roles` (default: `allowed_applications`)
+- `test_e2e_playwright_only_roles` (default: `lookup('deployment').running`, every role the round deploys, dependencies included)
 - `test_e2e_playwright_skip_roles` (default: `[]`)
 
 ## Design notes
@@ -110,7 +118,7 @@ Both are used as central defaults for every app role.
    - `roles/<application_id>/templates/playwright.env.j2`
    - `roles/<application_id>/files/playwright/playwright.spec.js`
    Follow [Contributing `playwright.env.j2`](../../docs/agents/files/role/playwright.env.j2.md) and [Contributing `playwright.spec.js`](../../docs/contributing/artefact/files/role/playwright.specs.js.md) while creating them.
-2. Run deployment and include your app in `allowed_applications` (or leave it empty to run all discovered apps).
+2. Deploy a round that includes your app (e.g. `make compose-deploy apps=<application_id>`); its specs run with those of every other role the round deploys.
 3. Keep `package.json` and `playwright.config.js` centralized in `roles/test-e2e-playwright/` (`templates/package.json.j2` and `files/playwright.config.js`).
 
 Example override for running only one spec:
@@ -127,7 +135,6 @@ This role no longer ships its own local recording wrapper.
 
 ## Credits
 
-Developed and maintained by **Kevin Veen-Birkenbach**.
-Learn more at [veen.world](https://www.veen.world).
-Part of the [Infinito.Nexus Project](https://s.infinito.nexus/code).
+Implemented by **[Kevin Veen-Birkenbach](https://www.veen.world)**.
+Part of the [Infinito.Nexus Project](https://s.infinito.nexus/code) and maintained by [Kevin Veen-Birkenbach](https://www.veen.world).
 Licensed under the [Infinito.Nexus Community License (Non-Commercial)](https://s.infinito.nexus/license).

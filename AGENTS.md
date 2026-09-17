@@ -41,6 +41,12 @@ Agents whose runtime does not consult `.claude/settings.json` MUST still enforce
 
 Changes to the policy MUST edit [`.claude/settings.json`](.claude/settings.json). Per-entry rationale: [settings.md](docs/contributing/tools/agents/claude/settings.md); sandbox layer: [sandbox.md](docs/contributing/tools/agents/claude/sandbox.md).
 
+## Shortcuts ⌨️
+
+Operator messages MAY use the portable conversation shortcuts from the `shortcuts` skill (set up via `make install-skills`); agents MUST expand any matching shortcut before acting. The repository's own agent workflows live in the `i8-` skills catalogued in [cheatsheet.md](docs/contributing/tools/agents/cheatsheet.md).
+
+Whenever an operator types out something an existing alias (listed by `make alias`) covers, the agent MUST append a hint right after that block so the operator learns the shorter form: ``Speed up by using prompt alias `<alias>` instead of `<what the operator wrote>`.`` for a prompt or request an agent shortcut covers, and ``Speed up by using cli alias `<alias>` instead of `<what the operator wrote>`.`` for a shell command a terminal alias covers.
+
 ## Role-Specific Instructions 📂
 
 - Before modifying any file under `roles/<role>/`, check for `roles/<role>/AGENTS.md`. If present, read and follow it (including any file-scoped subsections) before any change.
@@ -48,6 +54,14 @@ Changes to the policy MUST edit [`.claude/settings.json`](.claude/settings.json)
 ## Temporary Files 🗑️
 
 Agents MUST write all transient files (downloaded logs, intermediate output, scratch artefacts) to `/tmp`. The set of writable paths is defined by `sandbox.filesystem.allowWrite` in [`.claude/settings.json`](.claude/settings.json); of those entries, `/tmp` is the designated path for agent scratch data. Other entries are reserved for their respective tooling and MUST NOT be repurposed for agent temp data. The repository working tree MUST NOT hold transient files.
+
+## Credentials in Agent Output 🔐
+
+Agents MUST read deploy logs by extracting the field they need (`msg`, `stderr`, a probe result). Printing a raw task block, `argv` list, or environment dump is **FORBIDDEN ⛔**, including via a line-range `sed`/`head` over one.
+
+A secret denylist such as `grep -v 'password|token|key'` does **NOT** count as protection: it is case-sensitive, and secrets also travel inside URL paths. Local deploys run with `MASK_CREDENTIALS_IN_LOGS` disabled, so `no_log` does not mask these tasks.
+
+When a credential must be compared, compute and compare digests inside the container; never emit the value. If a credential does reach the transcript, agents MUST say so in the same message and list it for rotation.
 
 ## Container-Owned Filesystem Entries 🐳
 

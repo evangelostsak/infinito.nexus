@@ -1,0 +1,65 @@
+name: "💬 Test: DNS"
+
+on:
+  workflow_dispatch:
+    inputs:
+      distros:
+        description: "🐧 Space-separated distro list (e.g. 'arch debian ubuntu')"
+        required: false
+        default: "debian"
+        type: string
+
+  workflow_call:
+    inputs:
+      distros:
+        description: "Space-separated distro list"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  dns:
+    name: 🌐 DNS
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: 🧹 Free disk space
+        if: ${{ !env.ACT }}
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: ⬇️ Checkout
+        uses: actions/checkout@v7.0.0
+
+      - name: 🔑 Login to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🔍 Resolve image coordinates
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "OWNER=$(scripts/meta/resolve/repository/owner.sh)" >> "$GITHUB_ENV"
+          repo_name="${{ github.repository }}"
+          repo_name="${repo_name#*/}"
+          echo "REPO_NAME=${repo_name,,}" >> "$GITHUB_ENV"
+
+      - name: 🌐 DNS test per distro (parallel DinD)
+        shell: bash
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./scripts/tests/dns/parallel.sh ${{ inputs.distros }}

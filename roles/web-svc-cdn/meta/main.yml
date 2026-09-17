@@ -1,7 +1,7 @@
 ---
 galaxy_info:
   author: Kevin Veen-Birkenbach
-  description: "Configures an Nginx-based Content Delivery Network Server.\n"
+  description: Nginx-based content delivery network for serving shared static assets to internal web applications
   license: Infinito.Nexus Community License (Non-Commercial)
   company: |
     Kevin Veen-Birkenbach

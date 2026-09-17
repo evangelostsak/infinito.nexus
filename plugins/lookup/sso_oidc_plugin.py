@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from ansible.errors import AnsibleError
+from ansible.plugins.loader import lookup_loader
 from ansible.plugins.lookup import LookupBase
 
-from utils.cache.applications import get_merged_applications
 from utils.roles.applications.config import get
 from utils.roles.applications.services.sso import get_sso_config
 
@@ -40,16 +40,9 @@ class LookupModule(LookupBase):
         templar = getattr(self, "_templar", None)
         variables = variables or getattr(self._templar, "available_variables", {}) or {}
 
-        # Use the same merged+rendered applications payload that lookup('config')
-        # consumes. The raw `variables["applications"]` that Ansible hands the
-        # lookup is the pre-merge override slice, so nested defaults like
-        # services.ldap.enabled are not yet visible there and the flavor
-        # would silently fall back to 'sociallogin'.
-        applications = get_merged_applications(
-            variables=variables,
-            roles_dir=kwargs.get("roles_dir"),
-            templar=templar,
-        )
+        applications = lookup_loader.get(
+            "applications", loader=self._loader, templar=templar
+        ).run([], variables=variables)[0]
 
         if not get_sso_config(applications, _APPLICATION_ID)["is_enabled"]:
             return [""]

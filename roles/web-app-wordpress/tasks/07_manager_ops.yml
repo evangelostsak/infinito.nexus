@@ -1,0 +1,96 @@
+---
+- name: 🔎 Check if {{ WORDPRESS_CONFIG_FILE }} exists in WordPress
+  shell: >
+    container exec -u {{ WORDPRESS_USER }} {{ WORDPRESS_CONTAINER_ADDRESS }} test -f {{ WORDPRESS_CONFIG_PATH }}
+  register: wp_config_file_exists
+  changed_when: false
+  failed_when: false
+
+- name: 🩹 Patch WordPress {{ WORDPRESS_CONFIG_FILE }} with updated DB credentials
+  include_tasks: 01_patch_config.yml
+  when: wp_config_file_exists.rc == 0
+
+- name: "📦 Install wordpress"
+  include_tasks: 02_install.yml
+
+- name: "🔄 Convert to Multisite when opted in"
+  include_tasks: 03_multisite.yml
+  when: >-
+    (lookup('config', application_id, 'services.wordpress.multisite.enabled')
+      | default(false) | bool)
+
+- name: "🛑 Assert every required addon is claimed by an install path"
+  ansible.builtin.assert:
+    that:
+      - WORDPRESS_ADDONS_REQUIRED | difference(WORDPRESS_ADDONS_INSTALLED) | length == 0
+    fail_msg: >-
+      Required addon(s)
+      {{ WORDPRESS_ADDONS_REQUIRED | difference(WORDPRESS_ADDONS_INSTALLED) | join(', ') }}
+      are declared in meta/addons/ but no install loop selects them; their
+      `mechanism` must be `plugin` or `mu_plugin` to be installed at all.
+
+- name: "📦 Install declared mu-plugins"
+  include_tasks: 04_mu_plugins.yml
+
+- name: "🔁 Iterate through WordPress plugins"
+  include_tasks: 05_enable_plugin.yml
+  loop: "{{ WORDPRESS_PLUGINS }}"
+  loop_control:
+    loop_var: wordpress_plugin
+    label: "{{ wordpress_plugin.key }}"
+  vars:
+    plugin_name: "{{ wordpress_plugin.key }}"
+    plugin_enabled: "{{ wordpress_plugin.value.enabled | bool }}"
+    plugin_task_path: "{{ [role_path, 'tasks/addons', plugin_name  ~ '.yml' ] | path_join }}"
+  when: plugin_enabled | bool
+
+- name: "⬇️ Get current 'permalink_structure'"
+  shell: >
+    container exec -u {{ WORDPRESS_USER }} {{ WORDPRESS_CONTAINER_ADDRESS }}
+    wp option get permalink_structure --path={{ WORDPRESS_DOCKER_HTML_PATH }}
+  register: wp_permalink_structure
+  changed_when: false
+  failed_when: false
+
+- name: "🔗 Set the permalink structure the /wp-json routes need"
+  shell: >
+    container exec -u {{ WORDPRESS_USER }} {{ WORDPRESS_CONTAINER_ADDRESS }}
+    wp option update permalink_structure "{{ WORDPRESS_PERMALINK_STRUCTURE }}"
+    --path={{ WORDPRESS_DOCKER_HTML_PATH }}
+  when: (wp_permalink_structure.stdout | trim) != WORDPRESS_PERMALINK_STRUCTURE
+
+- name: 🔍 Detect if WordPress is Multisite
+  shell: >
+    container exec -u {{ WORDPRESS_USER }} {{ WORDPRESS_CONTAINER_ADDRESS }}
+    wp eval 'echo (int) is_multisite();' --path={{ WORDPRESS_DOCKER_HTML_PATH }}
+  register: wp_is_multisite
+  changed_when: false
+
+- name: "🔄 Update Single Side WordPress domain"
+  include_tasks: 06_update_domain.yml
+  when: (wp_is_multisite.stdout | trim) == '0'
+  vars:
+    wp_new_url: "{{ WORDPRESS_URL }}"
+
+- name: "📧 Verify the relay accepted WordPress's startup mail"
+  when: lookup('config', application_id, 'services.email.enabled', false) | bool
+  block:
+    - name: "⏳ Wait for the delivery marker the healthcheck writes"
+      shell: >
+        container exec {{ WORDPRESS_CONTAINER_ADDRESS }} test -f {{ lookup('container_mail_marker') }}
+      register: wordpress_smoke_mail
+      changed_when: false
+      failed_when: false
+      retries: 30
+      delay: 5
+      until: wordpress_smoke_mail.rc == 0
+
+    - name: "🛑 Report a relay that refused every attempt"
+      ansible.builtin.assert:
+        that: wordpress_smoke_mail.rc == 0
+        fail_msg: >-
+          WordPress never delivered its startup mail. The healthcheck writes
+          {{ lookup('container_mail_marker') }} only after msmtp exits 0, so
+          the relay refused every attempt. Its reason is in the container's
+          State.Health.Log; liveness itself is unaffected, which is why the
+          stack still converged.

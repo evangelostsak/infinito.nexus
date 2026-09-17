@@ -17,24 +17,26 @@ from pathlib import Path
 from utils.cache import PROJECT_ROOT
 from utils.install.lint import (
     actionlint,
-    ansible_collections,
-    ansible_commands,
-    ansible_lint,
     eslint,
+    hadolint,
     markdownlint_cli2,
     mbake,
+    mermaid_cli,
     packages,
+    php,
     playwright,
+    ruby,
     ruff,
     shellcheck,
     shfmt,
+    sqlfluff,
+    stylelint,
 )
+from utils.install.lint.ansible import collections as ansible_collections
+from utils.install.lint.ansible import commands as ansible_commands
+from utils.install.lint.ansible import lint as ansible_lint
 from utils.install.primitives import warn
 
-# Stamp filename includes a hash of sys.executable so the host venv and
-# the container venv track their installs independently even though
-# `build/` is bind-mounted. Without this suffix, a host install would
-# trick the container into thinking its tools were present.
 _STAMP_KEY = hashlib.sha256(sys.executable.encode("utf-8")).hexdigest()[:8]
 _STAMP = f"build/install-lint-{_STAMP_KEY}.stamp"
 _STAMP_DEPS = (
@@ -42,17 +44,16 @@ _STAMP_DEPS = (
     "pyproject.toml",
 )
 
-# Tools the all-mode install must produce. Verified before trusting the
-# stamp so a container rebuild (which wipes the layer that held the
-# binaries but leaves the host-mounted build/ stamp intact) cannot trick
-# us into skipping the reinstall.
 _STAMP_TOOLS = (
     "actionlint",
     "ansible-lint",
     "ansible-playbook",
     "eslint",
+    "hadolint",
     "markdownlint-cli2",
     "mbake",
+    "php",
+    "ruby",
     "ruff",
     "shellcheck",
     "shfmt",
@@ -74,12 +75,28 @@ def _install_python_tools() -> None:
     ruff.ensure()
 
 
+def _install_php_tools() -> None:
+    php.ensure()
+
+
+def _install_ruby_tools() -> None:
+    ruby.ensure()
+
+
 def _install_shellcheck_tools() -> None:
     shellcheck.ensure()
 
 
+def _install_dockerfile_tools() -> None:
+    hadolint.ensure()
+
+
 def _install_markdown_tools() -> None:
     markdownlint_cli2.ensure()
+
+
+def _install_mermaid_tools() -> None:
+    mermaid_cli.ensure()
 
 
 def _install_makefile_tools() -> None:
@@ -98,16 +115,38 @@ def _install_packages_tools() -> None:
     packages.ensure()
 
 
+def _install_php_tools() -> None:
+    php.ensure()
+
+
+def _install_ruby_tools() -> None:
+    ruby.ensure()
+
+
+def _install_sql_tools() -> None:
+    sqlfluff.ensure()
+
+
+def _install_css_tools() -> None:
+    stylelint.ensure()
+
+
 _GROUP_FN_NAMES = {
     "action": "_install_action_tools",
     "ansible": "_install_ansible_tools",
     "python": "_install_python_tools",
+    "php": "_install_php_tools",
+    "ruby": "_install_ruby_tools",
     "shellcheck": "_install_shellcheck_tools",
+    "dockerfile": "_install_dockerfile_tools",
     "markdown": "_install_markdown_tools",
+    "mermaid": "_install_mermaid_tools",
     "makefile": "_install_makefile_tools",
     "javascript": "_install_javascript_tools",
     "playwright": "_install_playwright_tools",
     "packages": "_install_packages_tools",
+    "sql": "_install_sql_tools",
+    "css": "_install_css_tools",
 }
 
 
@@ -115,8 +154,12 @@ def _install_all() -> None:
     _install_action_tools()
     _install_ansible_tools()
     _install_python_tools()
+    _install_php_tools()
+    _install_ruby_tools()
     _install_shellcheck_tools()
+    _install_dockerfile_tools()
     _install_markdown_tools()
+    _install_mermaid_tools()
     _install_makefile_tools()
     _install_javascript_tools()
     _install_playwright_tools()
@@ -153,9 +196,9 @@ def _dispatch(group: str) -> None:
     if fn_name is None:
         raise RuntimeError(
             "Usage: python -m utils.install.lint "
-            "[all|action|ansible|python|shellcheck|markdown|makefile|javascript|playwright|packages]..."
+            "[all|action|ansible|python|shellcheck|dockerfile|markdown|mermaid|makefile|"
+            "javascript|playwright|packages|php|ruby|sql|css]..."
         )
-    # Resolve by name so test patches via `mock.patch.object(cli, ...)` take effect.
     globals()[fn_name]()
 
 
@@ -180,8 +223,6 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     # chdir for installers that resolve relative paths (eslint's npm ci
-    # in node_modules/, etc.); restore on exit so test teardown does
-    # not orphan CWD when the test's repo_root is a TemporaryDirectory.
     previous_cwd = Path.cwd() if Path.cwd().exists() else None
     os.chdir(repo_root)
     try:

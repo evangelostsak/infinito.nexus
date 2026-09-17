@@ -1,0 +1,9 @@
+# nocheck: backup-service-flag locally built images are rebuildable; the volume is backup-disabled and the consumer permanently off
+---
+data:
+  type: volume
+  name: docker_registry_data
+  backup: false
+  mounts:
+    - service: docker
+      target: /var/lib/registry

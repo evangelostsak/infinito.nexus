@@ -4,11 +4,14 @@ import re
 from typing import Any
 
 from ansible.errors import AnsibleError
+from ansible.plugins.loader import lookup_loader
 from ansible.plugins.lookup import LookupBase
 
-from utils.cache.applications import get_merged_applications
 from utils.cache.base import _render_with_templar
 from utils.roles.applications.config import get
+from utils.roles.applications.services.registry import (
+    build_service_registry_from_applications,
+)
 
 ENV_SUFFIX = "_ADDON_ENABLED"
 _TRUE_TOKENS = {"true", "1", "yes", "on", "t", "y"}
@@ -26,10 +29,11 @@ def _is_enabled(value: Any) -> bool:
 
 
 def _resolve_deployed_roles(variables, templar, applications):
-    """Resolve TEST_E2E_PLAYWRIGHT_APPS (the deployed playwright role ids) to a set.
+    """Resolve the round's deployed role closure to a set.
     Returns None when it cannot be resolved, in which case bridge-deployment
-    gating is skipped (no behaviour change)."""
-    raw = (variables or {}).get("TEST_E2E_PLAYWRIGHT_APPS")
+    gating is skipped (no behaviour change).
+    """
+    raw = (variables or {}).get("group_names")
     if raw is None:
         return None
     resolved = raw
@@ -44,16 +48,22 @@ def _resolve_deployed_roles(variables, templar, applications):
         resolved = [r for r in re.split(r"[\s,]+", resolved.strip()) if r]
     if not isinstance(resolved, (list, tuple, set)):
         return None
-    return {str(r).strip() for r in resolved if str(r).strip()}
+    return {str(r).strip() for r in resolved if str(r).strip()} or None
 
 
-def _any_bridge_partner_deployed(bridges, deployed_roles):
-    """A bridged addon's partner counts as deployed iff some deployed role id
-    equals or ends with the bridge name (web-app-<bridge>, web-svc-<bridge>, ...)."""
+def _any_bridge_partner_deployed(bridges, deployed_roles, service_registry):
+    """A bridged addon's partner counts as deployed when a deployed role either
+    provides the bridged service (``sso`` -> ``web-app-keycloak``, ``ldap`` ->
+    ``svc-db-openldap``) or carries the bridge name as its entity
+    (``matrix`` -> ``web-app-matrix``)."""
     for bridge in bridges:
         name = str(bridge).strip()
         if not name:
             continue
+        entry = service_registry.get(name) if service_registry else None
+        provider = entry.get("role") if isinstance(entry, dict) else None
+        if provider and provider in deployed_roles:
+            return True
         variants = {name, name.replace("_", "-")}
         for role in deployed_roles:
             if role in variants or any(role.endswith("-" + v) for v in variants):
@@ -89,11 +99,9 @@ class LookupModule(LookupBase):
         templar = getattr(self, "_templar", None)
         variables = variables or getattr(self._templar, "available_variables", {}) or {}
 
-        applications = get_merged_applications(
-            variables=variables,
-            roles_dir=kwargs.get("roles_dir"),
-            templar=templar,
-        )
+        applications = lookup_loader.get(
+            "applications", loader=self._loader, templar=templar
+        ).run([], variables=variables)[0]
         addons = get(
             applications=applications,
             application_id=application_id,
@@ -112,6 +120,7 @@ class LookupModule(LookupBase):
             addons = {}
 
         deployed_roles = _resolve_deployed_roles(variables, templar, applications)
+        service_registry = build_service_registry_from_applications(applications)
 
         lines = []
         for addon_id in sorted(addons, key=env_key):
@@ -124,7 +133,9 @@ class LookupModule(LookupBase):
             if active and deployed_roles is not None:
                 bridges = spec.get("bridges")
                 if isinstance(bridges, list) and bridges:
-                    active = _any_bridge_partner_deployed(bridges, deployed_roles)
+                    active = _any_bridge_partner_deployed(
+                        bridges, deployed_roles, service_registry
+                    )
             lines.append(f"{env_key(addon_id)}={'true' if active else 'false'}")
 
         return ["\n".join(lines)]

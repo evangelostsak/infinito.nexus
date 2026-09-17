@@ -1,0 +1,86 @@
+---
+bigbluebutton:
+  type: volume
+  name: bigbluebutton_bigbluebutton
+  mounts:
+    - service: bbb-web
+      target: &var_bigbluebutton_target /var/bigbluebutton
+    - service: nginx
+      target: *var_bigbluebutton_target
+    - service: bbb-export-annotations
+      target: *var_bigbluebutton_target
+    - service: periodic
+      target: *var_bigbluebutton_target
+    - service: prometheus-exporter
+      target: *var_bigbluebutton_target
+      read_only: true
+    - service: recordings
+      target: *var_bigbluebutton_target
+freeswitch:
+  type: volume
+  name: bigbluebutton_freeswitch
+  mounts:
+    - service: bbb-web
+      target: &var_freeswitch_meetings_target /var/freeswitch/meetings
+    - service: freeswitch
+      target: *var_freeswitch_meetings_target
+    - service: apps-akka
+      target: *var_freeswitch_meetings_target
+    - service: recordings
+      target: *var_freeswitch_meetings_target
+mediasoup:
+  type: volume
+  name: bigbluebutton_mediasoup
+  mounts:
+    - service: webrtc-sfu
+      target: &var_mediasoup_target /var/mediasoup
+    - service: periodic
+      target: *var_mediasoup_target
+    - service: recordings
+      target: *var_mediasoup_target
+redis:
+  type: volume
+  name: bigbluebutton_redis
+  mounts:
+    - service: redis
+      target: /data
+database:
+  type: volume
+  name: bigbluebutton_database
+  mounts:
+    - service: postgres
+      target: /var/lib/postgresql/data
+greenlight:
+  type: volume
+  name: bigbluebutton_greenlight
+  mounts:
+    - service: greenlight
+      target: /usr/src/app/storage
+coturn:
+  type: volume
+  name: bigbluebutton_coturn
+  mounts:
+    - service: coturn
+      target: /var/lib/coturn
+ep_redis_publisher_patch:
+  type: bind
+  source: "{{ [lookup('container', 'web-app-bigbluebutton', 'directories.instance'), 'ep_redis_publisher_index.js'] | path_join }}"
+  read_only: true
+  mounts:
+    - service: etherpad
+      target: /opt/etherpad-lite/src/plugin_packages/.versions/ep_redis_publisher@0.0.3/index.js
+etherpad_pg_entrypoint:
+  type: config
+  source: "{{ [lookup('container', 'web-app-bigbluebutton', 'directories.instance'), 'etherpad_pg_entrypoint.sh'] | path_join }}"
+  mode: "0444"
+  mounts:
+    - service: etherpad
+      target: /etherpad_pg_entrypoint.sh
+
+postgres_initdb_etherpad:
+  type: config
+  source: "{{ [lookup('container', 'web-app-bigbluebutton', 'directories.instance'), 'postgres_initdb_etherpad.sh'] | path_join }}"
+  mode: "0555"
+  mounts:
+    - service: postgres
+      target: /docker-entrypoint-initdb.d/zz-etherpad.sh

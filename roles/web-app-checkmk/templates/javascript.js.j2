@@ -1,7 +1,5 @@
 (function () {
-  const LOGOUT_URL =
-    "{{ OIDC.CLIENT.LOGOUT_URL }}?redirect_uri=" +
-    encodeURIComponent("{{ lookup('tls', application_id, 'protocols.web') }}://{{ DOMAIN_PRIMARY }}");
+  const LOGOUT_URL = {{ lookup('sso', application_id, 'logout_url') | to_json }};
   const INJECTED_ATTR = "data-injected-logout";
   const LOGOUT_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
@@ -55,8 +53,6 @@
     );
 
     if (anchor) {
-      // Clone the styling of an existing sibling control so the injected
-      // logout matches the surrounding icon group.
       const sibling = anchor.querySelector(
         ":scope > button, :scope > a, :scope > li > button, :scope > li > a",
       );
@@ -75,10 +71,6 @@
       return;
     }
 
-    // Checkmk's classic GUI has no <header>/<nav> anchor in the top frame
-    // (the toolbar is bare <div>/<a>, and the real logout hides behind the
-    // "User" menu). Fall back to a fixed top-right control appended to the
-    // top-frame <body> so the universal persona logout can always reach it.
     btn.style.cssText = [
       "position:fixed",
       "top:6px",
@@ -107,8 +99,6 @@
       childList: true,
       subtree: true,
     });
-    // Checkmk mounts its top navigation asynchronously — retry after the
-    // initial paint so a single synchronous pass does not miss the banner.
     setTimeout(ensureLogoutIcon, 750);
     setTimeout(ensureLogoutIcon, 2500);
   }

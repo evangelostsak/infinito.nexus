@@ -1,5 +1,4 @@
 ---
-- name: install make
-  package:
-    name: make
-    state: present
+- name: 📦 install make
+  package_install:
+    id: make

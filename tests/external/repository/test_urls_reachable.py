@@ -2,19 +2,33 @@
 
 Scans git-tracked and untracked-but-not-ignored text files for literal
 ``http://`` and ``https://`` URLs. Placeholder/template URLs and reserved
-local/example hosts are skipped. Per-line suppression uses the unified
+local/example hosts are skipped, as are ``.onion`` addresses, which no
+clearnet probe can reach without a Tor SOCKS proxy this suite does not use.
+Per-line suppression uses the unified
 ``# nocheck: url`` marker. See
 ``docs/contributing/actions/testing/suppression.md``.
 
 This is an external test because it performs live HTTP requests against the
 referenced third-party URLs. HTTP ``401`` (Unauthorized), ``403`` (Forbidden),
-``405`` (Method Not Allowed) and ``415`` (Unsupported Media Type) are treated
-as reachable (server is alive but auth-gated, method-restricted, or rejecting
-the probe's content-type). HTTP ``418`` (I'm a teapot), ``429`` (Too
-Many Requests), ``451`` (Unavailable For Legal Reasons), every ``5xx`` server
-response, plus timeouts and connection errors (reset, aborted) emit warning
-annotations rather than failing the test, since these signal an upstream issue
-outside this repository's control. All other ``4xx`` codes fail the test.
+``405`` (Method Not Allowed), ``406`` (Not Acceptable) and ``415``
+(Unsupported Media Type) are treated as reachable (server is alive but
+auth-gated, method-restricted, or rejecting the probe's headers). HTTP ``418``
+(I'm a teapot), ``429`` (Too Many Requests), ``451`` (Unavailable For Legal
+Reasons) and every ``5xx`` server response emit warning annotations rather than
+failing: the server answered, so the URL exists. All other ``4xx`` codes fail
+once a second probe after a pause answers the same way.
+
+A timeout or connection error is a third outcome, reported as an unverified
+warning: the server never answered, so the URL was not checked at all. Such a
+probe is indeterminate rather than negative -- a host may be geo-blocked, be a
+rendered template placeholder, or simply be firewalled off from this runner.
+
+That tolerance is what let a sandbox with no route to the registry report a
+green run over 244 unanswered probes, among them 110 lockfile URLs that were in
+fact HTTP 404. The guard against it is ``_CONNECTIVITY_CANARIES``: before any
+probing, the suite checks the infrastructure hosts the repository actually
+depends on, and fails outright when they are unreachable. A run that cannot
+reach its subject does not pass; it does not run.
 """
 
 from __future__ import annotations
@@ -45,6 +59,11 @@ _REPO_ROOT = PROJECT_ROOT
 _URL_RE = re.compile(r"https?://[^\s<>'\"`\]]+")
 _TEMPLATE_MARKERS = ("${", "{{", "}}", "{%", "%}")
 _PUBLIC_HOST_RE = re.compile(r"^[A-Za-z0-9.-]+$")
+_CONNECTIVITY_CANARIES = (
+    "https://github.com/",
+    "https://pypi.org/simple/ansible/",
+    "https://registry.npmjs.org/",
+)
 _RESERVED_HOSTS = {
     "example",
     "example.com",
@@ -60,39 +79,22 @@ _RESERVED_HOST_SUFFIXES = (
     ".example.org",
     ".invalid",
     ".local",
+    ".onion",
     ".localhost",
     ".localdomain",
     ".test",
     ".tld",
 )
-# Codes that mean the server responded but access is auth-gated or method-gated.
-# These are not dead links; treat them as reachable.
-_OK_STATUS_CODES = {
-    401,  # Unauthorized: credentials required, server is alive.
-    403,  # Forbidden: server is alive, resource intentionally gated.
-    405,  # Method Not Allowed: server is alive, HEAD/GET rejected by design.
-    415,  # Unsupported Media Type: server is alive, probe content-type rejected.
-}
-# 4xx codes that mean the server is alive but the resource is not reliably
-# probeable. Emit a warning annotation instead of failing the test. All 5xx
-# responses are treated as warnings unconditionally (see _probe), since they
-# signal an upstream-side problem rather than a stale link in this repo.
-_WARNING_STATUS_CODES = {
-    418,  # I'm a teapot: playful/custom response; server is alive.
-    429,  # Too Many Requests: client rate-limited, transient.
-    451,  # Unavailable For Legal Reasons: jurisdiction-specific block.
-}
+_OK_STATUS_CODES = {401, 403, 405, 406, 415}
+_WARNING_STATUS_CODES = {418, 429, 451}
 _REQUEST_TIMEOUT_SECONDS = 10
-_USER_AGENT = "infinito-nexus-url-reachability-check"
+_FAIL_RETRY_DELAY_SECONDS = 5
+_USER_AGENT = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+)
 _MAX_WORKERS = int(os.environ["INFINITO_WORKER_FETCH"])
-# Hard ceiling for the whole probe loop. After this elapses, any probe
-# still in flight is marked as a Timeout warning so the test never hangs
-# indefinitely on a slow / trickling server. 5h30m matches the longest
-# CI workflow timeout (so the deadline trips before CI kills the job
-# with no annotations).
 _GLOBAL_DEADLINE_SECONDS = 5 * 3600 + 30 * 60
-# Emit a "[done/total] elapsed=Ns" line every N completions so the
-# operator sees progress instead of staring at silence.
 _PROGRESS_INTERVAL = 50
 
 
@@ -270,11 +272,6 @@ def _probe_key(url: str) -> str:
 def _probe_url(url: str) -> ProbeOutcome:
     """Probe one URL and classify the result for external-test stability."""
     try:
-        # allow_redirects=False: each redirect would otherwise start its
-        # own _REQUEST_TIMEOUT_SECONDS clock, so a 5-deep chain could
-        # legitimately block 5×10s = 50s. We treat any 3xx as "server
-        # alive" anyway (status < 400 is OK), so following the chain
-        # adds no signal.
         response = requests.get(
             url,
             allow_redirects=False,
@@ -287,9 +284,9 @@ def _probe_url(url: str) -> ProbeOutcome:
         finally:
             response.close()
     except requests.Timeout as exc:
-        return ProbeOutcome("warn", f"Timeout: {exc}")
+        return ProbeOutcome("unverified", f"Timeout: {exc}")
     except requests.ConnectionError as exc:
-        return ProbeOutcome("warn", f"ConnectionError: {exc}")
+        return ProbeOutcome("unverified", f"ConnectionError: {exc}")
     except requests.RequestException as exc:
         return ProbeOutcome("fail", f"{type(exc).__name__}: {exc}")
     except Exception as exc:  # pragma: no cover - defensive safety net
@@ -300,6 +297,23 @@ def _probe_url(url: str) -> ProbeOutcome:
     if status in _WARNING_STATUS_CODES or status >= 500:
         return ProbeOutcome("warn", f"HTTP {status}")
     return ProbeOutcome("fail", f"HTTP {status}")
+
+
+def _probe_canary(url: str) -> ProbeOutcome:
+    """Probe a connectivity canary, retrying once so one blip cannot fail the run."""
+    outcome = _probe_url(url)
+    if outcome.kind == "unverified":
+        outcome = _probe_url(url)
+    return outcome
+
+
+def _probe_with_retry(url: str) -> ProbeOutcome:
+    """Probe one URL; a failing HTTP status is confirmed by a second probe after a pause."""
+    outcome = _probe_url(url)
+    if outcome.kind == "fail" and outcome.detail.startswith("HTTP "):
+        time.sleep(_FAIL_RETRY_DELAY_SECONDS)
+        outcome = _probe_url(url)
+    return outcome
 
 
 def _collect_occurrences(root: Path) -> dict[str, list[UrlOccurrence]]:
@@ -321,8 +335,26 @@ class TestUrlsReachable(unittest.TestCase):
             "No probe-worthy public HTTP(S) URLs found in repository files.",
         )
 
+        unreachable_canaries = [
+            (url, outcome.detail)
+            for url, outcome in ((c, _probe_canary(c)) for c in _CONNECTIVITY_CANARIES)
+            if outcome.kind == "unverified"
+        ]
+        if unreachable_canaries:
+            self.fail(
+                "This host cannot reach the infrastructure the repository depends"
+                " on, so nothing below would actually be verified:\n"
+                + "\n".join(
+                    f"  {url} -> {detail}" for url, detail in unreachable_canaries
+                )
+                + "\n\n  Every other probe would fail the same way and be reported"
+                " as a warning, turning an unchecked run green. Run this suite from"
+                " a host with a route to the internet."
+            )
+
         failing_found: list[tuple[str, UrlOccurrence, str, int]] = []
         warnings_found: list[tuple[str, UrlOccurrence, str, int]] = []
+        unverified_found: list[tuple[str, UrlOccurrence, str, int]] = []
 
         total = len(occurrences_by_url)
         print(
@@ -334,18 +366,11 @@ class TestUrlsReachable(unittest.TestCase):
             flush=True,
         )
 
-        # Manual executor lifecycle (no `with`-block) so we can shutdown
-        # with wait=False on the deadline path — otherwise the context
-        # manager would still wait for every in-flight thread.
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=_MAX_WORKERS)
-        # Sort first for determinism, then shuffle so same-host URLs do
-        # not pile up at the front of the batch and self-DoS a single
-        # origin (and so retries don't always hit the slowest tail in
-        # the same order).
         submission_order = sorted(occurrences_by_url)
         random.shuffle(submission_order)
         future_to_url = {
-            executor.submit(_probe_url, url): url for url in submission_order
+            executor.submit(_probe_with_retry, url): url for url in submission_order
         }
 
         completed = 0
@@ -378,6 +403,17 @@ class TestUrlsReachable(unittest.TestCase):
                     )
                     continue
 
+                if outcome.kind == "unverified":
+                    unverified_found.append(
+                        (
+                            "External URL unverified",
+                            occurrences[0],
+                            f"{probe_url} -> {outcome.detail}",
+                            len(occurrences),
+                        )
+                    )
+                    continue
+
                 if outcome.kind == "warn":
                     warnings_found.append(
                         (
@@ -392,19 +428,21 @@ class TestUrlsReachable(unittest.TestCase):
             unfinished_urls = [u for f, u in future_to_url.items() if not f.done()]
             for probe_url in unfinished_urls:
                 occurrences = occurrences_by_url[probe_url]
-                warnings_found.append(
+                unverified_found.append(
                     (
-                        "External URL reachability",
+                        "External URL unverified",
                         occurrences[0],
-                        f"{probe_url} -> Timeout: global deadline "
-                        f"{_GLOBAL_DEADLINE_SECONDS}s exceeded",
+                        (
+                            f"{probe_url} -> Timeout: global deadline "
+                            f"{_GLOBAL_DEADLINE_SECONDS}s exceeded"
+                        ),
                         len(occurrences),
                     )
                 )
             print(
                 f"  global deadline reached at {elapsed:.1f}s; "
                 f"{len(unfinished_urls)} probes still running "
-                f"(marked as warn, not waited for)",
+                f"(counted as unverified, not waited for)",
                 file=sys.stderr,
                 flush=True,
             )
@@ -437,6 +475,19 @@ class TestUrlsReachable(unittest.TestCase):
                 line=occurrence.line,
             )
 
+        for title, occurrence, message, count in sorted(
+            unverified_found,
+            key=lambda item: (item[1].file.as_posix(), item[1].line, item[2]),
+        ):
+            rel = occurrence.file.relative_to(_REPO_ROOT).as_posix()
+            suffix = "" if count == 1 else f" ({count} occurrences)"
+            warning(
+                f"{message}{suffix}",
+                title=title,
+                file=rel,
+                line=occurrence.line,
+            )
+
         if not failing_found:
             return
 
@@ -444,7 +495,7 @@ class TestUrlsReachable(unittest.TestCase):
             f"Failing HTTP(S) URLs found ({len(failing_found)}):",
             "",
             "  Fix the URL, remove it, or adjust the reference.",
-            "  401/403/405 = server alive (auth/method). 418/429/451 + all 5xx = warning. Other 4xx = fail.",
+            "  401/403/405/406/415 = server alive (auth/method/headers). 418/429/451 + all 5xx = warning. Other 4xx = fail.",
             "",
         ]
         for _title, occurrence, message, count in sorted(

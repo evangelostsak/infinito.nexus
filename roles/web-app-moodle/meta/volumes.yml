@@ -1,3 +1,51 @@
 ---
-data: moodle_data
-code: moodle_code
+data:
+  type: volume
+  name: moodle_data
+  nfs:
+    uid: "33"
+    gid: "33"
+    mode: "0770"
+  mounts:
+    - service: moodle
+      target: &var_www_moodledata_target /var/www/moodledata
+    - service: cron
+      target: *var_www_moodledata_target
+localcache:
+  type: volume
+  name: moodle_localcache
+  # nocheck: nfs-false-data-loss  Reason: Moodle documents localcachedir as node-local and safe to delete, unlike cachedir and tempdir which stay on the shared dataroot
+  nfs: false
+  mounts:
+    - service: moodle
+      target: &moodle_localcache /var/www/moodlelocalcache
+    - service: cron
+      target: *moodle_localcache
+
+code:
+  type: volume
+  name: moodle_code
+  mounts:
+    - service: moodle
+      target: &var_www_html_target /var/www/html
+    - service: nginx
+      target: *var_www_html_target
+      read_only: true
+    - service: cron
+      target: *var_www_html_target
+nginx_conf:
+  type: config
+  source: "{{ [lookup('container', 'web-app-moodle', 'directories.instance'), 'nginx.conf'] | path_join }}"
+  mode: "0444"
+  mounts:
+    - service: nginx
+      target: /etc/nginx/conf.d/default.conf
+msmtprc:
+  type: config
+  source: "{{ [lookup('container', 'web-app-moodle', 'directories.config'), 'msmtprc.conf'] | path_join }}"
+  mode: "0444"
+  mounts:
+    - service: moodle
+      target: &etc_msmtprc_target /etc/msmtprc
+    - service: cron
+      target: *etc_msmtprc_target

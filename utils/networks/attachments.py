@@ -1,0 +1,224 @@
+"""Attachment computation for the compose networks renderers.
+
+Which provider overlays a role attaches to, and which proxy aliases the
+default network harvests, derived from the service_registry. Kept apart from
+the emitters in :mod:`utils.networks.render` so a change to the consumer rules
+cannot be confused with a change to the YAML they produce.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+from utils.roles.entity.name import get_entity_name
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+
+def _is_consumer(
+    entry: dict[str, Any],
+    application_id: str,
+    lookup_config: Callable[[str, str, Any], Any],
+    lookup_database: Callable[[str, str], Any],
+) -> bool:
+    overlay = entry.get("overlay") or {}
+    consumer = overlay.get("consumer") or {}
+    declared = consumer.get("kind") or "services_flags"
+    kinds = declared if isinstance(declared, list) else [declared]
+    return any(
+        _matches_kind(
+            str(kind), entry, consumer, application_id, lookup_config, lookup_database
+        )
+        for kind in kinds
+    )
+
+
+def _matches_kind(
+    kind: str,
+    entry: dict[str, Any],
+    consumer: dict[str, Any],
+    application_id: str,
+    lookup_config: Callable[[str, str, Any], Any],
+    lookup_database: Callable[[str, str], Any],
+) -> bool:
+    if kind == "database":
+        if not _coerce_bool(lookup_database(application_id, "enabled")):
+            return False
+        if not _coerce_bool(lookup_database(application_id, "shared")):
+            return False
+        return lookup_database(application_id, "id") == entry.get("role")
+    if kind == "services_flags":
+        key = consumer.get("key") or entry.get("provides") or entry.get("entity_name")
+        flags = consumer.get("flags") or ["enabled", "shared"]
+        for flag in flags:
+            if not _coerce_bool(
+                lookup_config(application_id, f"services.{key}.{flag}", False)
+            ):
+                return False
+        return True
+    if kind == "mcp_client":
+        if not _coerce_bool(lookup_config(application_id, "mcp.enabled", False)):
+            return False
+        if not _coerce_bool(lookup_config(application_id, "mcp.shared", False)):
+            return False
+        direction = str(
+            lookup_config(application_id, "mcp.direction", "") or ""
+        ).strip()
+        if direction not in ("client", "both"):
+            return False
+        consumer_key = get_entity_name(application_id)
+        if (
+            lookup_config(application_id, f"services.{consumer_key}.mcp_consumer", None)
+            is not True
+        ):
+            return False
+        refusal = lookup_config(
+            entry.get("role") or "", f"services.{consumer_key}.mcp_consumer", True
+        )
+        return refusal is not False
+    if kind == "onion_sso":
+        provider = consumer.get("provider")
+        if not provider:
+            return False
+        key = consumer.get("key") or "sso"
+        if not _coerce_bool(
+            lookup_config(application_id, f"services.{key}.enabled", False)
+        ):
+            return False
+        provider_key = consumer.get("provider_key") or "tor"
+        return _coerce_bool(
+            lookup_config(provider, f"services.{provider_key}.enabled", False)
+        )
+    if kind == "web_facing":
+        return application_id.startswith(("web-app-", "web-svc-"))
+    return False
+
+
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "1", "yes")
+    return bool(value)
+
+
+def _compute_attachments(
+    registry: dict[str, dict[str, Any]],
+    application_id: str,
+    deployment_mode: str,
+    lookup_config: Callable[[str, str, Any], Any],
+    lookup_database: Callable[[str, str], Any],
+) -> tuple[list[dict[str, Any]], list[str]]:
+    attachments: list[dict[str, Any]] = []
+    default_aliases: list[str] = []
+
+    for entry in registry.values():
+        if "canonical" in entry:
+            continue
+        overlay = entry.get("overlay")
+        if not overlay:
+            continue
+        if deployment_mode not in overlay.get("modes", []):
+            continue
+
+        is_provider = application_id == entry.get("role")
+        topology = overlay.get("topology")
+
+        if is_provider:
+            if topology == "default_net":
+                default_aliases.extend(overlay.get("aliases") or [])
+                for peer in registry.values():
+                    peer_overlay = peer.get("overlay")
+                    if not peer_overlay:
+                        continue
+                    if not peer_overlay.get("proxy_resolvable"):
+                        continue
+                    if deployment_mode not in peer_overlay.get("modes", []):
+                        continue
+                    if "canonical" in peer:
+                        continue
+                    if peer.get("role") == entry.get("role"):
+                        continue
+                    default_aliases.extend(
+                        peer_overlay.get("proxy_aliases")
+                        or peer_overlay.get("aliases")
+                        or []
+                    )
+            elif topology:
+                aliases = list(
+                    overlay.get("aliases", [entry.get("entity_name")])
+                    or [entry.get("entity_name")]
+                )
+                if overlay.get("collect_proxy_resolvable"):
+                    for peer in registry.values():
+                        peer_overlay = peer.get("overlay")
+                        if not peer_overlay:
+                            continue
+                        if not peer_overlay.get("proxy_resolvable"):
+                            continue
+                        if deployment_mode not in peer_overlay.get("modes", []):
+                            continue
+                        if "canonical" in peer:
+                            continue
+                        if peer.get("role") == entry.get("role"):
+                            continue
+                        aliases.extend(
+                            peer_overlay.get("proxy_aliases")
+                            or peer_overlay.get("aliases")
+                            or []
+                        )
+                attachments.append(
+                    {
+                        "role": entry["role"],
+                        "topology": topology,
+                        "aliases": aliases,
+                        "is_provider": True,
+                    }
+                )
+            continue
+
+        if not topology:
+            continue
+        if _is_consumer(entry, application_id, lookup_config, lookup_database):
+            attachments.append(
+                {
+                    "role": entry["role"],
+                    "topology": topology,
+                    "aliases": [],
+                    "is_provider": False,
+                }
+            )
+
+    return attachments, default_aliases
+
+
+def _suppress_default(
+    application_id: str, lookup_database: Callable[[str, str], Any]
+) -> bool:
+    if not application_id.startswith(("svc-db-", "svc-ai-")):
+        return False
+    return not bool(lookup_database(application_id, "local"))
+
+
+def _own_shared_net_provider(
+    attachments: list[dict[str, Any]],
+    own_entity: str,
+    get_entity_name: Callable[[str], str],
+) -> bool:
+    return any(
+        att["is_provider"]
+        and att["topology"] == "shared_net"
+        and get_entity_name(att["role"]) == own_entity
+        for att in attachments
+    )
+
+
+def _shared_network_key(
+    attachments: list[dict[str, Any]],
+    own_entity: str,
+    get_entity_name: Callable[[str], str],
+) -> str:
+    if _own_shared_net_provider(attachments, own_entity, get_entity_name):
+        return own_entity
+    return "default"

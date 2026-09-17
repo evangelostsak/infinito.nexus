@@ -1,16 +1,10 @@
 ---
-# General
 application_id: "web-app-pretix"
-container_port: 80
-container_hostname: "{{ lookup('domain',application_id) }}"
+container_hostname: "{{ lookup('container_hostname', application_id) }}"
 
-# Pretix
-
-## URLs
 PRETIX_URL: "{{ lookup('tls', application_id, 'url.base') }}"
 PRETIX_HOSTNAME: "{{ container_hostname }}"
 
-## OIDC (mirrors GitLab’s pattern)
 PRETIX_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.sso.enabled') }}"
 PRETIX_OIDC_LABEL: "{{ OIDC.BUTTON_TEXT }}"
 PRETIX_OIDC_CLIENT_ID: "{{ OIDC.CLIENT.ID }}"
@@ -22,20 +16,35 @@ PRETIX_OIDC_USERINFO_URL: "{{ OIDC.CLIENT.USER_INFO_URL }}"
 PRETIX_OIDC_LOGOUT_URL: "{{ OIDC.CLIENT.LOGOUT_URL }}"
 PRETIX_OIDC_JWKS_URL: "{{ OIDC.CLIENT.CERTS }}"
 PRETIX_OIDC_SCOPES: "openid,email,profile"
-# Use Keycloak username claim by default (plugin default is 'sub')
 PRETIX_OIDC_UNIQUE_ATTRIBUTE: "{{ OIDC.ATTRIBUTES.USERNAME }}"
 PRETIX_OIDC_PLUGIN_VERSION: "{{ lookup('config', application_id, 'addons.pretix-oidc.version') }}"
 
-## Redis
 PRETIX_REDIS_ENABLED: "{{ lookup('config', application_id, 'services.redis.enabled') }}"
 PRETIX_REDIS_CACHE_DB: 1
 PRETIX_REDIS_BROKER_DB: 0
 PRETIX_REDIS_RESULT_DB: 2
 
-## Docker
-PRETIX_IMAGE_CUSTOM: "pretix_custom"
 PRETIX_IMAGE: "{{ lookup('config', application_id, 'services.pretix.image') }}"
 PRETIX_VERSION: "{{ lookup('config', application_id, 'services.pretix.version') }}"
 PRETIX_CONTAINER: "{{ lookup('config', application_id, 'services.pretix.name') }}"
-PRETIX_DATA_VOLUME: "{{ lookup('config', application_id, 'volumes.data') }}"
-PRETIX_CONFIG_VOLUME: "{{ lookup('config', application_id, 'volumes.config') }}"
+PRETIX_MCP_ENABLED: "{{ lookup('config', application_id, 'services.pretixmcp.enabled') | bool }}"
+PRETIX_MCP_SERVICE_KEY: "pretixmcp"
+PRETIX_MCP_CONTAINER: "{{ lookup('config', application_id, 'services.pretixmcp.name') }}"
+PRETIX_MCP_PORT: "{{ lookup('config', application_id, 'services.pretixmcp.ports.internal.http') }}"
+PRETIX_MCP_BEARER: "{{ lookup('config', application_id, 'secrets.credentials.mcp_bearer') }}"
+PRETIX_MCP_INSTANCE_DIR: "{{ [lookup('container', application_id, 'directories.instance'), 'mcp'] | path_join }}"
+PRETIX_MCP_UPSTREAM_HOST: "{{ lookup('config', application_id, 'services.pretix.name') }}"
+PRETIX_MCP_UPSTREAM_PORT: "{{ lookup('config', application_id, 'services.pretix.ports.internal.http') }}"
+PRETIX_MCP_UPSTREAM_URL: "http://{{ PRETIX_MCP_UPSTREAM_HOST }}:{{ PRETIX_MCP_UPSTREAM_PORT }}"
+PRETIX_MCP_CONTRACT:
+  provider: "{{ application_id }}"
+  upstream_url: "{{ PRETIX_MCP_UPSTREAM_URL }}"
+  auth_subject: "{{ lookup('config', application_id, 'mcp.auth_subject') }}"
+  mutating_tools_enabled: "{{ lookup('config', application_id, 'mcp.tools.mutating_tools_enabled') | bool }}"
+  tools: "{{ lookup('file', 'mcp/tools.json') | from_json }}"
+  limits: "{{ lookup('config', application_id, 'mcp.limits') }}"
+  schema_sha256: "{{ lookup('config', application_id, 'mcp.tools.schema_sha256') }}"
+PRETIX_MCP_UPSTREAM_KEY: "{{ lookup('config', application_id, 'secrets.credentials.mcp_upstream_token') }}"
+PRETIX_MCP_UPSTREAM_TEAM: "mcp-readonly"
+PRETIX_MCP_UPSTREAM_AUTH_HEADER: "Authorization"
+PRETIX_MCP_UPSTREAM_AUTH_FORMAT: "Token {key}"

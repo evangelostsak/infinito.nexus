@@ -5,6 +5,8 @@
 # variant pinning every dynamic services.yml flag to true so the
 # matrix exercises the in-group_names branch of web-app-snipe-it.
 - services:
+    container_backup:
+      enabled: true
     css:
       enabled: true
       shared: true
@@ -22,6 +24,8 @@
       shared: true
     mariadb:
       shared: true
+    redis:
+      shared: true
     matomo:
       enabled: true
       shared: true
@@ -34,63 +38,104 @@
     seaweedfs:
       enabled: true
       shared: true
-- services:
-    css:
+    tor:
+      enabled: true
+    openwebui:
       enabled: false
       shared: false
-    dashboard:
+    hermes:
       enabled: false
       shared: false
-    email:
-      enabled: false
-      shared: false
-    ldap:
-      shared: false
-      enabled: false
-    logout:
-      enabled: false
-      shared: false
-    mariadb:
-      shared: false
-    matomo:
-      enabled: false
-      shared: false
-    sso:
-      enabled: false
-      shared: false
-    prometheus:
-      enabled: false
-      shared: false
-    seaweedfs:
+    openclaw:
       enabled: false
       shared: false
 - services:
+    container_backup:
+      enabled: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
+    css:
+      enabled: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
+    dashboard:
+      enabled: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
+    email:
+      enabled: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
+    ldap:
+      shared: false # nocheck: variants-static-override backup shared stays literally true
+      enabled: false
+    logout:
+      enabled: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
+    mariadb:
+      shared: false # nocheck: variants-static-override backup shared stays literally true
+    redis:
+      shared: false # nocheck: variants-static-override backup shared stays literally true
+    matomo:
+      enabled: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
+    sso:
+      enabled: true
+      shared: true
+    prometheus:
+      enabled: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
+    seaweedfs:
+      enabled: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
+    tor:
+      enabled: true
+    openwebui:
+      enabled: true
+      shared: true
+    hermes:
+      enabled: true
+      shared: true
+    openclaw:
+      enabled: true
+      shared: true
+- services:
+    container_backup:
+      enabled: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
     ldap:
       enabled: true
       shared: true
     seaweedfs:
       enabled: false
-      shared: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
     sso:
       enabled: false
-      shared: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
     css:
       enabled: false
-      shared: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
     dashboard:
       enabled: false
-      shared: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
     email:
       enabled: false
-      shared: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
     logout:
       enabled: false
-      shared: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
     mariadb:
       shared: true
     matomo:
       enabled: false
-      shared: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
     prometheus:
+      enabled: false
+      shared: false # nocheck: variants-static-override backup shared stays literally true
+    tor:
+      enabled: true
+    openwebui:
+      enabled: false
+      shared: false
+    hermes:
+      enabled: false
+      shared: false
+    openclaw:
       enabled: false
       shared: false

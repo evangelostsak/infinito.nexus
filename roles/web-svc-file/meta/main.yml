@@ -1,8 +1,7 @@
 ---
 galaxy_info:
   author: Kevin Veen-Birkenbach
-  description: "Configures an Nginx-based file server with HTTPS support, automatic SSL/TLS certificate retrieval, directory listing, and .well-known handling for
-    secure static file hosting.\n"
+  description: Static file server over HTTPS with directory listing, .well-known handling, and automatic TLS certificates
   license: Infinito.Nexus Community License (Non-Commercial)
   company: |
     Kevin Veen-Birkenbach

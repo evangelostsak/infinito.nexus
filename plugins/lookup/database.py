@@ -1,17 +1,29 @@
 from __future__ import annotations
 
+import contextlib
+import shlex
 from typing import Any
 
 from ansible.errors import AnsibleError
+from ansible.plugins.loader import lookup_loader
 from ansible.plugins.lookup import LookupBase
 
-from utils.cache.applications import get_merged_applications
+from utils.manager.credential_key import OVERRIDE_SECTION
 from utils.roles.applications.config import get
 from utils.roles.applications.services.database import (
+    REALIGN_CONFIG_KEY,
+    REALIGN_TARGET,
     get_database_service_config,
     resolve_database_service_key,
 )
-from utils.roles.entity_name import get_entity_name
+from utils.roles.entity.name import get_entity_name
+
+
+def _swarm_address(bin_resolver: str, stack_name: str, service_key: str) -> str:
+    return (
+        f'"$({shlex.quote(bin_resolver)} '
+        f'{shlex.quote(stack_name)} {shlex.quote(service_key)})"'
+    )
 
 
 class LookupModule(LookupBase):
@@ -37,7 +49,6 @@ class LookupModule(LookupBase):
         if len(terms) not in (1, 2):
             raise AnsibleError("database: requires database_consumer_id [, want_path]")
 
-        # STRICT: do not support legacy want= kwarg at all
         if "want" in kwargs and str(kwargs.get("want") or "").strip():
             raise AnsibleError(
                 "database: kwarg 'want=' is not supported; use positional want_path "
@@ -48,18 +59,21 @@ class LookupModule(LookupBase):
         if not consumer_id:
             raise AnsibleError("database: database_consumer_id must not be empty")
 
-        # STRICT positional want-path (optional)
         want = str(terms[1]).strip() if len(terms) == 2 else ""
         if not want:
             want = "all"
 
         vars_ = variables or self._templar.available_variables
-        applications = get_merged_applications(
-            variables=vars_,
-            roles_dir=kwargs.get("roles_dir"),
-            templar=getattr(self, "_templar", None),
-        )
+        applications = lookup_loader.get(
+            "applications", loader=self._loader, templar=getattr(self, "_templar", None)
+        ).run([], variables=vars_)[0]
         path_instances = self._require_var(vars_, "DIR_COMPOSITIONS")
+        if (
+            isinstance(path_instances, str)
+            and "{{" in path_instances
+            and self._templar is not None
+        ):
+            path_instances = self._templar.template(path_instances)
 
         consumer_entity = get_entity_name(consumer_id)
 
@@ -72,8 +86,6 @@ class LookupModule(LookupBase):
         enabled = bool(database_service.get("enabled", False))
         shared = bool(database_service.get("shared", False))
 
-        # If no direct database service is configured: keep behavior similar to the
-        # historical empty-value lookup payload.
         if not dbtype:
             resolved = {
                 "id": "",
@@ -83,6 +95,8 @@ class LookupModule(LookupBase):
                 "type": "",
                 "name": consumer_entity,
                 "instance": "",
+                "address": "",
+                "service_name": "",
                 "host": "",
                 "container": "",
                 "network": "",
@@ -90,6 +104,9 @@ class LookupModule(LookupBase):
                 "password": "",
                 "port": "",
                 "env": "",
+                "realign_sql": "",
+                "realign_target": REALIGN_TARGET,
+                "realign_config": REALIGN_CONFIG_KEY,
                 "initdb_dir": "",
                 "build_dir": "",
                 "url_jdbc": "",
@@ -101,7 +118,6 @@ class LookupModule(LookupBase):
             }
             return [resolved if want == "all" else resolved.get(want, "")]
 
-        # Central/shared DB if shared==True
         central_enabled = shared
         db_id = f"svc-db-{dbtype}"
 
@@ -115,17 +131,29 @@ class LookupModule(LookupBase):
         )
         central_name = (str(central_name) if central_name is not None else "").strip()
 
+        declared_name = get(
+            applications,
+            consumer_id,
+            f"services.{dbtype}.name",
+            strict=False,
+            default="",
+        )
+        declared_name = (
+            str(declared_name) if declared_name is not None else ""
+        ).strip()
+
         name = consumer_entity
         instance = central_name if central_enabled else name
         host = central_name if central_enabled else "database"
-        container = dbtype if central_enabled else f"{consumer_entity}-database"
+        dedicated_container = declared_name or f"{consumer_entity}-database"
+        container = dbtype if central_enabled else dedicated_container
         network = dbtype if central_enabled else consumer_entity
         username = consumer_entity
 
         password = get(
             applications,
             consumer_id,
-            "credentials.database_password",
+            f"{OVERRIDE_SECTION}.database_password",
             strict=False,
             default="",
         )
@@ -165,9 +193,9 @@ class LookupModule(LookupBase):
             skip_missing_app=True,
         )
 
-        # env path without compose dict
         env_dir = f"{path_instances}{get_entity_name(consumer_id)}/.env/"
         env = f"{env_dir}{dbtype}.env"
+        realign_sql = f"{env_dir}{dbtype}-realign.sql"
         initdb_dir = f"{path_instances}{get_entity_name(consumer_id)}/.initdb.d/"
         build_dir = f"{path_instances}{get_entity_name(consumer_id)}/.postgres-build/"
 
@@ -178,6 +206,40 @@ class LookupModule(LookupBase):
         volume_prefix = f"{consumer_entity}_" if not central_enabled else ""
         volume = f"{volume_prefix}{host}"
 
+        templar = getattr(self, "_templar", None)
+
+        def _templated(value: Any) -> str:
+            if templar is not None:
+                with contextlib.suppress(Exception):
+                    value = templar.template(value)
+            return str(value or "").strip()
+
+        cluster_mode = _templated(vars_.get("DEPLOYMENT_MODE", "compose"))
+        forced = _templated(vars_.get("compose_mode_force", ""))
+        deployment_mode = cluster_mode if central_enabled else (forced or cluster_mode)
+
+        db_stack = dbtype if central_enabled else consumer_entity
+        db_service_key = dbtype if central_enabled else "database"
+        service_name = (
+            f"{db_stack}_{db_service_key}"
+            if deployment_mode == "swarm"
+            else db_service_key
+        )
+
+        if deployment_mode == "swarm":
+            bin_resolver = vars_.get("BIN_RESOLVE_CONTAINER_ID")
+            if templar is not None and bin_resolver is not None:
+                with contextlib.suppress(Exception):
+                    bin_resolver = templar.template(bin_resolver)
+            bin_resolver = (
+                str(bin_resolver).strip()
+                if bin_resolver
+                else "/usr/bin/resolve-container-id"
+            )
+            address = _swarm_address(bin_resolver, db_stack, db_service_key)
+        else:
+            address = container
+
         resolved = {
             "id": db_id,
             "enabled": enabled,
@@ -186,6 +248,8 @@ class LookupModule(LookupBase):
             "type": dbtype,
             "name": name,
             "instance": instance,
+            "address": address,
+            "service_name": service_name,
             "host": host,
             "container": container,
             "network": network,
@@ -193,6 +257,9 @@ class LookupModule(LookupBase):
             "password": password,
             "port": port,
             "env": env,
+            "realign_sql": realign_sql,
+            "realign_target": REALIGN_TARGET,
+            "realign_config": REALIGN_CONFIG_KEY,
             "initdb_dir": initdb_dir,
             "build_dir": build_dir,
             "url_jdbc": url_jdbc,

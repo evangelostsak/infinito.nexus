@@ -1,0 +1,8 @@
+---
+hostname-tool:
+  Archlinux:
+    - inetutils
+  Debian:
+    - hostname
+  RedHat:
+    - hostname

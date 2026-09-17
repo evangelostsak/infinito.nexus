@@ -5,8 +5,16 @@ A role's `meta/services.yml` MAY contain (per-service-entity):
 
     <entity>:
       required_by:
-        categories: [web, web.app, ...]   # category handles (cf. roles/categories.yml)
+        categories: [web, web.app, ...]   # category handles (cf. meta/categories.yml)
         roles: [web-app-yourls, ...]      # full role names incl. category prefix
+
+A `required_by` block MAY instead nest `compose:` / `swarm:` sub-blocks to
+scope the requirement to one deploy mode (a flat block applies in every mode);
+the deploy mode is inferred from the role set (swarm pulls in svc-swarm-node):
+
+    <entity>:
+      required_by:
+        compose: { categories: [web] }    # required only in compose deploys
 
 Semantics: when the current deploy contains any role whose id matches a
 listed `roles` entry, OR whose category set (top-level + first sub-level)
@@ -16,6 +24,15 @@ non-skip status) in the run log slice that this verifier scans.
 
 A missing event indicates a coverage regression in the deploy chain
 (typically: a once-flag swallowed an include before the role could run).
+
+Two log-parsing trip-wires shape the regexes below. The non-skip status
+match is anchored to line start (after optional indent) so a substring in
+arbitrary task output cannot fake a status. And Ansible's `log_path` file
+(`ANSIBLE_LOG_PATH`, what the swarm/compose deploy feeds this verifier)
+prefixes every line with `<ts> p=<pid> u=<user> n=<name> <LVL>| `; left
+unstripped that prefix defeats both the line anchor and the `\\nTASK [`
+block split, so every required role would false-positive as "did not
+execute".
 
 CLI: `python -m cli.meta.roles.services.called --help`
 """
@@ -28,13 +45,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+from utils.ansible_log import LOG_PREFIX_RE
 from utils.cache.yaml import load_yaml_any
 from utils.roles.mapping import ROLE_FILE_META_SERVICES
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
-# Status indicators that prove a task block was NOT skipped. We anchor to
-# line start (after optional indent) so substring matches in arbitrary
-# task output cannot trigger a false positive.
 _NON_SKIP_RE = re.compile(
     r"^\s*(?:ok|changed|fatal|included):\s+",
     re.MULTILINE,
@@ -58,6 +73,18 @@ def categories_of(role_id: str) -> set[str]:
     return out
 
 
+_SWARM_MARKER_ROLES = frozenset({"svc-swarm-node", "svc-swarm-manager"})
+
+
+def _deploy_mode(deployed_role_ids: list[str]) -> str:
+    """Deploy mode inferred from the role set.
+
+    ``DEPLOYMENT_MODE`` is out of scope post-deploy, but a swarm deploy
+    always pulls in the swarm-node/manager infra and compose never does.
+    """
+    return "swarm" if _SWARM_MARKER_ROLES.intersection(deployed_role_ids) else "compose"
+
+
 def required_role_ids(
     *,
     roles_dir: Path,
@@ -68,6 +95,7 @@ def required_role_ids(
     for d in deployed_role_ids:
         deployed_categories.update(categories_of(d))
     deployed_set = set(deployed_role_ids)
+    deploy_mode = _deploy_mode(deployed_role_ids)
 
     required: set[str] = set()
     if not roles_dir.is_dir():
@@ -93,6 +121,10 @@ def required_role_ids(
             rb = entry.get("required_by")
             if not isinstance(rb, dict):
                 continue
+            if "compose" in rb or "swarm" in rb:
+                rb = rb.get(deploy_mode) or {}
+                if not isinstance(rb, dict):
+                    continue
             rb_categories = set(rb.get("categories") or [])
             rb_roles = set(rb.get("roles") or [])
             if (rb_categories & deployed_categories) or (rb_roles & deployed_set):
@@ -169,7 +201,7 @@ def _role_body_executed(log_content: str, role_id: str) -> bool:
     `skipping:` status line, so a header alone is insufficient evidence
     that the role's body ran — we must see at least one non-skip outcome.
     """
-    clean = _ANSI_RE.sub("", log_content)
+    clean = LOG_PREFIX_RE.sub("", _ANSI_RE.sub("", log_content))
     marker = f"TASK [{role_id} :"
     pos = 0
     while True:
@@ -200,6 +232,9 @@ def verify(
     Reads from `log_byte_offset` to end and asserts that every required
     role's body actually executed in that slice (i.e. at least one TASK
     block for the role ended with a non-skip status).
+
+    An unreadable log proves coverage neither way and is reported as
+    "missing" for every required role, so the operator notices.
     """
     required = required_role_ids(
         roles_dir=roles_dir, deployed_role_ids=deployed_role_ids
@@ -214,8 +249,6 @@ def verify(
     else:
         log_content = _host_log_slice(log_path=log_path, byte_offset=log_byte_offset)
     if log_content is None:
-        # Missing log == we cannot prove coverage either way; treat as
-        # missing for every required role so the operator notices.
         return False, sorted(required)
 
     missing = [

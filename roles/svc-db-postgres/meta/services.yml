@@ -1,19 +1,43 @@
 ---
 postgres:
+  modes:
+    compose:
+      enabled: true
+    swarm:
+      enabled: true
+  # nocheck: default-placement-manager  central RDBMS, single-node until multi-replica replication (streaming / logical) is in scope
+  placement: manager
   bond: 1
   enabled: true
   shared: true
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -h 127.0.0.1"]
   image: postgis/postgis
   name: postgres
   version: 17-3.5
-  min_storage: 10GB
+  custom: true
+  min_storage: 419MB
   backup:
     database_routine: true
   cpus: "2.0"
   mem_reservation: 3g
   mem_limit: 6g
   pids_limit: 1024
+  exposed: false
   ports:
     local:
       postgres: 5432
+    internal:
+      postgres: 5432
   lifecycle: beta
+# nocheck: variants-coverage — sso-variant-tor requires the onion on in every variant, so the false polarity has no variant left to live in
+tor:
+  bond: 0.5
+  enabled: "{{ 'svc-net-tor' in group_names }}"
+  shared: true # nocheck: dynamic-flag
+
+# nocheck: playwright-service-flag, dynamic-flag infrastructure backup consumer
+container_backup: # nocheck: bond-baseline backup host joins outside the variant topology
+  bond: 1
+  enabled: "{{ 'svc-bkp-volume-2-local' in group_names }}"
+  shared: true

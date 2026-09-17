@@ -15,7 +15,7 @@ sso:
   flavor: oauth2
   oauth2:
     origin:
-      host: application
+      host: gitea
       port: "{{ lookup('config', 'web-app-gitea', 'services.gitea.ports.internal.http') }}"
     acl:
       blacklist:
@@ -39,13 +39,19 @@ mariadb:
   shared: "{{ 'svc-db-mariadb' in group_names }}"
 # nocheck: playwright-service-flag — self-provider
 gitea:
+  modes:
+    compose:
+      enabled: true
+    swarm:
+      enabled: true
   bond: 1
-  enabled: true
+  enabled: true # nocheck: dynamic-flag
   shared: true
   provides: gitea
   image: gitea/gitea
-  version: latest
-  min_storage: 10GB
+  version: 1.27.3
+  replicas: 1 # nocheck: single-replica  single-writer app state on swarm-shared NFS; concurrent multi-node writers corrupt app.ini
+  min_storage: 270MB
   backup:
     no_stop_required: true
   name: gitea
@@ -53,6 +59,8 @@ gitea:
   mem_reservation: 1g
   mem_limit: 2g
   pids_limit: 1024
+  healthcheck:
+    flavor: curl
   title: "{{ SOFTWARE_NAME }} Code Hub"
   configuration:
     repository:
@@ -62,6 +70,7 @@ gitea:
   ports:
     internal:
       http: 3000
+      ssh: 22
     local:
       sso: 16488
       http: 8002
@@ -72,12 +81,50 @@ gitea:
     - web-app-keycloak
     - web-app-mailu
   lifecycle: beta
+# nocheck: playwright-service-flag
+# nocheck: dockerfile-custom  the Dockerfile is owned by svc-ai-mcp-adapter and staged per instance, so every adapter-backed provider shares one audited build
+# nocheck: dynamic-flag  the sidecar tracks this role's own mcp flag, not another role's presence; a group_names expression would decide its exposure from an unrelated deployment
+giteamcp:
+  enabled: "{{ lookup('config', 'web-app-gitea', 'mcp.enabled') | bool }}"
+  shared: false
+  image: python
+  # nocheck: docker-version  base of the self-built stdlib adapter, not the served application
+  version: "3.13.15-slim"
+  custom: true
+  name: giteamcp
+  cpus: "0.25"
+  mem_reservation: 16m
+  mem_limit: 24m
+  pids_limit: 64
+  healthcheck:
+    flavor: http_status
+    path: health
+  ports:
+    internal:
+      http: 8080
+# nocheck: playwright-service-flag
+# nocheck: dynamic-flag  the vendor server exists only behind the adapter, so it tracks this role's own mcp flag rather than another role's presence
+giteamcpupstream:
+  enabled: "{{ lookup('config', 'web-app-gitea', 'mcp.enabled') | bool }}"
+  shared: false
+  image: docker.gitea.com/gitea-mcp-server
+  version: "1.6.0"
+  name: gitea-mcp
+  cpus: 0.25
+  mem_reservation: 0.1g
+  mem_limit: 0.25g
+  pids_limit: 256
+  ports:
+    internal:
+      http: 8080
 # nocheck: dynamic-flag
 # nocheck: playwright-service-flag — DB engine, covered by role-local integration tests
 redis:
+  bond: 1
   backup:
     disabled: true
-  enabled: false
+  enabled: true # nocheck: dynamic-flag
+  shared: "{{ 'svc-db-redis' in group_names }}"
   cpus: 0.25
   mem_reservation: 0.2g
   mem_limit: 0.3g
@@ -103,3 +150,37 @@ prometheus:
   native_metrics:
     enabled: true
     port: 3000
+
+# nocheck: playwright-service-flag
+# nocheck: variants-coverage — sso-variant-tor requires the onion on in every variant, so the false polarity has no variant left to live in
+tor:
+  bond: 0.5
+  enabled: "{{ 'svc-net-tor' in group_names }}"
+  shared: true # nocheck: dynamic-flag
+# nocheck: dynamic-flag
+# nocheck: playwright-service-flag, dynamic-flag infrastructure backup consumer
+container_backup: # nocheck: bond-baseline backup host joins outside the variant topology
+  bond: 1
+  enabled: "{{ 'svc-bkp-volume-2-local' in group_names }}"
+  shared: true
+# nocheck: playwright-service-flag  MCP pairing is proven by the role's own MCP spec, not by a per-consumer gate
+openwebui:
+  bond: 0.5
+  enabled: "{{ 'web-app-openwebui' in group_names }}"
+  shared: "{{ 'web-app-openwebui' in group_names }}"
+# nocheck: playwright-service-flag  MCP pairing is proven by the role's own MCP spec, not by a per-consumer gate
+hermes:
+  bond: 0.5
+  enabled: "{{ 'web-app-hermes' in group_names }}"
+  shared: "{{ 'web-app-hermes' in group_names }}"
+# nocheck: playwright-service-flag  MCP pairing is proven by the role's own MCP spec, not by a per-consumer gate
+openclaw:
+  bond: 0.5
+  enabled: "{{ 'web-app-openclaw' in group_names }}"
+  shared: "{{ 'web-app-openclaw' in group_names }}"
+# nocheck: playwright-service-flag  MCP pairing is proven by the role's own MCP spec, not by a per-consumer gate
+# nocheck: dynamic-flag  the entry refuses this client, so the link is off on every host and no group_names gate can decide it
+flowise:
+  enabled: false
+  shared: false
+  mcp_consumer: false

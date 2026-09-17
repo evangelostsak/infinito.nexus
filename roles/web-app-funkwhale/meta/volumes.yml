@@ -1,0 +1,49 @@
+---
+media:
+  type: volume
+  name: funkwhale_media
+  mounts:
+    - service: celeryworker
+      target: &var_lib_funkwhale_media_target /var/lib/funkwhale/media
+    - service: celerybeat
+      target: *var_lib_funkwhale_media_target
+    - service: api
+      target: *var_lib_funkwhale_media_target
+    - service: front
+      target: *var_lib_funkwhale_media_target
+      read_only: true
+
+music:
+  type: volume
+  name: funkwhale_music
+  mounts:
+    - service: celeryworker
+      target: &var_lib_funkwhale_music_target /var/lib/funkwhale/music
+      read_only: true
+    - service: celerybeat
+      target: *var_lib_funkwhale_music_target
+      read_only: true
+    - service: api
+      target: *var_lib_funkwhale_music_target
+      read_only: true
+
+static:
+  type: volume
+  name: funkwhale_static
+  mounts:
+    - service: celeryworker
+      target: &var_lib_funkwhale_static_target /var/lib/funkwhale/static
+    - service: celerybeat
+      target: *var_lib_funkwhale_static_target
+    - service: api
+      target: *var_lib_funkwhale_static_target
+    - service: front
+      target: *var_lib_funkwhale_static_target
+      read_only: true
+
+typesense_data:
+  type: volume
+  name: funkwhale_typesense_data
+  mounts:
+    - service: typesense
+      target: /data

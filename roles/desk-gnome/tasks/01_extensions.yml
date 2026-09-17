@@ -1,0 +1,23 @@
+---
+- name: 🟢 GNOME Activate Extensions
+  ansible.builtin.shell: gsettings set org.gnome.shell disable-user-extensions false
+  become: false
+
+- name: 📦 Install cli-gnome-extension-manager system-wide via pip
+  include_role:
+    name: sys-pip-install
+  vars:
+    # TODO: switch to the PyPI name 'cli-gnome-extension-manager' once it is published
+    package_name: "git+{{ DESK_GNOME_EXTENSION_MANAGER_REPO }}@{{ DESK_GNOME_EXTENSION_MANAGER_REF }}"
+    global_install: true
+
+- name: ▶️ Execute CLI GNOME Extension manager script
+  ansible.builtin.shell: >-
+    cli-gnome-extension-manager
+    "{{ 'enable' if item.value.enabled | bool else 'disable' }}"
+    "{{ item.value.config.uuid }}"
+    "{{ item.value.config.url }}"
+  loop: "{{ lookup('config', application_id, 'addons') | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  become: false

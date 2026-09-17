@@ -1,8 +1,7 @@
 ---
 galaxy_info:
   author: Kevin Veen-Birkenbach
-  description: Interactive presentation platform that guides end-users through the Infinito.Nexus software, demonstrating features and workflows for
-    Administrators, Developers, End-Users, Businesses, and Investors.
+  description: Containerized Reveal.js slide deck for presenting the platform to admins, developers, users, and investors
   license: Infinito.Nexus Community License (Non-Commercial)
   company: |
     Kevin Veen-Birkenbach

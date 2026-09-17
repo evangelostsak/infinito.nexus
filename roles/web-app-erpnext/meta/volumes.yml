@@ -1,3 +1,45 @@
 ---
-sites: erpnext_sites
-logs: erpnext_logs
+sites:
+  type: volume
+  name: erpnext_sites
+  nfs:
+    uid: "1000"
+    gid: "1000"
+    mode: "0770"
+  mounts:
+    - service: configurator
+      target: &home_frappe_frappe_bench_sites_target /home/frappe/frappe-bench/sites
+    - service: backend
+      target: *home_frappe_frappe_bench_sites_target
+    - service: websocket
+      target: *home_frappe_frappe_bench_sites_target
+    - service: scheduler
+      target: *home_frappe_frappe_bench_sites_target
+    - service: queue-short
+      target: *home_frappe_frappe_bench_sites_target
+    - service: queue-long
+      target: *home_frappe_frappe_bench_sites_target
+    - service: frontend
+      target: *home_frappe_frappe_bench_sites_target
+logs:
+  type: volume
+  name: erpnext_logs
+  nfs:
+    uid: "1000"
+    gid: "1000"
+    mode: "0770"
+  mounts:
+    - service: configurator
+      target: &home_frappe_frappe_bench_logs_target /home/frappe/frappe-bench/logs
+    - service: backend
+      target: *home_frappe_frappe_bench_logs_target
+    - service: websocket
+      target: *home_frappe_frappe_bench_logs_target
+    - service: scheduler
+      target: *home_frappe_frappe_bench_logs_target
+    - service: queue-short
+      target: *home_frappe_frappe_bench_logs_target
+    - service: queue-long
+      target: *home_frappe_frappe_bench_logs_target
+    - service: frontend
+      target: *home_frappe_frappe_bench_logs_target

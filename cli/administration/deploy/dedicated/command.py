@@ -99,7 +99,6 @@ def build_parser() -> argparse.ArgumentParser:
         add_help=False,
     )
 
-    # Custom combined help (-h / --help)
     parser.add_argument(
         "-h",
         "--help",
@@ -108,7 +107,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Show this help message and ansible-playbook --help.",
     )
 
-    # Standard arguments
     parser.add_argument("inventory", help="Path to the inventory file.")
     parser.add_argument(
         "-l", "--limit", help="Limit execution to certain hosts or groups."
@@ -165,7 +163,6 @@ def _normalize_app_ids(raw_ids: list[str]) -> list[str]:
         parts = [p.strip() for p in item.split(",") if p.strip()]
         result.extend(parts)
 
-    # remove duplicates while preserving order
     seen = set()
     unique: list[str] = []
     for app in result:
@@ -176,25 +173,26 @@ def _normalize_app_ids(raw_ids: list[str]) -> list[str]:
     return unique
 
 
-def main(argv: list[str] | None = None) -> int:
-    """
-    CLI entrypoint for `python -m cli.administration.deploy.dedicated`.
-
-    `argv` is injectable for tests and avoids reliance on global sys.argv.
-    """
+def parse_args(
+    argv: list[str] | None = None,
+) -> tuple[Any, list[str], dict[str, Any]]:
+    """Parse argv into ``(args, passthrough, modes_spec)``."""
     parser = build_parser()
-
-    # Dynamic MODE_* parsing
     modes_meta = load_modes_from_yaml(MODES_FILE)
     modes_spec = add_dynamic_mode_args(parser, modes_meta)
-
     args, passthrough = _split_args(argv, parser)
     args.id = _normalize_app_ids(args.id)
+    return args, passthrough, modes_spec
 
-    # Validate application IDs
+
+def run_from_args(
+    args: Any,
+    passthrough: list[str],
+    modes_spec: dict[str, Any],
+) -> int:
+    """Validate, build the mode map, and dispatch to the playbook runner."""
     validate_application_ids(args.inventory, args.id)
 
-    # Build final mode map
     modes: dict[str, Any] = build_modes_from_args(modes_spec, args)
 
     run_ansible_playbook(
@@ -213,3 +211,14 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Strict, explicit-only deploy entrypoint.
+
+    Deploys exactly the application_ids passed via ``--id``; no
+    swarm-infra auto-include. For dependency-driven swarm deploys use
+    ``cli.administration.deploy.swarm``.
+    """
+    args, passthrough, modes_spec = parse_args(argv)
+    return run_from_args(args, passthrough, modes_spec)

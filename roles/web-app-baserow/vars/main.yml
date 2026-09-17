@@ -1,26 +1,19 @@
 ---
-# General
 application_id: "web-app-baserow"
 entity_name: "{{ application_id | get_entity_name }}"
-database_password: "{{ lookup('config', application_id, 'credentials.database_password') }}" # nocheck: lookup-config-path
+database_password: "{{ lookup('config', application_id, 'secrets.credentials.database_password') }}" # nocheck: lookup-config-path
 
-# Baserow
 BASEROW_PUBLIC_URL: "{{ lookup('tls', application_id, 'url.base') }}"
 BASEROW_VERSION: "{{ lookup('config', application_id, 'services.baserow.version') }}"
 BASEROW_IMAGE: "{{ lookup('config', application_id, 'services.baserow.image') }}"
-BASEROW_CUSTOM_IMAGE: "{{ entity_name }}_custom:{{ BASEROW_VERSION }}"
 BASEROW_CONTAINER: "{{ lookup('config', application_id, 'services.baserow.name') }}"
-BASEROW_VOLUME: "{{ lookup('config', application_id, 'volumes.data') }}"
 
-# Auth integrations
 BASEROW_SSO_PROXY_GATED: "{{ lookup('sso', application_id, 'is_proxy_gated') }}"
 BASEROW_SSO_ADMIN_GROUP: "/{{ lookup('rbac_group_path', application_id=application_id, role='administrator') }}"
 BASEROW_SSO_FALLBACK_EMAIL_DOMAIN: "{{ lookup('domain', application_id) }}"
 
-# Required by Django/Baserow (e.g. JWT, sessions, etc.)
-BASEROW_SECRET_KEY: "{{ lookup('config', application_id, 'credentials.secret_key') }}"
+BASEROW_SECRET_KEY: "{{ lookup('config', application_id, 'secrets.credentials.secret_key') }}"
 
-# Database — single SPOT; env.j2 renders all DATABASE_* fields plus DATABASE_URL from here.
 BASEROW_DATABASE_USER: "{{ lookup('database', application_id, 'username') }}"
 BASEROW_DATABASE_NAME: "{{ lookup('database', application_id, 'name') }}"
 BASEROW_DATABASE_HOST: "{{ lookup('database', application_id, 'host') }}"
@@ -29,21 +22,40 @@ BASEROW_DATABASE_PASSWORD: "{{ lookup('database', application_id, 'password') }}
 BASEROW_DATABASE_URL: "postgresql://{{ BASEROW_DATABASE_USER }}:{{ BASEROW_DATABASE_PASSWORD }}@{{ BASEROW_DATABASE_HOST }}:{{ BASEROW_DATABASE_PORT }}/{{ BASEROW_DATABASE_NAME
   }}"
 
-# Redis — single SPOT; sidecar service name matches the compose service emitted by sys-svc-compose.
-BASEROW_REDIS_HOST: "redis"
-BASEROW_REDIS_PORT: 6379
-BASEROW_REDIS_URL: "redis://{{ BASEROW_REDIS_HOST }}:{{ BASEROW_REDIS_PORT }}"
+BASEROW_REDIS_HOST: "{{ lookup('engine', 'redis', application_id, 'host') }}"
+BASEROW_REDIS_PORT: "{{ lookup('engine', 'redis', application_id, 'port') }}"
+BASEROW_REDIS_URL: "{{ lookup('engine', 'redis', application_id, 'url') }}"
 
-# Internal runtime paths inside the baserow container image
 BASEROW_DJANGO_SETTINGS_MODULE: "baserow.config.settings.base"
 BASEROW_PYTHON: "/baserow/venv/bin/python"
 BASEROW_MANAGE_PY: "/baserow/backend/src/baserow/manage.py"
 
-# Compose service name inside compose.yml.j2
-# The template defines the service as "application:".
-BASEROW_SERVICE_NAME: "application"
+BASEROW_SERVICE_NAME: "baserow"
+BASEROW_INTERNAL_URL: "http://{{ BASEROW_CONTAINER }}:{{ lookup('config', application_id, 'services.baserow.ports.internal.http') }}"
 
-# Optional bootstrap admin user (Django superuser)
+BASEROW_MCP_ENABLED: "{{ lookup('config', application_id, 'services.baserowmcp.enabled') | bool }}"
+BASEROW_MCP_ENDPOINT_KEY: "{{ lookup('config', application_id, 'secrets.credentials.mcp_endpoint_key') }}"
+BASEROW_MCP_UPSTREAM_PATH: "{{ lookup('config', application_id, 'mcp.adapter.upstream_path') }}"
+BASEROW_MCP_ENDPOINT_PATH: "{{ lookup('config', application_id, 'mcp.endpoint.path') }}"
+BASEROW_MCP_ENDPOINT_NAME: "Infinito.Nexus"
+BASEROW_MCP_WORKSPACE_NAME: "Infinito.Nexus MCP"
+BASEROW_MCP_OWNER_EMAIL: "mcp@{{ lookup('domain', application_id) }}"
+BASEROW_MCP_BEARER: "{{ lookup('config', application_id, 'secrets.credentials.mcp_bearer') }}"
+BASEROW_MCP_CONTAINER: "{{ lookup('config', application_id, 'services.baserowmcp.name') }}"
+BASEROW_MCP_PORT: "{{ lookup('config', application_id, 'services.baserowmcp.ports.internal.http') }}"
+BASEROW_MCP_INSTANCE_DIR: "{{ [lookup('container', application_id, 'directories.instance'), 'mcp'] | path_join }}"
+BASEROW_MCP_UPSTREAM_URL: "{{ BASEROW_INTERNAL_URL }}{{ BASEROW_MCP_UPSTREAM_PATH }}"
+BASEROW_MCP_CONTRACT:
+  upstream_kind: mcp
+  upstream_transport: "{{ lookup('config', application_id, 'mcp.adapter.upstream_transport') }}"
+  provider: "{{ application_id }}"
+  upstream_url: "{{ BASEROW_MCP_UPSTREAM_URL }}"
+  auth_subject: "{{ lookup('config', application_id, 'mcp.auth_subject') }}"
+  mutating_tools_enabled: "{{ lookup('config', application_id, 'mcp.tools.mutating_tools_enabled') | bool }}"
+  tools: "{{ lookup('file', 'mcp/tools.json') | from_json }}"
+  limits: "{{ lookup('config', application_id, 'mcp.limits') }}"
+  schema_sha256: "{{ lookup('config', application_id, 'mcp.tools.schema_sha256') }}"
+
 BASEROW_BOOTSTRAP_ADMIN_USERNAME: "{{ lookup('users', 'administrator').username }}"
 BASEROW_BOOTSTRAP_ADMIN_EMAIL: "{{ lookup('users', 'administrator').email }}"
 BASEROW_BOOTSTRAP_ADMIN_PASSWORD: "{{ lookup('users', 'administrator').password }}"

@@ -1,6 +1,7 @@
 import unittest
 
 from utils.cache.yaml import load_yaml_any
+from utils.roles.categories import categories_file
 
 from . import PROJECT_ROOT
 
@@ -8,7 +9,7 @@ from . import PROJECT_ROOT
 class TestCategoryPaths(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        file_path = str(PROJECT_ROOT / "roles" / "categories.yml")
+        file_path = str(categories_file())
         data = load_yaml_any(file_path)
         cls.roles_def = data["roles"]
 
@@ -19,13 +20,21 @@ class TestCategoryPaths(unittest.TestCase):
         expected = set()
 
         for top_key, attrs in self.roles_def.items():
-            # Top-level category
             expected.add(top_key)
 
-            # Nested subcategories (keys other than metadata)
             for sub_key in attrs:
-                # Skip metadata keys
-                if sub_key in ("title", "description", "icon", "children", "invokable"):
+                if sub_key in (
+                    "title",
+                    "hanzi",
+                    "description",
+                    "icon",
+                    "children",
+                    "invokable",
+                    "stage",
+                    "run_after",
+                    "bootstrap",
+                    "modes",
+                ):
                     continue
                 expected.add(f"{top_key}-{sub_key}")
 

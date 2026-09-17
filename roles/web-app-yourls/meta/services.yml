@@ -18,14 +18,25 @@ mariadb:
   enabled: true # nocheck: dynamic-flag
   shared: "{{ 'svc-db-mariadb' in group_names }}"
 yourls:
-  version: 1.10.4-apache
+  modes:
+    compose:
+      enabled: true
+    swarm:
+      enabled: true
+  version: 1.10.6-apache
+  custom: true
   name: yourls
   image: yourls
-  min_storage: 1GB
+  min_storage: 388MB
   ports:
     local:
       sso: 16484
       http: 8006
+    internal:
+      http: 8080
+  healthcheck:
+    flavor: curl
+    path: "{{ (lookup('config', 'web-app-yourls', 'server.locations.admin') | regex_replace('^/+', '') | regex_replace('/+$', '')) ~ '/' }}"
   run_after:
     - web-app-matomo
     - web-app-keycloak
@@ -41,8 +52,8 @@ sso:
   flavor: oauth2
   oauth2:
     origin:
-      host: application
-      port: "80"
+      host: yourls
+      port: "{{ lookup('config', 'web-app-yourls', 'services.yourls.ports.internal.http') }}"
     allowed_groups:
       - "{{ lookup('rbac_group_path', application_id='web-app-yourls', role='administrator') }}"
     acl:
@@ -62,3 +73,10 @@ prometheus:
   bond: 1
   enabled: "{{ 'web-app-prometheus' in group_names }}"
   shared: "{{ 'web-app-prometheus' in group_names }}"
+
+# nocheck: playwright-service-flag
+# nocheck: variants-coverage — sso-variant-tor requires the onion on in every variant, so the false polarity has no variant left to live in
+tor:
+  bond: 0.5
+  enabled: "{{ 'svc-net-tor' in group_names }}"
+  shared: true # nocheck: dynamic-flag

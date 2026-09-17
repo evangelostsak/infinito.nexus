@@ -15,7 +15,7 @@ class TestSubsetRoles(unittest.TestCase):
 
     The "no subset label" case (existing diff behaviour stays unchanged) is
     covered by test_diff_affected_roles.py: this module only ever runs when
-    the label gates it in entry-pull-request-change.yml.
+    the label gates it in entry-pr-change-orchestrate.yml.
     """
 
     def _run(self, body: str):
@@ -52,7 +52,6 @@ class TestSubsetRoles(unittest.TestCase):
         result, outputs = self._run(body)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(outputs["whitelist"], " ".join(REAL_ROLES))
-        self.assertEqual(outputs["roles_only"], "true")
 
     def test_invalid_yaml_fails(self):
         body = "```yaml\nroles:\n  - web-app-nextcloud\n   bad: : :\n```\n"

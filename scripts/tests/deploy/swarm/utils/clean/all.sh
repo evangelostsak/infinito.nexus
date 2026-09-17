@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# Reclaim ALL leftover act-swarm state (DinD nodes, NFS sidecars, lab networks,
+# act outer containers) from aborted or wedged roundtrip swarm runs, across every
+# cluster id. Unlike teardown.sh (one cluster via SWARM_NAME), this nukes every
+# act-swarm container/network so the next swarm step starts from a clean host.
+# Run BETWEEN swarm runs: it would kill an in-flight one.
+#
+# Scope is precise, never by guessed name prefix, so unrelated containers (a
+# production `nfs-server`, someone's own `swarm-mgr`, ...) are NEVER touched:
+#   - DinD nodes + NFS sidecars carry the INFINITO_SWARM_TEST_LABEL label (SPOT in
+#     default.env, stamped by routine/01_bootstrap.sh).
+#   - the act outer container is matched by act's own job-name prefix.
+#   - lab networks are matched by the `swarm-lab` token the harness assigns.
+# Containers created before the label existed are not matched; those are wedged
+# D-state remnants that a host `systemctl restart docker` clears anyway.
+#
+# Two layers:
+#   1. docker (no privileges): rm matching containers + lab networks + prune.
+#   2. host (root): D-state containers (wedged kernel NFS, "did not receive an
+#      exit event") survive `docker rm -f`; clear with umount + exportfs + a docker
+#      restart. Attempted with passwordless sudo, reported under a no-priv sandbox.
+set -uo pipefail
+
+# INFINITO_SWARM_TEST_LABEL lives in the env SPOT (default.env -> .env).
+# shellcheck source=scripts/meta/env/load.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../../../.." && pwd)/scripts/meta/env/load.sh"
+
+_act_name='act--Test-Deploy-swarm'
+
+_select_ids() {
+	docker ps -aq --filter "label=${INFINITO_SWARM_TEST_LABEL}" 2>/dev/null
+	docker ps -aq --filter "name=${_act_name}" 2>/dev/null
+}
+_select_names() {
+	docker ps -a --format '{{.Names}}' --filter "label=${INFINITO_SWARM_TEST_LABEL}" 2>/dev/null
+	docker ps -a --format '{{.Names}}' --filter "name=${_act_name}" 2>/dev/null
+}
+
+_names="$(_select_names | sort -u)"
+if [ -n "${_names}" ]; then
+	echo ">>> swarm-clean: quiesce nested engines and detach NFS before removal"
+	for _node in ${_names}; do
+		if ! timeout 60 docker exec "${_node}" systemctl stop docker.socket docker >/dev/null 2>&1; then
+			echo "    ${_node}: nested engine did not stop; removing it anyway"
+		fi
+	done
+	# shellcheck disable=SC2086
+	if ! timeout 600 bash "$(dirname "$0")/../unmount/nfs_mounts.sh" ${_names} 2>&1 | sed 's/^/    /'; then
+		echo "    nfs detach reported failures; the host layer below clears what survives"
+	fi
+fi
+
+echo ">>> swarm-clean: leftover containers"
+_ctrs="$(_select_ids | sort -u)"
+if [ -n "${_ctrs}" ]; then
+	# shellcheck disable=SC2086  # intentional word-split of the id list
+	docker rm -f ${_ctrs} 2>&1 | sed 's/^/    /' || true # nocheck: shell-or-true -- grandfathered: worked in practice; TODO: sharpen to catch only the exact tolerated error
+fi
+
+for _reap in 1 2 3 4 5; do
+	_rest="$(_select_ids | sort -u)"
+	[ -n "${_rest}" ] || break
+	# shellcheck disable=SC2086  # intentional word-split of the id list
+	docker kill -s KILL ${_rest} >/dev/null 2>&1 || true # nocheck: shell-or-true -- grandfathered: worked in practice; TODO: sharpen to catch only the exact tolerated error
+	# shellcheck disable=SC2086  # intentional word-split of the id list
+	docker rm ${_rest} 2>&1 | sed 's/^/    /' || true # nocheck: shell-or-true -- grandfathered: worked in practice; TODO: sharpen to catch only the exact tolerated error
+	sleep 2
+done
+
+echo ">>> swarm-clean: leftover networks"
+_nets="$(docker network ls --format '{{.Name}}' | grep -E "${INFINITO_SWARM_LAB_NET_NAME}" || true)"
+if [ -n "${_nets}" ]; then
+	# shellcheck disable=SC2086  # intentional word-split of the network list
+	docker network rm ${_nets} 2>&1 | sed 's/^/    /' || true # nocheck: shell-or-true -- grandfathered: worked in practice; TODO: sharpen to catch only the exact tolerated error
+fi
+docker network prune -f >/dev/null 2>&1 || true # nocheck: shell-or-true -- grandfathered: worked in practice; TODO: sharpen to catch only the exact tolerated error
+
+echo ">>> swarm-clean: leftover nfs-export volumes"
+_vols="$(docker volume ls --format '{{.Name}}' | grep -E '_nfs-export$' || true)"
+if [ -n "${_vols}" ]; then
+	# shellcheck disable=SC2086
+	if ! docker volume rm ${_vols} 2>&1 | sed 's/^/    /'; then
+		echo "    some nfs-export volumes survived removal; a node still holds them"
+	fi
+fi
+
+_left="$(_select_names | sort -u)"
+if [ -z "${_left}" ]; then
+	echo ">>> swarm-clean: done, no remnants"
+	exit 0
+fi
+
+echo ">>> swarm-clean: D-state remnants survived docker rm -f:"
+echo "    ${_left//$'\n'/$'\n'    }"
+if sudo -n true 2>/dev/null; then
+	echo ">>> clearing wedged kernel NFS on host (sudo)"
+	sudo umount -f -l "${INFINITO_DIR_VAR_LIB:?}" 2>/dev/null || true # nocheck: shell-or-true -- grandfathered: worked in practice; TODO: sharpen to catch only the exact tolerated error
+	sudo exportfs -ua 2>/dev/null || true                             # nocheck: shell-or-true -- grandfathered: worked in practice; TODO: sharpen to catch only the exact tolerated error
+	sudo systemctl restart containerd docker
+	echo ">>> containerd and docker restarted; D-state remnants cleared"
+else
+	echo "!!! sudo unavailable here (sandbox). Clear on the host (this kills every container):"
+	echo "    sudo umount -f -l ${INFINITO_DIR_VAR_LIB}; sudo exportfs -ua; sudo systemctl restart containerd docker"
+	echo "    Never run this while a deploy is in flight: it wipes every exec instance and the run dies."
+	exit 1
+fi

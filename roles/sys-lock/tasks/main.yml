@@ -1,8 +1,8 @@
 ---
 - block:
-    - name: create {{ BIN_LOCK }}
+    - name: 📁 create {{ BIN_LOCK }}
       copy:
-        src: sys-lock.py
+        src: python/sys-lock.py
         dest: "{{ BIN_LOCK }}"
         mode: "0755"
 

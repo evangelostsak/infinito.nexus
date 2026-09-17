@@ -1,0 +1,4 @@
+---
+- name: 📦 Install & configure the admin OIDC plugin
+  ansible.builtin.include_tasks: setup/oidc.yml
+  when: SHOPWARE_OIDC_ENABLED | bool

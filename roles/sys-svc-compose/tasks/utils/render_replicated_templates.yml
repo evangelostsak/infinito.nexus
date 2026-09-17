@@ -1,0 +1,7 @@
+---
+- name: "📄 Render and replicate templates for '{{ application_id }}'"
+  ansible.builtin.include_tasks: "_render_one_template.yml"
+  loop: "{{ lookup('role_templates_expanded', application_id, role_templates) }}"
+  loop_control:
+    loop_var: _tpl
+    label: "{{ _tpl.dest }}"

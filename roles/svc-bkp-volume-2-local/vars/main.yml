@@ -1,0 +1,107 @@
+---
+# Mapping logic for baudolo CLI arguments
+#
+# - BKP_VOLUME_2_LOCAL_DB_ROUTINE:       Service names where backup.database_routine is set (for --database-containers)
+# - BKP_VOLUME_2_LOCAL_NO_STOP_REQUIRED: Exact deployed image refs where backup.no_stop_required is set (for --images-no-stop-required)
+# - BKP_VOLUME_2_LOCAL_DISABLED:         Exact deployed image refs where backup.disabled is set (for --images-no-backup-required)
+# - BKP_VOLUME_2_LOCAL_HARD_RESTART:     Compose project (entity) names where backup.project_hard_restart is set (for --hard-restart-projects)
+# - BKP_VOLUME_2_LOCAL_SNAPSHOT_BIN:     Launcher that appends --snapshot/--snapshot-subject per run when the mode allows it
+# - BKP_VOLUME_2_LOCAL_SNAPSHOT_MODE:    services.volume-2-local.snapshot_mode normalised; YAML reads a bare off/no/false as a boolean
+# - BKP_VOLUME_2_LOCAL_REPO_NAME:        Directory under <backups-dir>/<machine-hash>/; MUST match cli/administration/recover/full.py's volume repo
+# baudolo matches --images-* exactly, so the refs carry the swarm registry prefix.
+# CLI-ready variables render these lists as argument strings.
+
+application_id: svc-bkp-volume-2-local
+system_service_id: "{{ application_id }}"
+
+BKP_VOLUME_2_LOCAL_BAUDOLO_BIN: baudolo
+BKP_VOLUME_2_LOCAL_REPO_NAME: backup-docker-to-local
+BKP_VOLUME_2_LOCAL_SNAPSHOT_BIN: "{{ [ DIR_BIN, 'baudolo-snapshot' ] | path_join }}"
+BKP_VOLUME_2_LOCAL_SUBVOLUME_BIN: "{{ [ DIR_BIN, 'baudolo-subject-subvolume' ] | path_join }}"
+
+BKP_VOLUME_2_LOCAL_SNAPSHOT_MODES:
+  - auto
+  - never
+  - btrfs
+  - zfs
+
+BKP_VOLUME_2_LOCAL_SNAPSHOT_FALSEY:
+  - "false"
+  - "off"
+  - "no"
+  - "n"
+  - "0"
+  - "never"
+
+BKP_VOLUME_2_LOCAL_SNAPSHOT_MODE_RAW: >-
+  {{ lookup('config', application_id, 'services.volume-2-local.snapshot_mode') }}
+
+BKP_VOLUME_2_LOCAL_SNAPSHOT_MODE: >-
+  {{ 'never'
+     if (BKP_VOLUME_2_LOCAL_SNAPSHOT_MODE_RAW | string | lower | trim) in BKP_VOLUME_2_LOCAL_SNAPSHOT_FALSEY
+     else (BKP_VOLUME_2_LOCAL_SNAPSHOT_MODE_RAW | string | lower | trim) }}
+
+BKP_VOLUME_2_LOCAL_DB_ENABLED: >-
+  {{
+    (database_type | default(false) | string | trim | lower)
+    in ['1', 'true', 'yes', 'on', 'y', 't']
+  }}
+
+BKP_VOLUME_2_LOCAL_DB_ROUTINE: >-
+  {{ lookup('backup_database_containers') }}
+
+BKP_VOLUME_2_LOCAL_NO_STOP_REQUIRED: >-
+  {{ lookup('backup_image', 'no_stop_required') }}
+
+BKP_VOLUME_2_LOCAL_DISABLED: >-
+  {{ lookup('backup_image', 'disabled') }}
+
+BKP_VOLUME_2_LOCAL_VOLUMES_DISABLED: >-
+  {{ lookup('backup_volume') }}
+
+BKP_VOLUME_2_LOCAL_HARD_RESTART: >-
+  {{ lookup('backup_hard_restart_projects') }}
+
+BKP_VOLUME_2_LOCAL_DB_ROUTINE_CLI: >-
+  {% if BKP_VOLUME_2_LOCAL_DB_ROUTINE | length > 0 -%}
+    --database-containers {{ BKP_VOLUME_2_LOCAL_DB_ROUTINE | join(' ') }}
+  {%- endif %}
+
+BKP_VOLUME_2_LOCAL_NO_STOP_REQUIRED_CLI: >-
+  {% if BKP_VOLUME_2_LOCAL_NO_STOP_REQUIRED | length > 0 -%}
+    --images-no-stop-required {{ BKP_VOLUME_2_LOCAL_NO_STOP_REQUIRED | join(' ') }}
+  {%- endif %}
+
+BKP_VOLUME_2_LOCAL_DISABLED_CLI: >-
+  {% if BKP_VOLUME_2_LOCAL_DISABLED | length > 0 -%}
+    --images-no-backup-required {{ BKP_VOLUME_2_LOCAL_DISABLED | join(' ') }}
+  {%- endif %}
+
+BKP_VOLUME_2_LOCAL_VOLUMES_DISABLED_CLI: >-
+  {% if BKP_VOLUME_2_LOCAL_VOLUMES_DISABLED | length > 0 -%}
+    --volumes-no-backup-required {{ BKP_VOLUME_2_LOCAL_VOLUMES_DISABLED | join(' ') }}
+  {%- endif %}
+
+BKP_VOLUME_2_LOCAL_HARD_RESTART_CLI: >-
+  {% if DEPLOYMENT_MODE == 'compose' and BKP_VOLUME_2_LOCAL_HARD_RESTART | length > 0 -%}
+    --hard-restart-projects {{ BKP_VOLUME_2_LOCAL_HARD_RESTART | join(' ') }}
+  {%- endif %}
+
+BKP_VOLUME_2_LOCAL_CLI_ARGS_LIST:
+  - "{{ BKP_VOLUME_2_LOCAL_DB_ROUTINE_CLI }}"
+  - "{{ BKP_VOLUME_2_LOCAL_NO_STOP_REQUIRED_CLI }}"
+  - "{{ BKP_VOLUME_2_LOCAL_DISABLED_CLI }}"
+  - "{{ BKP_VOLUME_2_LOCAL_VOLUMES_DISABLED_CLI }}"
+  - "{{ BKP_VOLUME_2_LOCAL_HARD_RESTART_CLI }}"
+
+BKP_VOLUME_2_LOCAL_EXEC: >-
+  {{ BKP_VOLUME_2_LOCAL_SNAPSHOT_BIN }}
+  --mode {{ BKP_VOLUME_2_LOCAL_SNAPSHOT_MODE }}
+  --
+  {{ BKP_VOLUME_2_LOCAL_BAUDOLO_BIN }}
+  --compose-dir {{ DIR_COMPOSITIONS }}
+  --databases-csv {{ FILE_DATABASE_SECRETS }}
+  --backups-dir {{ DIR_BACKUPS }}
+  --repo-name {{ BKP_VOLUME_2_LOCAL_REPO_NAME }}
+  --only-sql
+  {{ BKP_VOLUME_2_LOCAL_CLI_ARGS_LIST | select('string') | join(' ') }}

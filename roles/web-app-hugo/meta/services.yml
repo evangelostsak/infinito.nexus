@@ -24,8 +24,16 @@ css:
   enabled: "{{ 'web-svc-css' in group_names }}"
   shared: "{{ 'web-svc-css' in group_names }}"
 hugo:
+  healthcheck:
+    flavor: wget
+  modes:
+    compose:
+      enabled: true
+    swarm:
+      enabled: true
   image: nginx
   version: 1.31-alpine
+  custom: true
   builder_image: hugomods/hugo
   builder_version: exts-0.148.0
   source_repository: https://github.com/gohugoio/hugoDocs.git
@@ -35,8 +43,12 @@ hugo:
   ports:
     local:
       http: 8008
+    internal:
+      http: 80
+  proxy:
+    service_key: hugo
   lifecycle: beta
-  min_storage: 1GB
+  min_storage: 227MB
   cpus: "0.2"
   mem_reservation: 128m
   mem_limit: 256m
@@ -50,3 +62,10 @@ prometheus:
   bond: 1
   enabled: "{{ 'web-app-prometheus' in group_names }}"
   shared: "{{ 'web-app-prometheus' in group_names }}"
+
+# nocheck: playwright-service-flag
+# nocheck: variants-coverage — sso-variant-tor requires the onion on in every variant, so the false polarity has no variant left to live in
+tor:
+  bond: 0.5
+  enabled: "{{ 'svc-net-tor' in group_names }}"
+  shared: true # nocheck: dynamic-flag

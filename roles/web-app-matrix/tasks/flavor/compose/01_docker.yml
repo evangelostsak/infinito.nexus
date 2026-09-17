@@ -1,86 +1,94 @@
 ---
-- name: "load docker and db for {{ application_id }}"
+# include-gated: when: DEPLOYMENT_MODE == "compose"
+- name: "🧩 load docker and db for {{ application_id }}"
   include_role:
     name: sys-stk-backend
   vars:
     compose_handlers_flush: false
 
-- name: include 02_create-and-seed-database.yml for multiple bridges
+- name: 📂 include 02_create-and-seed-database.yml for multiple bridges
   include_tasks: 02_create-and-seed-database.yml
   vars:
     database_password: "{{ item.database_password }}"
     database_username: "{{ item.database_username }}"
     database_name: "{{ item.database_name }}"
   loop: "{{ MATRIX_BRIDGES }}"
+  loop_control:
+    label: "{{ item.bridge_name }}"
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
 
-- name: "cleanup project folder"
+- name: "🧹 cleanup project folder"
   file:
     path: "{{ lookup('container', application_id, 'directories.instance') }}mautrix/"
     state: absent
 
-- name: "create bridge folders"
+- name: "📁 create bridge folders"
   file:
-    path: "{{ lookup('container', application_id, 'directories.instance') }}mautrix/{{ item.bridge_name }}"
+    path: "{{ [ MATRIX_BRIDGE_SOURCE_DIR, item.bridge_name ] | path_join }}"
     state: directory
     mode: "0755"
   loop: "{{ MATRIX_BRIDGES }}"
+  loop_control:
+    label: "{{ item.bridge_name }}"
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
 
-- name: add multiple mautrix bridge configuration
-  template:
+- name: ➕ add multiple mautrix bridge configuration
+  stack_host_template:
     src: "flavor/compose/mautrix/{{ item.bridge_name }}.config.yml.j2"
-    dest: "{{ lookup('container', application_id, 'directories.instance') }}mautrix/{{ item.bridge_name }}/config.yaml"
+    dest: "{{ [ MATRIX_BRIDGE_SOURCE_DIR, item.bridge_name, 'config.yaml' ] | path_join }}"
   loop: "{{ MATRIX_BRIDGES }}"
-  notify: compose up
+  loop_control:
+    label: "{{ item.bridge_name }}"
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
+  notify: compose-up
 
-- name: add element configuration
-  template:
+- name: "➕ add the registration each bridge config implies"
+  stack_host_template:
+    src: "flavor/compose/mautrix/registration.yaml.j2"
+    dest: "{{ [ MATRIX_BRIDGE_SOURCE_DIR, item.bridge_name, 'registration.yaml' ] | path_join }}"
+  loop: "{{ MATRIX_BRIDGES }}"
+  loop_control:
+    label: "{{ item.bridge_name }}"
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
+  notify: compose-up
+
+- name: ➕ add element configuration
+  stack_host_template:
     src: "flavor/compose/element.config.json.j2"
     dest: "{{ MATRIX_ELEMENT_CONFIG_PATH_HOST }}"
-  notify: compose up
+  notify: compose-up
 
-- name: add synapse homeserver configuration
-  template:
-    src: "flavor/compose/synapse/homeserver.yaml.j2"
-    dest: "{{ MATRIX_SYNAPSE_CONFIG_PATH_HOST }}"
-  notify: compose up
+- name: "📄 Render Synapse config files (local + swarm peers)"
+  ansible.builtin.include_tasks:
+    file: "{{ lookup('path_absolute', 'roles/sys-svc-compose/tasks/utils/render_replicated_templates.yml') }}"
+  vars:
+    role_templates:
+      - src: "flavor/compose/synapse/homeserver.yaml.j2"
+        dest: "{{ MATRIX_SYNAPSE_CONFIG_PATH_HOST }}"
+        mode: "{{ MATRIX_SYNAPSE_BIND_MOUNT_MODE }}"
+      - src: "flavor/compose/synapse/log.config.j2"
+        dest: "{{ MATRIX_SYNAPSE_LOG_PATH_HOST }}"
+        mode: "{{ MATRIX_SYNAPSE_BIND_MOUNT_MODE }}"
 
-- name: add synapse log configuration
-  template:
-    src: "flavor/compose/synapse/log.config.j2"
-    dest: "{{ MATRIX_SYNAPSE_LOG_PATH_HOST }}"
-  notify: compose up
-
-- name: set correct folder permissions
+- name: 🔧 set correct folder permissions
   command:
     cmd: "container run --rm --mount type=volume,src={{ MATRIX_SYNAPSE_VOLUME }},dst=/data -e SYNAPSE_SERVER_NAME={{ MATRIX_SYNAPSE_DOMAIN }} -e SYNAPSE_REPORT_STATS=no
-      --entrypoint /bin/sh matrixdotorg/synapse:latest -c 'chown -vR 991:991 /data'"
+      --entrypoint /bin/sh matrixdotorg/synapse:latest -c 'chown -vR {{ MATRIX_SYNAPSE_UID }}:{{ MATRIX_SYNAPSE_GID }} /data'"
 
-- name: Flush handlers
+- name: ➕ add compose.yml
+  stack_host_template:
+    src: "compose.yml.j2"
+    dest: "{{ [ lookup('container', application_id, 'directories.instance'),'compose.yml' ] | path_join }}"
+  notify: compose-up
+
+- name: "🐳 compose-mode lifecycle (pull + up)"
+  include_tasks: 03_compose_pull_and_up.yml
+  when: DEPLOYMENT_MODE == 'compose'
+
+- name: "🚿 Flush handlers so the stack deploys before the Synapse wait"
   meta: flush_handlers
 
-- name: wait for registration files
-  wait_for:
-    path: "{{ lookup('container', application_id, 'directories.instance') }}mautrix/{{ item.bridge_name }}/registration.yaml"
-    state: present
-    timeout: 120
-  loop: "{{ MATRIX_BRIDGES }}"
-
-- name: "change file permissions"
-  file:
-    path: "{{ lookup('container', application_id, 'directories.instance') }}mautrix/{{ item.bridge_name }}/registration.yaml"
-    mode: "0755"
-  loop: "{{ MATRIX_BRIDGES }}"
-  async: "{{ ASYNC_TIME if ASYNC_ENABLED | bool else omit }}"
-  poll: "{{ ASYNC_POLL if ASYNC_ENABLED | bool else omit }}"
-
-- name: "Restart synapse so it loads the freshly generated bridge appservice registrations"
-  command:
-    cmd: "{{ BIN_COMPOSE }} restart synapse"
-    chdir: "{{ lookup('container', application_id, 'directories.instance') }}"
-  changed_when: true
-  when: MATRIX_BRIDGES | length > 0
-
-- name: wait for Synapse client/versions endpoint
+- name: ⏳ wait for Synapse client/versions endpoint
   uri_retry:
     url: "http://127.0.0.1:{{ lookup('config', application_id, 'services.synapse.ports.local.http') }}/_matrix/client/versions"
     method: GET
@@ -90,26 +98,27 @@
   delay: 2
   until: matrix_synapse_health.status == 200
 
-- name: create admin account
-  command:
-    cmd: "{{ BIN_COMPOSE }} exec -T synapse register_new_matrix_user -u {{ MATRIX_ADMINISTRATOR_USERNAME | quote }} -p {{ MATRIX_ADMINISTRATOR_PASSWORD | quote }}
-      -a -c {{ MATRIX_SYNAPSE_CONFIG_PATH_CONTAINER | quote }} http://localhost:{{ MATRIX_SYNAPSE_CONTAINER_PORT }}"
-    chdir: "{{ lookup('container', application_id, 'directories.instance') }}"
-  register: matrix_create_admin
-  changed_when: matrix_create_admin.rc == 0
-  failed_when: >
-    matrix_create_admin.rc != 0 and
-    'User ID already taken' not in (matrix_create_admin.stdout + matrix_create_admin.stderr)
+- name: "✅ Wait until Synapse reaches every bridge as ready"
+  ansible.builtin.shell:
+    cmd: >-
+      container exec {{ MATRIX_SYNAPSE_CONTAINER_ADDRESS }}
+      {{ 10 | curl(retries=0) }} --noproxy '*' -fS
+      http://mautrix-{{ item.bridge_name }}:{{ item.appservice_port }}/_matrix/mau/ready
+    executable: /bin/bash
+  loop: "{{ MATRIX_BRIDGES }}"
+  loop_control:
+    label: "{{ item.bridge_name }}"
+  register: matrix_bridge_ready
   no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
+  retries: 60
+  delay: 10
+  until: matrix_bridge_ready.rc == 0
+  changed_when: false
+  when: IS_STACK_HOST | bool
 
-- name: create chatgpt bot
-  command:
-    cmd: "{{ BIN_COMPOSE }} exec -T synapse register_new_matrix_user -u chatgptbot -p {{ lookup('config', application_id, 'credentials.chatgpt_bridge_user_password')
-      | quote }} -a -c {{ MATRIX_SYNAPSE_CONFIG_PATH_CONTAINER | quote }} http://localhost:{{ MATRIX_SYNAPSE_CONTAINER_PORT }}"
-    chdir: "{{ lookup('container', application_id, 'directories.instance') }}"
-  register: matrix_create_chatgptbot
-  changed_when: matrix_create_chatgptbot.rc == 0
-  failed_when: >
-    matrix_create_chatgptbot.rc != 0 and
-    'User ID already taken' not in (matrix_create_chatgptbot.stdout + matrix_create_chatgptbot.stderr)
-  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
+- name: "👤 Provision what only the stack host owns (accounts, bridge token, compose)"
+  ansible.builtin.include_tasks: utils/stack_host_provisioning.yml
+  when: IS_STACK_HOST | bool
+
+- name: "🔄 Flush all handlers after docker setup so they don't intervine with openresty"
+  meta: flush_handlers

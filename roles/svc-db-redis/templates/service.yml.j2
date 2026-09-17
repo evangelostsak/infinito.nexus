@@ -1,15 +1,12 @@
 # This template needs to be included in compose.yml, which depend on redis
-{% set redis_image = lookup('config','svc-db-redis', 'services.redis.image') %}
-{% set redis_version = lookup('config','svc-db-redis', 'services.redis.version')%}
   redis:
-    image: "{{ redis_image }}:{{ redis_version }}"
-    container_name: {{ application_id | get_entity_name }}-redis
-    restart: {{ DOCKER_RESTART_POLICY }}
+    {{ lookup('container_image', 'svc-db-redis', 'redis') }}
+    {{ lookup('compose_only', 'container_name', ((application_id | get_entity_name) ~ '-redis')) }}
+    {{ lookup('compose_restart') }}
     logging:
       driver: journald
     volumes:
       - redis:/data
-    # Just save in memory and prevent huge redis_volumes
     command:
       - redis-server
       - --appendonly
@@ -19,12 +16,15 @@
       - --maxmemory {{ lookup('applications') | redis_maxmemory_mb(application_id, 0.8, RESOURCE_MEM_LIMIT | int ) }}mb
       - --maxmemory-policy
       - "allkeys-lru"
-    healthcheck:
+    # nocheck: container-healthcheck-literal  probes every second, so the SPOT's 5s start cadence would report healthy later than this block already does
+    healthcheck: # nocheck: healthcheck-timing-override, healthcheck-start-period-covers-interval  a swarm-init gate that must clear in seconds, so it runs without a start window rather than inside one
       test: ["CMD", "redis-cli", "ping"]
+      # nocheck: healthcheck-timing-override  probes every second on purpose, which is why start_interval is left off
       interval: 1s
+      # nocheck: healthcheck-timing-override  a redis ping needs no five seconds
       timeout: 3s
       retries: 30
-    networks:
+    networks:  # nocheck: networks-literal  local sidecar inside consumer stack, default-only attachment
       - default
 {% macro include_resource_for(svc, indent=4) -%}
   {% set service_name = svc -%}
@@ -33,5 +33,10 @@
   {%- endset -%}
 {{ _snippet | indent(indent, true) }}
 {%- endmacro %}
+{% if DEPLOYMENT_MODE == 'compose' %}
 {{ include_resource_for('redis') }}
+{% endif %}
+{% set service_name = 'redis' %}
+{% set service_replicas_forced = 1 %}
+{% include 'roles/sys-svc-container/templates/deploy.yml.j2' %}
 {{ "\n" }}

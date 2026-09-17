@@ -1,7 +1,7 @@
 ---
 galaxy_info:
   author: Kevin Veen-Birkenbach
-  description: Installs and applies dotlinker (doli) mappings (generic role).
+  description: Generic role installing the doli CLI and applying dotfile symlink mappings passed in by other roles
   license: Infinito.Nexus Community License (Non-Commercial)
   company: |
     Kevin Veen-Birkenbach

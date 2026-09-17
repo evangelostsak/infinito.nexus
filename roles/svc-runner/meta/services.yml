@@ -1,10 +1,21 @@
 ---
-svc-runner:
+# nocheck: dockerfile-custom
+# nocheck: image-healthcheck  CI runner, no service port; readiness is the runner's own registration
+runner:
+  modes:
+    compose:
+      enabled: true
+    swarm:
+      enabled: true
   lifecycle: beta
+  proxy:
+    service_key: runner-1
   github_owner: infinito-nexus
   github_repo: core
   docker_base: /mnt/docker
-  base_image: ubuntu:22.04
+  image: ubuntu
+  # nocheck: docker-version
+  version: "26.04"
   docker_gid_fallback: 999
   project_prefix: runner
   sysctl_conf: /etc/sysctl.d/99-github-runner.conf
@@ -12,3 +23,19 @@ svc-runner:
   image_tag: latest
   install_dir: /opt/github-runner
   cpus: 2
+
+# Exception: mirror-only entries — CI pulls these images directly and never deploys them as services
+# nocheck: dynamic-flag
+buildkit:
+  enabled: false
+  shared: false
+  image: moby/buildkit
+  # nocheck: docker-version
+  version: "buildx-stable-1"
+# nocheck: dynamic-flag
+act-runner:
+  enabled: false
+  shared: false
+  image: catthehacker/ubuntu
+  # nocheck: docker-version
+  version: "act-latest"

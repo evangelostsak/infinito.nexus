@@ -31,11 +31,22 @@ if [[ ! -d "node_modules/@playwright/test" ]]; then
 	exit 127
 fi
 
-PERSONAS_SRC="${REPO_ROOT}/roles/test-e2e-playwright/files/personas"
-SERVICE_GATING_SRC="${REPO_ROOT}/roles/test-e2e-playwright/files/service-gating.js"
-PLAYWRIGHT_CONFIG_SRC="${REPO_ROOT}/roles/test-e2e-playwright/files/playwright.config.js"
+HELPERS_SRC="${REPO_ROOT}/roles/test-e2e-playwright/files"
+PERSONAS_SRC="${HELPERS_SRC}/personas"
+PLAYWRIGHT_CONFIG_SRC="${HELPERS_SRC}/playwright.config.js"
+ROLE_VARS_SRC="${REPO_ROOT}/roles/test-e2e-playwright/vars/main.yml"
 
-for asset in "${PERSONAS_SRC}" "${SERVICE_GATING_SRC}" "${PLAYWRIGHT_CONFIG_SRC}"; do
+mapfile -t CONFIG_TIMEOUT_ENV < <(
+	sed -n '/^TEST_E2E_PLAYWRIGHT_CONFIG_TIMEOUTS:/,/^[^[:space:]#]/p' "${ROLE_VARS_SRC}" |
+		grep -oE '^[[:space:]]+[A-Z][A-Z0-9_]+:' | tr -d ' :' | sed 's/$/=1/'
+)
+
+if [[ ${#CONFIG_TIMEOUT_ENV[@]} -eq 0 ]]; then
+	echo "lint-playwright: no timeouts read from ${ROLE_VARS_SRC}; every config load would throw" >&2
+	exit 2
+fi
+
+for asset in "${PERSONAS_SRC}" "${PLAYWRIGHT_CONFIG_SRC}"; do
 	if [[ ! -e "${asset}" ]]; then
 		echo "lint-playwright: missing staging asset: ${asset}" >&2
 		exit 2
@@ -114,13 +125,18 @@ lint_one_role() {
 	config_stub >"${stage_dir}/playwright.config.js"
 
 	cp -f "${role_files_dir}"/*.js "${tests_dir}/"
-	cp -f "${SERVICE_GATING_SRC}" "${tests_dir}/service-gating.js"
+	find "${role_files_dir}" -mindepth 1 -maxdepth 1 -type d -exec cp -R {} "${tests_dir}/" \;
+	for helper_src in "${HELPERS_SRC}"/*.js; do
+		[[ -f "${helper_src}" ]] || continue
+		[[ "$(basename "${helper_src}")" == "playwright.config.js" ]] && continue
+		cp -f "${helper_src}" "${tests_dir}/$(basename "${helper_src}")"
+	done
 	cp -f "${PERSONAS_SRC}"/*.js "${tests_dir}/personas/"
 	cp -f "${PERSONAS_SRC}"/utils/*.js "${tests_dir}/personas/utils/"
 
 	ln -sfn "${REPO_ROOT}/node_modules" "${stage_dir}/node_modules"
 
-	local stub_env=()
+	local stub_env=("${CONFIG_TIMEOUT_ENV[@]}")
 	local env_template="roles/${role}/templates/playwright.env.j2"
 	if [[ -f "${env_template}" ]]; then
 		local key
@@ -136,10 +152,6 @@ lint_one_role() {
 	return "${rc}"
 }
 
-# Dispatch every spec through `lint_one_role` with up to
-# INFINITO_WORKER_CPU concurrent workers. Output is captured per role
-# and replayed in `SPEC_FILES` order in the second pass so stdout stays
-# deterministic regardless of completion order.
 log_dir="${STAGE_ROOT}/logs"
 mkdir -p "${log_dir}"
 

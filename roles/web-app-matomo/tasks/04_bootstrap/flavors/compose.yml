@@ -1,0 +1,15 @@
+---
+- name: "🐳 Matomo bootstrap | Compose: run installer attempts"
+  ansible.builtin.include_tasks: compose_attempt.yml
+  loop: "{{ range(MATOMO_BOOTSTRAP_ATTEMPTS | int) | list }}"
+  loop_control:
+    loop_var: matomo_attempt_index
+
+- name: "🛑 Matomo bootstrap | Compose: fail when no attempt succeeded"
+  ansible.builtin.fail:
+    msg: >-
+      Matomo compose bootstrap failed after {{ MATOMO_BOOTSTRAP_ATTEMPTS }} attempt(s)
+      with rc={{ matomo_bootstrap_compose.rc | default('n/a') }}:
+      {{ (matomo_bootstrap_compose | default({})).stderr | default('') | trim }}
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
+  when: ((matomo_bootstrap_compose | default({})).rc | default(1)) | int != 0

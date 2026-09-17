@@ -9,7 +9,7 @@
 # directly and writes through correctly. We piping the JSON via
 # kcadm.sh update users/profile -f -.
 
-- name: "Push UserProfileProvider config via realms/{{ KEYCLOAK_REALM }}/users/profile"
+- name: "⬆️ Push UserProfileProvider config via realms/{{ KEYCLOAK_REALM }}/users/profile"
   ansible.builtin.shell: >
     {{ KEYCLOAK_EXEC_KCADM }}
     update users/profile -r {{ KEYCLOAK_REALM | quote }} -f -
@@ -17,5 +17,4 @@
     stdin: "{{ KEYCLOAK_USER_PROFILE_OBJECT | to_json }}"
   changed_when: true
   no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
-  async: "{{ ASYNC_TIME if ASYNC_ENABLED | bool else omit }}"
-  poll: "{{ ASYNC_POLL if ASYNC_ENABLED | bool else omit }}"
+  register: kc_userprofile

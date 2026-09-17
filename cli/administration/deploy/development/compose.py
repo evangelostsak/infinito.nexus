@@ -132,7 +132,8 @@ class Compose:
             / "scripts"
             / "docker"
             / "cache"
-            / "package-frontend-certs.sh"
+            / "package-frontend"
+            / "certs.sh"
         )
         print(">>> Generating package-cache-frontend CA + per-hostname certs")
         subprocess.run(
@@ -189,9 +190,7 @@ class Compose:
         args: list[str] = ["up", "-d"]
         if no_build:
             args.append("--no-build")
-        # Cache services have `required: false` on infinito; list them
-        # explicitly so they boot before the runner.
-        if self.profile.registry_cache_active():
+        if self.profile.owns_cache_stack():
             self._generate_package_frontend_certs(env)
             args += ["registry-cache", "package-cache", "package-cache-frontend"]
         args += ["coredns", "infinito"]
@@ -200,8 +199,9 @@ class Compose:
 
         self.wait_for_healthy()
 
-        if self.profile.registry_cache_active():
+        if self.profile.owns_cache_stack():
             self._bootstrap_package_cache(env)
+        if self.profile.cache_stack_enabled():
             self._install_package_frontend_ca_in_runner()
 
         if run_entry_init:

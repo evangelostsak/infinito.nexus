@@ -1,0 +1,91 @@
+---
+# nocheck: config-volume-secret  Zammad's auto_wizard.json is consumed once at first boot and must carry the OIDC client secret inline; the wizard accepts no reference to a secret held elsewhere.
+zammad_storage:
+  type: volume
+  mounts:
+    - service: websocket
+      target: &opt_zammad_storage_target /opt/zammad/storage
+    - service: scheduler
+      target: *opt_zammad_storage_target
+    - service: nginx
+      target: *opt_zammad_storage_target
+    - service: init
+      target: *opt_zammad_storage_target
+    - service: railsserver
+      target: *opt_zammad_storage_target
+zammad_search:
+  type: volume
+  mounts:
+    - service: elasticsearch
+      target: /usr/share/elasticsearch/data
+auto_wizard:
+  type: config
+  source: "{{ [lookup('container', 'web-app-zammad', 'directories.volumes'), 'auto_wizard.json'] | path_join }}"
+  mode: "0444"
+  mounts:
+    - service: init
+      target: &opt_zammad_auto_wizard_json_target /opt/zammad/auto_wizard.json
+    - service: railsserver
+      target: *opt_zammad_auto_wizard_json_target
+zammad_omniauth_init:
+  type: bind
+  source: "{{ [lookup('container', 'web-app-zammad', 'directories.volumes'), 'zz_omniauth_allow_get.rb'] | path_join }}"
+  read_only: true
+  mounts:
+    - service: websocket
+      target: &opt_zammad_config_initializers_zz_omniauth_allow_get_rb_target /opt/zammad/config/initializers/zz_omniauth_allow_get.rb
+    - service: scheduler
+      target: *opt_zammad_config_initializers_zz_omniauth_allow_get_rb_target
+    - service: nginx
+      target: *opt_zammad_config_initializers_zz_omniauth_allow_get_rb_target
+    - service: railsserver
+      target: *opt_zammad_config_initializers_zz_omniauth_allow_get_rb_target
+zammad_telegram_helper:
+  type: bind
+  source: "{{ [lookup('container', 'web-app-zammad', 'directories.volumes'), 'telegram_helper.rb'] | path_join }}"
+  read_only: true
+  mounts:
+    - service: websocket
+      target: &opt_zammad_lib_telegram_helper_rb_target /opt/zammad/lib/telegram_helper.rb
+    - service: scheduler
+      target: *opt_zammad_lib_telegram_helper_rb_target
+    - service: nginx
+      target: *opt_zammad_lib_telegram_helper_rb_target
+    - service: init
+      target: *opt_zammad_lib_telegram_helper_rb_target
+    - service: railsserver
+      target: *opt_zammad_lib_telegram_helper_rb_target
+zammad_oidc_group_role_map:
+  type: bind
+  source: "{{ [lookup('container', 'web-app-zammad', 'directories.volumes'), 'zz_oidc_group_role_mapping.rb'] | path_join }}"
+  read_only: true
+  mounts:
+    - service: websocket
+      target: &opt_zammad_config_initializers_zz_oidc_group_role_mapping_rb_target /opt/zammad/config/initializers/zz_oidc_group_role_mapping.rb
+      when: "{{ lookup('config', 'web-app-zammad', 'services.sso.enabled') | bool }}"
+    - service: scheduler
+      target: *opt_zammad_config_initializers_zz_oidc_group_role_mapping_rb_target
+      when: "{{ lookup('config', 'web-app-zammad', 'services.sso.enabled') | bool }}"
+    - service: nginx
+      target: *opt_zammad_config_initializers_zz_oidc_group_role_mapping_rb_target
+      when: "{{ lookup('config', 'web-app-zammad', 'services.sso.enabled') | bool }}"
+    - service: railsserver
+      target: *opt_zammad_config_initializers_zz_oidc_group_role_mapping_rb_target
+      when: "{{ lookup('config', 'web-app-zammad', 'services.sso.enabled') | bool }}"
+zammad_oidc_http_discovery:
+  type: bind
+  source: "{{ [lookup('container', 'web-app-zammad', 'directories.volumes'), 'zz_oidc_http_discovery.rb'] | path_join }}"
+  read_only: true
+  mounts:
+    - service: websocket
+      target: &opt_zammad_config_initializers_zz_oidc_http_discovery_rb_target /opt/zammad/config/initializers/zz_oidc_http_discovery.rb
+      when: "{{ (lookup('config', 'web-app-zammad', 'services.sso.enabled') | bool) and not (lookup('tls', 'web-app-zammad', 'enabled') | bool) }}"
+    - service: scheduler
+      target: *opt_zammad_config_initializers_zz_oidc_http_discovery_rb_target
+      when: "{{ (lookup('config', 'web-app-zammad', 'services.sso.enabled') | bool) and not (lookup('tls', 'web-app-zammad', 'enabled') | bool) }}"
+    - service: nginx
+      target: *opt_zammad_config_initializers_zz_oidc_http_discovery_rb_target
+      when: "{{ (lookup('config', 'web-app-zammad', 'services.sso.enabled') | bool) and not (lookup('tls', 'web-app-zammad', 'enabled') | bool) }}"
+    - service: railsserver
+      target: *opt_zammad_config_initializers_zz_oidc_http_discovery_rb_target
+      when: "{{ (lookup('config', 'web-app-zammad', 'services.sso.enabled') | bool) and not (lookup('tls', 'web-app-zammad', 'enabled') | bool) }}"

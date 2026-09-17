@@ -1,0 +1,70 @@
+---
+- name: "🔍 Matomo install | Check if already installed"
+  ansible.builtin.shell: > # nocheck: container-exec-resolver  MATOMO_LOCAL_CID resolved at delegate_to runtime; container_address would return a manager-only subshell
+    container exec {{ MATOMO_LOCAL_CID | quote }}
+    sh -c 'test -f {{ MATOMO_CONFIG | quote }} && grep -q "^\[database\]" {{ MATOMO_CONFIG | quote }} && echo installed || echo fresh'
+  register: matomo_install_state
+  changed_when: false
+  delegate_to: "{{ MATOMO_HOST_NODE }}"
+
+- name: "🥾 Bootstrap Matomo (Initialisation and setting of API token if not defined)"
+  include_tasks: 04_bootstrap.yml
+  when: >
+    ((matomo_install_state.stdout | trim) != 'installed') or
+    ((lookup('users', 'administrator').tokens['web-app-matomo'] | default('') | string | trim) == "")
+
+- name: "🩹 Patch database credentials for {{ application_id }}"
+  include_tasks:
+    file: 05_patch_database.yml
+    apply:
+      delegate_to: "{{ MATOMO_HOST_NODE }}"
+      notify: compose-up
+  when: (matomo_install_state.stdout | trim) == 'installed'
+
+- name: "🩹 Patch Trusted Hosts for {{ application_id }}"
+  include_tasks: 06_patch_trusted_hosts.yml
+
+- name: 🚿 flush docker service
+  meta: flush_handlers
+
+- name: "🐝 Matomo install | Swarm: restart matomo so patched config is re-read"
+  when: DEPLOYMENT_MODE == 'swarm'
+  block:
+    - name: "🐝 Matomo install | Swarm: force-restart matomo service"
+      ansible.builtin.command: >-
+        container service update --force
+        {{ lookup('container_service', application_id, MATOMO_SERVICE) }}
+      changed_when: true
+      timeout: "{{ lookup('timeout', 600) | int }}"
+
+    - name: "🐝 Matomo install | Swarm: re-resolve hosting node + container ID after restart"
+      include_tasks: utils/resolve/host_cid.yml
+
+- name: "⏳ Matomo install | Wait for Matomo container to be healthy"
+  ansible.builtin.shell: >
+    container inspect --type container -f '{{ "{{" }}.State.Health.Status{{ "}}" }}'
+    {{ MATOMO_LOCAL_CID | quote }}
+  register: matomo_health
+  changed_when: false
+  retries: 60
+  delay: 2
+  until: >
+    matomo_health.rc == 0 and (matomo_health.stdout | trim) == 'healthy'
+  delegate_to: "{{ MATOMO_HOST_NODE }}"
+
+- name: "🔐 Matomo install | Make config writable by web user (entrypoint re-owns it root)"
+  ansible.builtin.shell: > # nocheck: container-exec-resolver  MATOMO_LOCAL_CID resolved at delegate_to runtime; container_address would return a manager-only subshell
+    container exec --user root {{ MATOMO_LOCAL_CID | quote }}
+    chown www-data:www-data {{ MATOMO_CONFIG }}
+  changed_when: true
+  delegate_to: "{{ MATOMO_HOST_NODE }}"
+
+- name: "🔧 Config '{{ application_id }}' via API"
+  include_tasks:
+    file: 07_config.yml
+    apply:
+      delegate_to: "{{ STACK_HOST }}"
+      run_once: true
+
+- name: "📄 Matomo | Re-render consumer injections after the final compose flush"
+  include_tasks: 08_reinject_consumers.yml

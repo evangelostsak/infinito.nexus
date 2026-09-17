@@ -9,11 +9,20 @@ against the same fallback chain the literal-path test uses.
 The classifier owns the rule "concat-pattern match → wildcard path
 keyed by `(role_id, wildcard_path)`". `role_id` resolves from the
 literal app argument when present, otherwise from the file's
-``roles/<role>/...`` location.
+``roles/<role>/...`` location -- and then only when that role declares
+an ``application_id`` of its own. A role that does not is rendering the
+template on another role's behalf, so its own defaults are the wrong
+thing to validate the path against.
 """
 
 import unittest
 from collections.abc import Iterable, Mapping
+
+from utils.manager.credential_key import (
+    CREDENTIALS_KEY,
+    OVERRIDE_SECTION,
+    SECRETS_KEY,
+)
 
 from ._scan import (
     LookupMatch,
@@ -27,6 +36,7 @@ from ._validate import match_wildcard_path, match_wildcard_segment
 
 def _build_wildcard_paths(
     matches: Iterable[LookupMatch],
+    roles_with_application_id: frozenset[str],
 ) -> dict[tuple[str, str], list[tuple]]:
     out: dict[tuple[str, str], list[tuple]] = {}
     for m in matches:
@@ -39,8 +49,8 @@ def _build_wildcard_paths(
             role_id = m.app_literal
         else:
             role_id = role_id_from_path(m.file)
-        if role_id is None:
-            continue
+            if role_id is None or role_id not in roles_with_application_id:
+                continue
         out.setdefault((role_id, wildcard_path), []).append((m.file, m.lineno))
     return out
 
@@ -49,7 +59,9 @@ class TestWildcardPaths(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.ctx = get_context()
-        cls.wildcard_paths = _build_wildcard_paths(iter_matches())
+        cls.wildcard_paths = _build_wildcard_paths(
+            iter_matches(), cls.ctx.roles_with_application_id
+        )
 
     def test_wildcard_paths(self):
         if not self.wildcard_paths:
@@ -81,15 +93,20 @@ class TestWildcardPaths(unittest.TestCase):
             sub = wildcard_path.split(".", 1)[1]
             if match_wildcard_path({"_root": ctx.user_defaults}, "_root." + sub):
                 return True
-        if wildcard_path.startswith("credentials."):
-            sub = wildcard_path.split(".", 1)[1]
-            creds_cfg = cfg.get("credentials")
+        if wildcard_path.startswith(f"{OVERRIDE_SECTION}."):
+            sub = wildcard_path.split(f"{OVERRIDE_SECTION}.", 1)[1]
+            secrets_cfg = cfg.get(SECRETS_KEY)
+            creds_cfg = (
+                secrets_cfg.get(CREDENTIALS_KEY)
+                if isinstance(secrets_cfg, Mapping)
+                else None
+            )
             if isinstance(creds_cfg, Mapping) and match_wildcard_segment(
                 creds_cfg, sub
             ):
                 return True
             schema = ctx.role_schemas.get(role_id, {})
-            creds = schema.get("credentials") if isinstance(schema, Mapping) else None
+            creds = schema.get(CREDENTIALS_KEY) if isinstance(schema, Mapping) else None
             if isinstance(creds, Mapping) and match_wildcard_segment(creds, sub):
                 return True
         return bool(

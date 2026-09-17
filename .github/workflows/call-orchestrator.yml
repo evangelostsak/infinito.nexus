@@ -1,0 +1,362 @@
+name: "🎵 CI: Orchestrator"
+on:
+  workflow_call:
+    inputs:
+      distros:
+        description: "Distro pool the deploy matrix spreads its rows over. Empty: every declared distro, which is what a sweep wants. The rows rotate over the pool, so narrowing it only makes sense to chase one distribution."
+        required: false
+        type: string
+        default: ""
+      whitelist:
+        description: "Optional space-separated whitelist of app ids"
+        required: false
+        type: string
+        default: ""
+      lifecycles:
+        description: "Lifecycle envelope for test-deploy discovery (comma/space-separated)."
+        required: false
+        type: string
+        default: ""
+      mode:
+        description: "Deploy modes rows may be drawn from: 'auto' rotates every row over the modes its role offers; a subset of 'host compose swarm' keeps only the rows those modes can take."
+        required: false
+        type: string
+        default: "auto"
+      priority:
+        description: "Optional space-separated app ids for the priority line: sorted to the head of the list and cut into chunks of their own, so every priority row is deployed before the first regular one starts. Priority rows skip the sweep rotation and run every combination they can take (each variant, each offered mode, Tor and clearnet)."
+        required: false
+        type: string
+        default: ""
+      sweep:
+        description: "Sweep number driving the mode and tor rotation. Empty: the run number."
+        required: false
+        type: string
+        default: ""
+      offset:
+        description: "Regular rows to skip before filling the chunks. 0 starts at the head of the ranking; raise it to reach rows the budget leaves behind."
+        required: false
+        type: string
+        default: "0"
+      resume_from_chunk:
+        description: "⏭️ Skip every chunk below this index. Use to continue a sweep after fixing what broke it, instead of re-running the green chunks. Typed string, not number: a workflow_dispatch number input reaches the caller as a string, and handing that to a number-typed workflow_call input makes GitHub reject the job before it is created."
+        required: false
+        type: string
+        default: "0"
+      chunk_gate:
+        description: "🛑 Stop the chunk chain at its first failed chunk. Off: keep deploying the remaining chunks."
+        required: false
+        type: boolean
+        default: true
+      filesystem:
+        description: "🗄️ Filesystem pool the deploy matrix spreads its rows over (ext4, btrfs, zfs). Empty: all three."
+        required: false
+        type: string
+        default: ""
+      image_wait_attempts:
+        description: "Polling attempts for waiting on prebuilt or mirrored images"
+        required: false
+        type: string
+        default: "1980"
+      image_wait_sleep_seconds:
+        description: "Polling interval in seconds for waiting on prebuilt or mirrored images"
+        required: false
+        type: string
+        default: "10"
+      workspace:
+        description: "Run the workspace test (dev-runtime image matrix). 'auto' runs it on a global scope only, 'true'/'false' force it."
+        required: false
+        type: string
+        default: "auto"
+      workspace_track:
+        description: "Which workspace track each distro runs: 'rotate' splits them across compose and swarm and flips with the run number, 'compose'/'swarm' pin every distro."
+        required: false
+        type: string
+        default: "rotate"
+      tor:
+        description: "Tor axis of the deploy matrix: 'auto' rotates the onion over the tor-capable rows, 'enforced' onions all of them, 'exclusive' also drops the rows that cannot, 'disabled' onions none."
+        required: false
+        type: string
+        default: "auto"
+      trusted_pr:
+        description: "True when the PR carries the maintainer '🛡️ Trusted' label; skips the fork-prereq wait."
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  actions: read
+  contents: read
+  packages: read
+
+jobs:
+  validate-selection:
+    name: 🎯 Selection
+    uses: ./.github/workflows/call-validation.yml
+    with:
+      whitelist: ${{ inputs.whitelist }}
+      priority: ${{ inputs.priority }}
+      mode: ${{ inputs.mode }}
+      tor: ${{ inputs.tor }}
+      distros: ${{ inputs.distros }}
+      filesystem: ${{ inputs.filesystem }}
+      lifecycles: ${{ inputs.lifecycles }}
+      fork_prereqs: true
+      trusted_pr: ${{ inputs.trusted_pr }}
+      image_wait_attempts: ${{ inputs.image_wait_attempts }}
+      image_wait_sleep_seconds: ${{ inputs.image_wait_sleep_seconds }}
+    secrets: inherit
+
+  security-codeql:
+    needs: validate-selection
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    uses: ./.github/workflows/cron-security-codeql.yml
+
+  lint:
+    needs: validate-selection
+    uses: ./.github/workflows/call-lint.yml
+
+  test:
+    needs: validate-selection
+    uses: ./.github/workflows/call-test.yml
+
+  build-ci-images:
+    needs: validate-selection
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/call-images-build-ci.yml
+    with:
+      distros: "arch debian ubuntu fedora centos"
+      concurrency_channel: ci-orchestrator-build-consumer
+    secrets: inherit
+
+  test-dns:
+    needs:
+      - build-ci-images
+      - validate-selection
+    uses: ./.github/workflows/call-test-dns.yml
+    with:
+      distros: "arch debian ubuntu fedora centos"
+
+  images-mirror-missing:
+    needs: validate-selection
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/call-images-mirror-missing.yml
+    with:
+      concurrency_channel: ci-orchestrator-mirror-consumer
+      image_wait_attempts: ${{ inputs.image_wait_attempts }}
+      image_wait_sleep_seconds: ${{ inputs.image_wait_sleep_seconds }}
+    secrets: inherit
+
+  test-deploy-chunk-0:
+    name: 🧱 Chunk 0
+    if: >-
+      ${{ always()
+          && inputs.resume_from_chunk <= 0
+          && needs.lint.result == 'success'
+          && needs.test.result == 'success'
+          && needs.build-ci-images.result == 'success'
+          && needs.images-mirror-missing.result == 'success'
+          && needs.test-dns.result == 'success' }}
+    needs:
+      - lint
+      - test
+      - build-ci-images
+      - images-mirror-missing
+      - test-dns
+      - validate-selection
+    uses: ./.github/workflows/call-test-deploy.yml
+    with:
+      distros: ${{ inputs.distros }}
+      index: "0"
+      sweep: ${{ inputs.sweep != '' && inputs.sweep || github.run_number }}
+      offset: ${{ inputs.offset }}
+      whitelist: ${{ inputs.whitelist }}
+      priority: ${{ inputs.priority }}
+      lifecycles: ${{ inputs.lifecycles }}
+      modes: ${{ inputs.mode }}
+      filesystem: ${{ inputs.filesystem }}
+      tor: ${{ inputs.tor }}
+
+  test-deploy-chunk-1:
+    name: 🧱 Chunk 1
+    if: >-
+      ${{ always()
+          && inputs.resume_from_chunk <= 1
+          && needs.lint.result == 'success'
+          && needs.test.result == 'success'
+          && needs.build-ci-images.result == 'success'
+          && needs.images-mirror-missing.result == 'success'
+          && needs.test-dns.result == 'success'
+          && (!inputs.chunk_gate
+              || contains(fromJSON('["success","skipped"]'), needs.test-deploy-chunk-0.result)) }}
+    needs:
+      - lint
+      - test
+      - build-ci-images
+      - images-mirror-missing
+      - test-dns
+      - test-deploy-chunk-0
+    uses: ./.github/workflows/call-test-deploy.yml
+    with:
+      distros: ${{ inputs.distros }}
+      index: "1"
+      sweep: ${{ inputs.sweep != '' && inputs.sweep || github.run_number }}
+      offset: ${{ inputs.offset }}
+      whitelist: ${{ inputs.whitelist }}
+      priority: ${{ inputs.priority }}
+      lifecycles: ${{ inputs.lifecycles }}
+      modes: ${{ inputs.mode }}
+      filesystem: ${{ inputs.filesystem }}
+      tor: ${{ inputs.tor }}
+
+  test-deploy-chunk-2:
+    name: 🧱 Chunk 2
+    if: >-
+      ${{ always()
+          && inputs.resume_from_chunk <= 2
+          && needs.lint.result == 'success'
+          && needs.test.result == 'success'
+          && needs.build-ci-images.result == 'success'
+          && needs.images-mirror-missing.result == 'success'
+          && needs.test-dns.result == 'success'
+          && (!inputs.chunk_gate
+              || (contains(fromJSON('["success","skipped"]'), needs.test-deploy-chunk-0.result)
+                  && contains(fromJSON('["success","skipped"]'), needs.test-deploy-chunk-1.result))) }}
+    needs:
+      - lint
+      - test
+      - build-ci-images
+      - images-mirror-missing
+      - test-dns
+      - test-deploy-chunk-0
+      - test-deploy-chunk-1
+    uses: ./.github/workflows/call-test-deploy.yml
+    with:
+      distros: ${{ inputs.distros }}
+      index: "2"
+      sweep: ${{ inputs.sweep != '' && inputs.sweep || github.run_number }}
+      offset: ${{ inputs.offset }}
+      whitelist: ${{ inputs.whitelist }}
+      priority: ${{ inputs.priority }}
+      lifecycles: ${{ inputs.lifecycles }}
+      modes: ${{ inputs.mode }}
+      filesystem: ${{ inputs.filesystem }}
+      tor: ${{ inputs.tor }}
+
+  test-deploy-chunk-3:
+    name: 🧱 Chunk 3
+    if: >-
+      ${{ always()
+          && inputs.resume_from_chunk <= 3
+          && needs.lint.result == 'success'
+          && needs.test.result == 'success'
+          && needs.build-ci-images.result == 'success'
+          && needs.images-mirror-missing.result == 'success'
+          && needs.test-dns.result == 'success'
+          && (!inputs.chunk_gate
+              || (contains(fromJSON('["success","skipped"]'), needs.test-deploy-chunk-0.result)
+                  && contains(fromJSON('["success","skipped"]'), needs.test-deploy-chunk-1.result)
+                  && contains(fromJSON('["success","skipped"]'), needs.test-deploy-chunk-2.result))) }}
+    needs:
+      - lint
+      - test
+      - build-ci-images
+      - images-mirror-missing
+      - test-dns
+      - test-deploy-chunk-0
+      - test-deploy-chunk-1
+      - test-deploy-chunk-2
+    uses: ./.github/workflows/call-test-deploy.yml
+    with:
+      distros: ${{ inputs.distros }}
+      index: "3"
+      sweep: ${{ inputs.sweep != '' && inputs.sweep || github.run_number }}
+      offset: ${{ inputs.offset }}
+      whitelist: ${{ inputs.whitelist }}
+      priority: ${{ inputs.priority }}
+      lifecycles: ${{ inputs.lifecycles }}
+      modes: ${{ inputs.mode }}
+      filesystem: ${{ inputs.filesystem }}
+      tor: ${{ inputs.tor }}
+
+  test-runner-smoke:
+    needs:
+      - test-deploy-chunk-0
+    if: ${{ always() && vars.CI_SELF_HOSTED_RUNNER_COUNT != '0' && vars.CI_SELF_HOSTED_RUNNER_COUNT != '' && (needs.test-deploy-chunk-0.result == 'success' || needs.test-deploy-chunk-0.result == 'failure') }}
+    uses: ./.github/workflows/call-test-runner-smoke.yml
+    with:
+      ref: ${{ github.sha }}
+    secrets: inherit
+
+  test-install-make:
+    needs: validate-selection
+    uses: ./.github/workflows/call-test-install-make.yml
+  test-install-pkgmgr:
+    needs: validate-selection
+    uses: ./.github/workflows/call-test-install-pkgmgr.yml
+
+  test-workspace:
+    if: ${{ inputs.workspace == 'true' || (inputs.workspace == 'auto' && (inputs.whitelist == '' || inputs.whitelist == '__ALL__')) }}
+    uses: ./.github/workflows/call-test-workspace.yml
+    with:
+      workspace_track: ${{ inputs.workspace_track }}
+    needs:
+      - images-mirror-missing
+      - lint
+      - test
+    secrets: inherit
+
+  report-main-failures:
+    name: 🐞 Report main role failures
+    needs:
+      - test-deploy-chunk-0
+      - test-deploy-chunk-1
+      - test-deploy-chunk-2
+      - test-deploy-chunk-3
+    if: ${{ always() && github.ref == 'refs/heads/main' && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v7.0.0
+      - name: 🐞 Open or append issues for failed roles
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 -m cli.meta.ci.report_failures --run-id "${{ github.run_id }}" --repo "${{ github.repository }}"
+
+  done:
+    name: 🏁 Finish pipeline
+    needs:
+      - validate-selection
+      - build-ci-images
+      - images-mirror-missing
+      - test-dns
+      - test-install-make
+      - test-install-pkgmgr
+      - test-deploy-chunk-0
+      - test-deploy-chunk-1
+      - test-deploy-chunk-2
+      - test-deploy-chunk-3
+      - test-runner-smoke
+      - test-workspace
+      - test
+      - lint
+      - security-codeql
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🛑 Fail if any upstream job failed or was cancelled
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "Pipeline failed: at least one upstream job failed or was cancelled." >&2
+          exit 1
+      - name: ✅ Done
+        run: echo "All checks passed."

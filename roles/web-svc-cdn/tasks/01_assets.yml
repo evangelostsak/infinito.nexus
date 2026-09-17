@@ -1,0 +1,40 @@
+---
+- name: "📁 Ensure the CDN staging tree exists on the CDN host"
+  ansible.builtin.file:
+    path: "{{ CDN_ASSET_STAGE }}"
+    state: directory
+    mode: "0755"
+
+- name: "🔎 Find every role that declares frontend dependencies"
+  ansible.builtin.find:
+    paths: "{{ lookup('path_absolute', 'roles') }}"
+    patterns: "package-lock.json"
+    recurse: true
+    depth: 3
+  register: cdn_asset_locks
+  delegate_to: localhost
+  run_once: true
+
+- name: "📁 Ensure the CDN volume directory exists before anything is staged into it"
+  ansible.builtin.file:
+    path: "{{ CDN_BUILD_SCRIPT_HOST | dirname }}"
+    state: directory
+    mode: "0755"
+  delegate_to: "{{ STACK_HOST }}"
+  become: true
+
+- name: "📁 Stage each deployed role's frontend manifests on the CDN host"
+  ansible.builtin.include_tasks: utils/stage_manifest.yml
+  loop: "{{ cdn_asset_locks.files }}"
+  loop_control:
+    loop_var: manifest
+    label: "{{ manifest_role }}"
+  vars:
+    manifest_role: "{{ manifest.path | dirname | dirname | basename }}"
+  when: manifest_role in groups
+
+- name: "📁 Stage the mirror build script on the CDN host"
+  ansible.builtin.copy:
+    src: shell/build_assets.sh
+    dest: "{{ CDN_BUILD_SCRIPT_HOST }}"
+    mode: "0755"

@@ -1,2 +1,42 @@
 ---
-data: openproject_data
+data:
+  type: volume
+  name: openproject_data
+  mounts:
+    - service: proxy
+      target: &var_openproject_assets_target /var/openproject/assets
+    - service: web
+      target: *var_openproject_assets_target
+    - service: worker
+      target: *var_openproject_assets_target
+    - service: cron
+      target: *var_openproject_assets_target
+    - service: seeder
+      target: *var_openproject_assets_target
+await_migrations:
+  type: config
+  source: "{{ [ lookup('container', 'web-app-openproject', 'directories.config'), 'await_migrations.sh'] | path_join }}"
+  mode: "0555"
+  mounts:
+    - service: web
+      target: &await_migrations_target /usr/local/bin/await_migrations.sh
+    - service: worker
+      target: *await_migrations_target
+pgdata_dummy:
+  # Exception: mount only exists to prevent OpenProject images from creating
+  # anonymous volumes for the unused embedded postgres data path.
+  type: volume
+  name: openproject_pgdata_dummy
+  # nocheck: nfs-false-data-loss  Reason: throwaway dummy, never read or written, re-provisioned on redeploy
+  nfs: false
+  mounts:
+    - service: proxy
+      target: &var_openproject_pgdata_target /var/openproject/pgdata
+    - service: web
+      target: *var_openproject_pgdata_target
+    - service: worker
+      target: *var_openproject_pgdata_target
+    - service: cron
+      target: *var_openproject_pgdata_target
+    - service: seeder
+      target: *var_openproject_pgdata_target

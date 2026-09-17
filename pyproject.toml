@@ -4,31 +4,41 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "infinito-nexus"
-version = "11.6.0"
+version = "13.0.0"
 description = "Infinito.Nexus"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE.md" }
 
 dependencies = [
-  "numpy",
-  "ansible",
-  "colorscheme-generator @ https://github.com/kevinveenbirkenbach/colorscheme-generator/archive/refs/tags/v0.3.0.zip",
+  # Pinned: utils/recovery reads the generation layout from baudolo's own
+  # BackupPaths, so the version here and in svc-bkp-volume-2-local must match.
+  "backup-docker-to-local==7.0.1",
   "bcrypt",
-  "ruamel.yaml",
-  "PyYAML",
-  "tld",
-  "passlib",
-  "requests",
+  "cryptography",
   "humanfriendly",
+  "PyMySQL",
+  "psycopg2-binary",
+  "ldap3",
+  "PyYAML",
+  "ruamel.yaml",
 ]
 
 [project.optional-dependencies]
+deploy = [
+  "ansible",
+  "colorscheme-generator @ https://github.com/kevinveenbirkenbach/colorscheme-generator/archive/refs/tags/v0.3.0.zip",
+  "tld",
+  "passlib",
+  "requests",
+]
 dev = [
-  "ruff",
+  "ruff==0.16.6",
   "import-linter",
   "pre-commit",
   "git-maintainer-tools",
+  "pytest>=9.1",
+  "pytest-xdist",
 ]
 
 [project.scripts]
@@ -184,8 +194,8 @@ ignore = [
 # ``patch.object(sut, "os")`` replacements). Converting these call
 # sites to ``pathlib.Path`` would require rewriting every coupled
 # test in lockstep — out of scope for the use-pathlib pass.
-"roles/sys-ctl-rpr-container-hard/files/script.py" = ["PTH"]
-"roles/sys-ctl-rpr-container-soft/files/script.py" = ["PTH"]
+"roles/sys-ctl-rpr-container-hard/files/python/script.py" = ["PTH"]
+"roles/sys-ctl-rpr-container-soft/files/python/script.py" = ["PTH"]
 
 # BLE001 (flake8-blind-except) ratchet.
 # Broad `except Exception:` is now selected project-wide so NEW code is
@@ -210,6 +220,7 @@ ignore = [
 "cli/administration/inventory/validate/loaders.py" = ["BLE001"]
 "cli/contributing/mirror/sync/__main__.py" = ["BLE001"]
 "cli/core/help.py" = ["BLE001"]
+"cli/meta/ci/roles/runtime/__main__.py" = ["BLE001"]
 "cli/meta/j2/compiler/__main__.py" = ["BLE001"]
 "cli/meta/roles/applications/all/__main__.py" = ["BLE001"]
 "cli/meta/roles/applications/in_group_deps/__main__.py" = ["BLE001"]
@@ -219,17 +230,18 @@ ignore = [
 "cli/meta/roles/services/called/__init__.py" = ["BLE001"]
 "library/docker_bridge_gateway.py" = ["BLE001"]
 "plugins/filter/active_docker.py" = ["BLE001"]
-"plugins/filter/docker_service_enabled.py" = ["BLE001"]
-"plugins/filter/get_all_application_ids.py" = ["BLE001"]
+"plugins/filter/docker/service_enabled.py" = ["BLE001"]
+"plugins/filter/dotenv.py" = ["BLE001"]
+"plugins/filter/get/all/application_ids.py" = ["BLE001"]
 "plugins/filter/role_path_by_app_id.py" = ["BLE001"]
 "plugins/filter/split_postgres_connections.py" = ["BLE001"]
 "plugins/lookup/addon_env_flags.py" = ["BLE001"]
 "plugins/lookup/applications_current_play.py" = ["BLE001"]
+"plugins/lookup/image.py" = ["BLE001"]
 "plugins/lookup/email.py" = ["BLE001"]
 "plugins/lookup/prometheus_integration_active.py" = ["BLE001"]
 "plugins/lookup/version.py" = ["BLE001"]
 "utils/cache/base.py" = ["BLE001"]
-"utils/github/variant_bundles.py" = ["BLE001"]
 "utils/nexus/list_apt_proxy_repos.py" = ["BLE001"]
 "utils/roles/applications/in_group_deps.py" = ["BLE001"]
 "utils/roles/applications/services/resources.py" = ["BLE001"]
@@ -252,7 +264,7 @@ ignore = [
 "cli/administration/deploy/development/deploy.py" = ["N806"]
 "cli/administration/deploy/development/init.py" = ["N806"]
 "cli/administration/deploy/development/inventory.py" = ["N806"]
-"tests/unit/cli/administration/deploy/development/test_inventory.py" = ["N806"]
+"tests/unit/python/cli/administration/deploy/development/test_inventory.py" = ["N806"]
 
 # Lazy-loaded class binding: ``ValueGenerator = _value_generator_cls()``
 # rebinds the imported class inside the function. PEP 8 keeps the
@@ -269,20 +281,18 @@ root_package = "cli"
 [[tool.importlinter.contracts]]
 # The dev/CI deploy package was repeatedly hit by CodeQL
 # `py/unsafe-cyclic-import`. The fix split the env/arg helpers into the
-# leaf module `env`, giving the load-time DAG compose -> common -> deps
-# -> env. This layers contract locks that order in: a lower layer
-# importing a higher one (i.e. a new cycle) breaks the build.
-name = "cli.administration.deploy.development stays acyclic (compose -> common -> deps -> env)"
+# leaf module `env`, giving the load-time DAG compose -> common -> env.
+# This layers contract locks that order in: a lower layer importing a
+# higher one (i.e. a new cycle) breaks the build.
+name = "cli.administration.deploy.development stays acyclic (compose -> common -> env)"
 type = "layers"
 layers = [
     "cli.administration.deploy.development.compose",
     "cli.administration.deploy.development.common",
-    "cli.administration.deploy.development.deps",
     "cli.administration.deploy.development.env",
 ]
 # Type-checking-only / lazily-deferred back-references to `compose` do
 # not run at import time, so they cannot form a load-time cycle.
 ignore_imports = [
     "cli.administration.deploy.development.common -> cli.administration.deploy.development.compose",
-    "cli.administration.deploy.development.deps -> cli.administration.deploy.development.compose",
 ]

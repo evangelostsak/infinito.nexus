@@ -1,7 +1,7 @@
 ---
 galaxy_info:
   author: Kevin Veen-Birkenbach
-  description: Configures GNOME Shell extensions and installs the CLI GNOME Extension Manager for managing extensions.
+  description: Desktop config role for activating GNOME Shell extensions and installing a CLI tool to manage them
   license: Infinito.Nexus Community License (Non-Commercial)
   company: |
     Kevin Veen-Birkenbach

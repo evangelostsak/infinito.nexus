@@ -1,5 +1,5 @@
 ---
-- name: Install base development toolchain (cross-distro)
+- name: 📦 Install base development toolchain (cross-distro)
   become: true
   vars:
     dev_base_devel_packages:
@@ -17,7 +17,7 @@
         - "@development-tools"
       RedHat:
         - "@development-tools"
-  ansible.builtin.package:
+  ansible.builtin.package: # nocheck: dynamic-package - installs a distro toolchain group, not named packages
     name: >-
       {{
         dev_base_devel_packages.get(

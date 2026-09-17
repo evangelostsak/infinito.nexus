@@ -2,3 +2,7 @@
 # General
 application_id: "web-svc-cdn"
 domain: "{{ lookup('domain',application_id) }}"
+
+CDN_FLAVOR: "{{ lookup('config', 'web-svc-cdn', 'services.cdn.flavor') }}"
+CDN_ASSET_STAGE: "{{ [ lookup('container', 'web-svc-cdn', 'directories.volumes'), 'pkgsrc' ] | path_join }}"
+CDN_BUILD_SCRIPT_HOST: "{{ [ lookup('container', 'web-svc-cdn', 'directories.volumes'), 'build_assets.sh' ] | path_join }}"

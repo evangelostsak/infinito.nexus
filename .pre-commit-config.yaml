@@ -1,7 +1,9 @@
 ---
 default_install_hook_types:
   - pre-commit
+  - commit-msg
   - pre-push
+  - post-checkout
 
 repos:
   - repo: local
@@ -13,6 +15,30 @@ repos:
         pass_filenames: false
         stages:
           - pre-commit
+      - id: make-test-merge-signed
+        name: Run make test-merge-signed (merge gate)
+        entry: make test-merge-signed
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages:
+          - commit-msg
+      - id: make-lint
+        name: Run make lint (pre-push gate)
+        entry: make lint
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages:
+          - pre-push
+      - id: make-test-main-merged
+        name: Run make test-main-merged (pre-push gate)
+        entry: make test-main-merged
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages:
+          - pre-push
       - id: make-test-signed
         name: Run make test-signed (pre-push gate)
         entry: make test-signed
@@ -21,3 +47,11 @@ repos:
         always_run: true
         stages:
           - pre-push
+      - id: clean-pycache-dirs
+        name: Prune orphan __pycache__-only dirs (post-checkout)
+        entry: make clean-pycache-dirs
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages:
+          - post-checkout

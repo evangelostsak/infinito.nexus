@@ -1,5 +1,5 @@
 ---
-# nocheck: seaweedfs-playwright — GitLab ships no templates/playwright.env.j2 and object storage is server-side consolidated storage with no isolated upload surface
+# nocheck: seaweedfs-playwright
 sso:
   bond: 1
   enabled: "{{ 'web-app-keycloak' in group_names }}"
@@ -17,50 +17,141 @@ matomo:
   bond: 1
   enabled: "{{ 'web-app-matomo' in group_names }}"
   shared: "{{ 'web-app-matomo' in group_names }}"
+# nocheck: playwright-service-flag
 email:
   bond: 1
   enabled: "{{ 'web-app-mailu' in group_names }}"
   shared: "{{ 'web-app-mailu' in group_names }}"
 # nocheck: shared
 # nocheck: dynamic-flag
+# nocheck: playwright-service-flag
 redis:
+  bond: 1
   backup:
     disabled: true
-  enabled: true
+  enabled: true # nocheck: dynamic-flag
+  shared: "{{ 'svc-db-redis' in group_names }}"
   cpus: "0.5"
   mem_reservation: 128m
   mem_limit: 512m
   pids_limit: 512
+# nocheck: playwright-service-flag
 postgres:
   bond: 1
   enabled: true # nocheck: dynamic-flag
   shared: "{{ 'svc-db-postgres' in group_names }}"
+# nocheck: playwright-service-flag
 gitlab:
+  modes:
+    compose:
+      enabled: true
+    swarm:
+      enabled: true
   bond: 1
-  enabled: true
+  enabled: true # nocheck: dynamic-flag
   shared: true
-  image: gitlab/gitlab-ee
-  version: 19.1.2-ee.0
-  name: gitlab
   min_storage: 30GB
-  cpus: "4.0"
-  mem_reservation: 8g
-  mem_limit: 12g
-  pids_limit: 4096
+  cpus: "0.1"
+  mem_reservation: 128m
+  mem_limit: 256m
+  pids_limit: 128
   ports:
     local:
       http: 8024
     public:
       ssh: 2202
+    internal:
+      http: 8181
+      ssh: 2222
+  proxy:
+    service_key: workhorse
   run_after:
     - web-app-matomo
     - web-app-keycloak
     - web-app-mailu
   lifecycle: beta
+webservice:
+  image: registry.gitlab.com/gitlab-org/build/cng/gitlab-webservice-ce
+  version: v19.3.2
+  name: gitlab-webservice
+  healthcheck:
+    test: ["CMD", "/scripts/healthcheck"]
+    # nocheck: healthcheck-timing-override  the script answers from the Rails webservice, which does not reply inside the 5s default while it is still loading
+    timeout: 10s
+    retries: 5
+  ports:
+    internal:
+      http: 8080
+  cpus: "2.0"
+  mem_reservation: 4g
+  mem_limit: 6g
+  pids_limit: 2048
+sidekiq:
+  healthcheck:
+    flavor: tcp
+    path: liveness
+  image: registry.gitlab.com/gitlab-org/build/cng/gitlab-sidekiq-ce
+  version: v19.3.2
+  name: gitlab-sidekiq
+  cpus: "1.0"
+  mem_reservation: 2g
+  mem_limit: 3g
+  pids_limit: 1024
+  ports:
+    internal:
+      http: 3808
+workhorse:
+  image: registry.gitlab.com/gitlab-org/build/cng/gitlab-workhorse-ce
+  version: v19.3.2
+  name: gitlab-workhorse
+  healthcheck:
+    test: ["CMD", "/scripts/healthcheck"]
+  cpus: "0.5"
+  mem_reservation: 256m
+  mem_limit: 512m
+  pids_limit: 256
+gitaly:
+  # nocheck: single-replica
+  replicas: 1
+  image: registry.gitlab.com/gitlab-org/build/cng/gitaly
+  version: v19.3.2
+  healthcheck:
+    test: ["CMD", "/scripts/healthcheck"]
+  name: gitlab-gitaly
+  ports:
+    internal:
+      grpc: 8075
+  cpus: "1.0"
+  mem_reservation: 1g
+  mem_limit: 2g
+  pids_limit: 1024
+shell:
+  image: registry.gitlab.com/gitlab-org/build/cng/gitlab-shell
+  version: v19.3.2
+  name: gitlab-shell
+  ports:
+    internal:
+      metrics: 9122
+  cpus: "0.25"
+  mem_reservation: 128m
+  mem_limit: 256m
+  pids_limit: 256
+migrations:
+  # nocheck: single-replica
+  replicas: 1
+  image: registry.gitlab.com/gitlab-org/build/cng/gitlab-rails-ce
+  version: v19.3.2
+  name: gitlab-migrations
+  cpus: "1.0"
+  mem_reservation: 1g
+  mem_limit: 2g
+  pids_limit: 512
+# nocheck: playwright-service-flag
 seaweedfs:
   bond: 1
   enabled: "{{ 'web-app-seaweedfs' in group_names }}"
   shared: "{{ 'web-app-seaweedfs' in group_names }}"
+# nocheck: playwright-service-flag
 css:
   bond: 1
   enabled: "{{ 'web-svc-css' in group_names }}"
@@ -69,3 +160,55 @@ prometheus:
   bond: 1
   enabled: "{{ 'web-app-prometheus' in group_names }}"
   shared: "{{ 'web-app-prometheus' in group_names }}"
+
+# nocheck: playwright-service-flag
+# nocheck: variants-coverage — sso-variant-tor requires the onion on in every variant, so the false polarity has no variant left to live in
+tor:
+  bond: 0.5
+  enabled: "{{ 'svc-net-tor' in group_names }}"
+  shared: true # nocheck: dynamic-flag
+# nocheck: dynamic-flag
+# nocheck: playwright-service-flag, dynamic-flag infrastructure backup consumer
+container_backup: # nocheck: bond-baseline backup host joins outside the variant topology
+  bond: 1
+  enabled: "{{ 'svc-bkp-volume-2-local' in group_names }}"
+  shared: true
+# nocheck: playwright-service-flag  internal adapter sidecar, covered by the role's MCP spec
+# nocheck: dockerfile-custom  the Dockerfile is owned by svc-ai-mcp-adapter and staged per instance, so every adapter-backed provider shares one audited build
+# nocheck: dynamic-flag  the sidecar tracks this role's own mcp flag, not another role's presence; a group_names expression would decide its exposure from an unrelated deployment
+gitlabmcp:
+  enabled: "{{ lookup('config', 'web-app-gitlab', 'mcp.enabled') | bool }}"
+  shared: false
+  image: python
+  # nocheck: docker-version  base of the self-built stdlib adapter, not the served application
+  version: "3.13.15-slim"
+  custom: true
+  name: gitlabmcp
+  cpus: "0.25"
+  mem_reservation: 16m
+  mem_limit: 24m
+  pids_limit: 64
+  ports:
+    internal:
+      http: 8080
+# nocheck: playwright-service-flag  MCP pairing is proven by the role's own MCP spec, not by a per-consumer gate
+openwebui:
+  bond: 0.5
+  enabled: "{{ 'web-app-openwebui' in group_names }}"
+  shared: "{{ 'web-app-openwebui' in group_names }}"
+# nocheck: playwright-service-flag  MCP pairing is proven by the role's own MCP spec, not by a per-consumer gate
+hermes:
+  bond: 0.5
+  enabled: "{{ 'web-app-hermes' in group_names }}"
+  shared: "{{ 'web-app-hermes' in group_names }}"
+# nocheck: playwright-service-flag  MCP pairing is proven by the role's own MCP spec, not by a per-consumer gate
+openclaw:
+  bond: 0.5
+  enabled: "{{ 'web-app-openclaw' in group_names }}"
+  shared: "{{ 'web-app-openclaw' in group_names }}"
+# nocheck: playwright-service-flag  MCP pairing is proven by the role's own MCP spec, not by a per-consumer gate
+# nocheck: dynamic-flag  the entry refuses this client, so the link is off on every host and no group_names gate can decide it
+flowise:
+  enabled: false
+  shared: false
+  mcp_consumer: false

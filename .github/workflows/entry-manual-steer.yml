@@ -1,0 +1,115 @@
+name: "🕹️ Manual"
+run-name: "🕹️ ${{ inputs.chunk_gate && '🛑 ' || '' }}${{ inputs.offset != '0' && inputs.offset != '' && format('⏩{0} ', inputs.offset) || '' }}${{ inputs.workspace != 'auto' && format('🧑‍💻{0} ', inputs.workspace == 'true' && '是' || '否') || '' }}${{ inputs.tor != 'auto' && format('{0} ', inputs.tor == 'disabled' && '🌐' || inputs.tor == 'enforced' && '🧅强制' || '🧅独占') || '' }}${{ inputs.filesystem != '' && format('🗄️{0} ', inputs.filesystem) || '' }}${{ inputs.distros != '' && format('🐧{0} ', inputs.distros) || '' }}${{ inputs.lifecycles != '' && format('♻️{0} ', inputs.lifecycles) || '' }}${{ inputs.mode != 'auto' && format('🚀{0} ', inputs.mode) || '' }}${{ inputs.priority != '' && format('⭐{0} ', inputs.priority) || '' }}${{ inputs.whitelist != '' && format('🎯{0}', inputs.whitelist) || '🔀 diff (origin/main)' }}"
+
+concurrency:
+  group: global-ci-${{ github.repository }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+    inputs:
+      distros:
+        description: "🐧 Distro pool the rows are spread over. Empty: all five. Example: 'arch debian'"
+        required: false
+        default: ""
+        type: string
+      priority:
+        description: "⭐ Roles to lead, in every combination left open (see README)"
+        required: false
+        default: ""
+        type: string
+      whitelist:
+        description: "🎯 Roles to deploy. Empty: diff vs origin/main. '__ALL__': every role"
+        required: false
+        default: ""
+        type: string
+      lifecycles:
+        description: "♻️ Lifecycle envelope for test-deploy discovery (comma/space-separated)."
+        required: false
+        default: ""
+        type: string
+      mode:
+        description: "🚀 Deploy mode. 'auto' rotates a row over the modes its role offers"
+        required: false
+        default: "auto"
+        type: choice
+        options:
+          - "auto"
+          - "host"
+          - "compose"
+          - "swarm"
+      filesystem:
+        description: "🗄️ Filesystem pool the rows are spread over. Empty: ext4, btrfs, zfs"
+        required: false
+        default: ""
+        type: string
+      tor:
+        description: "🧅 Tor axis for swarm and compose; the four values are in the README"
+        required: false
+        default: "auto"
+        type: choice
+        options:
+          - "auto"
+          - "enforced"
+          - "exclusive"
+          - "disabled"
+      offset:
+        description: "⏩ Where chunk 0 starts: a row count, or a token like web-app-x#2"
+        required: false
+        default: "0"
+        type: string
+      chunk_gate:
+        description: "🛑 Stop the chunk chain at its first failed chunk"
+        required: false
+        default: true
+        type: boolean
+      sweep:
+        description: "🔁 Sweep number driving the mode and tor rotation. Empty: the run number"
+        required: false
+        default: ""
+        type: string
+      workspace:
+        description: "🧑‍💻 Run the workspace test. 'auto': on a global scope only"
+        required: false
+        default: "auto"
+        type: choice
+        options:
+          - "auto"
+          - "true"
+          - "false"
+      workspace_track:
+        description: "🧑‍💻 Workspace track per distro. 'rotate' splits compose and swarm"
+        required: false
+        default: "rotate"
+        type: choice
+        options:
+          - "rotate"
+          - "compose"
+          - "swarm"
+permissions:
+  contents: read
+
+jobs:
+  ci-orchestrator:
+    name: 🎛️ Orchestrate CI (manual)
+    permissions:
+      actions: read
+      contents: read
+      packages: write
+      security-events: write
+      issues: write
+    uses: ./.github/workflows/call-orchestrator.yml
+    with:
+      distros: ${{ inputs.distros }}
+      whitelist: ${{ inputs.whitelist }}
+      lifecycles: ${{ inputs.lifecycles }}
+      mode: ${{ inputs.mode }}
+      priority: ${{ inputs.priority }}
+      sweep: ${{ inputs.sweep }}
+      offset: ${{ inputs.offset }}
+      chunk_gate: ${{ inputs.chunk_gate }}
+      filesystem: ${{ inputs.filesystem }}
+      workspace: ${{ inputs.workspace }}
+      workspace_track: ${{ inputs.workspace_track }}
+      tor: ${{ inputs.tor }}
+    secrets: inherit

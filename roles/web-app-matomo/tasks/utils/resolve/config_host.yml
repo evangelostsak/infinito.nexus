@@ -1,0 +1,11 @@
+---
+- name: "🧭 Resolve matomo_data mountpoint on the hosting node"
+  ansible.builtin.command: >-
+    container volume inspect --format '{{ "{{" }}.Mountpoint{{ "}}" }}' matomo_data
+  register: matomo_data_mountpoint
+  changed_when: false
+  delegate_to: "{{ MATOMO_HOST_NODE }}"
+
+- name: "🧭 Set host path to config.ini.php"
+  ansible.builtin.set_fact:
+    MATOMO_CONFIG_HOST: "{{ [matomo_data_mountpoint.stdout | trim, 'config/config.ini.php'] | path_join }}"

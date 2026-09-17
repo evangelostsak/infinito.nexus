@@ -16,17 +16,26 @@ matomo:
   enabled: "{{ 'web-app-matomo' in group_names }}"
   shared: "{{ 'web-app-matomo' in group_names }}"
 phpldapadmin:
+  healthcheck:
+    flavor: curl
+  modes:
+    compose:
+      enabled: true
+    swarm:
+      enabled: true
   image: phpldapadmin/phpldapadmin
-  version: latest
-  min_storage: 1GB
+  version: 2.3.11
+  min_storage: 276MB
   ports:
     local:
       sso: 16486
       http: 8037
+    internal:
+      http: 8080
   run_after:
     - web-app-matomo
     - web-app-keycloak
-  lifecycle: unsupported
+  lifecycle: eol
   cpus: "0.2"
   mem_reservation: 128m
   mem_limit: 256m
@@ -38,7 +47,7 @@ sso:
   flavor: oauth2
   oauth2:
     origin:
-      host: application
+      host: phpldapadmin
       port: 8080
     allowed_groups:
       - "{{ lookup('rbac_group_path', application_id='web-app-phpldapadmin', role='administrator') }}"
@@ -50,3 +59,10 @@ prometheus:
   bond: 1
   enabled: "{{ 'web-app-prometheus' in group_names }}"
   shared: "{{ 'web-app-prometheus' in group_names }}"
+
+# nocheck: playwright-service-flag
+# nocheck: variants-coverage — sso-variant-tor requires the onion on in every variant, so the false polarity has no variant left to live in
+tor:
+  bond: 0.5
+  enabled: "{{ 'svc-net-tor' in group_names }}"
+  shared: true # nocheck: dynamic-flag

@@ -1,0 +1,14 @@
+---
+- name: "🔎 Check if plugin has a dedicated install task under '{{ plugin_task_path }}'"
+  stat:
+    path: "{{ plugin_task_path }}"
+  register: plugin_task_file
+  delegate_to: localhost
+  become: false
+
+- name: "📂 Include plugin-specific install task if it exists"
+  include_tasks: "{{ plugin_task_path }}"
+  when: plugin_task_file.stat.exists
+
+- name: "📦 Ensure WordPress plugin is installed and active"
+  ansible.builtin.include_tasks: utils/install/plugin.yml

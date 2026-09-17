@@ -5,8 +5,8 @@ FROM ${OPENLDAP_IMAGE}:${OPENLDAP_VERSION}
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN rm -rf /var/lib/apt/lists/* \
- && apt-get update \
- && apt-get install -y --no-install-recommends \
+ && apt-get -o Acquire::Retries=3 update \
+ && apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
     slapd slapd-contrib ldap-utils ca-certificates tini \
  && rm -rf /var/lib/apt/lists/* \
  && rm -rf /etc/ldap/slapd.d/* /var/lib/ldap/* \
@@ -21,7 +21,7 @@ RUN chmod +x /healthcheck.sh
 
 EXPOSE 389
 
-HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=12 \
+HEALTHCHECK --interval=2m --timeout=5s --start-period=10m --retries=12 --start-interval=5s \
   CMD ["/healthcheck.sh"]
 
 ENTRYPOINT ["/usr/bin/tini","--","/entrypoint.sh"]

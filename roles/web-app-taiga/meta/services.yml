@@ -1,4 +1,5 @@
 ---
+# nocheck: dockerfile-custom
 sso:
   bond: 1
   enabled: "{{ 'web-app-keycloak' in group_names }}"
@@ -34,6 +35,16 @@ postgres:
   enabled: true # nocheck: dynamic-flag
   shared: "{{ 'svc-db-postgres' in group_names }}"
 taiga:
+  healthcheck:
+    test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1',8000),5).close()"]
+    retries: 5
+  modes:
+    compose:
+      enabled: true
+    swarm:
+      enabled: true
+  # nocheck: default-placement-manager  embedded rabbitmq engine state; node-local in swarm
+  placement: manager
   repository: https://github.com/taigaio/taiga-docker
   ref: main
   version: latest
@@ -46,21 +57,40 @@ taiga:
     local:
       sso: 16491
       http: 8027
+    internal:
+      http: 80
+  proxy:
+    service_key: gateway
   run_after:
     - web-app-matomo
     - web-app-keycloak
   lifecycle: beta
 async:
+  healthcheck:
+    test: ["CMD-SHELL", "tr '\\0' ' ' </proc/1/cmdline | grep -qi celery"]
+    retries: 5
   cpus: "1.0"
   mem_reservation: 1g
   mem_limit: 1.5g
   pids_limit: 512
 front:
+  healthcheck:
+    flavor: http
+  ports:
+    internal:
+      http: 80
+  image: node
+  version: 26-alpine
   cpus: "0.3"
   mem_reservation: 256m
   mem_limit: 512m
   pids_limit: 256
 gateway:
+  healthcheck:
+    flavor: http
+  ports:
+    internal:
+      http: 80
   image: nginx
   version: alpine
   cpus: "0.3"
@@ -68,13 +98,19 @@ gateway:
   mem_limit: 512m
   pids_limit: 256
 events:
+  healthcheck:
+    test: ["CMD-SHELL", "nc -z 127.0.0.1 8888"]
+    retries: 5
   image: taigaio/taiga-events
-  version: latest
+  version: 6.10.0
   cpus: "0.3"
   mem_reservation: 256m
   mem_limit: 512m
   pids_limit: 256
 async-rabbitmq:
+  healthcheck:
+    test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+    retries: 5
   image: rabbitmq
   version: "4.3-management-alpine"
   cpus: "1.0"
@@ -82,6 +118,9 @@ async-rabbitmq:
   mem_limit: 1.5g
   pids_limit: 512
 events-rabbitmq:
+  healthcheck:
+    test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+    retries: 5
   image: rabbitmq
   version: "4.3-management-alpine"
   cpus: "0.5"
@@ -89,13 +128,19 @@ events-rabbitmq:
   mem_limit: 1g
   pids_limit: 512
 manager:
+  # nocheck: single-replica
+  replicas: 1
+  name: "taiga-manager"
   cpus: "0.5"
   mem_reservation: 512m
   mem_limit: 1g
   pids_limit: 256
 protected:
+  healthcheck:
+    test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1',8003),5).close()"]
+    retries: 5
   image: taigaio/taiga-protected
-  version: latest
+  version: 6.10.1
   cpus: "0.2"
   mem_reservation: 128m
   mem_limit: 256m
@@ -117,3 +162,16 @@ prometheus:
   bond: 1
   enabled: "{{ 'web-app-prometheus' in group_names }}"
   shared: "{{ 'web-app-prometheus' in group_names }}"
+
+# nocheck: playwright-service-flag
+# nocheck: variants-coverage — sso-variant-tor requires the onion on in every variant, so the false polarity has no variant left to live in
+tor:
+  bond: 0.5
+  enabled: "{{ 'svc-net-tor' in group_names }}"
+  shared: true # nocheck: dynamic-flag
+# nocheck: dynamic-flag
+# nocheck: playwright-service-flag, dynamic-flag infrastructure backup consumer
+container_backup: # nocheck: bond-baseline backup host joins outside the variant topology
+  bond: 1
+  enabled: "{{ 'svc-bkp-volume-2-local' in group_names }}"
+  shared: true

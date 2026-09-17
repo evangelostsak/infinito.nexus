@@ -33,15 +33,15 @@ package path. New tests SHOULD patch the submodule path directly
 from __future__ import annotations
 
 from .builder import build_dev_inventory, build_dev_inventory_matrix
-from .legacy_resolver import _build_services_overrides_for_round, _resolve_round_include
+from .legacy_resolver import (
+    _build_services_overrides_for_round,
+    _resolve_round_include,
+    prune_orphans_after_disable,
+)
 from .payload import _bake_overrides, _resolve_variant_payloads
 from .planner import filter_plan_to_variants, plan_dev_inventory_matrix
 from .spec import DevInventorySpec, PlanEntry
 
-# Private helper names appear in `__all__` to silence ruff's F401
-# "unused import" — they are re-exported here so tests that historically
-# import them from the package root keep working. New tests SHOULD patch
-# the submodule path directly rather than the re-export.
 __all__ = [
     "DevInventorySpec",
     "PlanEntry",
@@ -53,4 +53,5 @@ __all__ = [
     "build_dev_inventory_matrix",
     "filter_plan_to_variants",
     "plan_dev_inventory_matrix",
+    "prune_orphans_after_disable",
 ]

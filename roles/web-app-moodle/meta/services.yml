@@ -1,4 +1,8 @@
 ---
+litellm:
+  bond: 0.5
+  enabled: "{{ ('svc-ai-litellm' in group_names) and (LITELLM_CHAT_MODEL_SERVED | bool) }}"
+  shared: "{{ 'svc-ai-litellm' in group_names }}"
 # nocheck: seaweedfs-required — object storage not implemented for this role
 sso:
   bond: 1
@@ -32,35 +36,44 @@ mariadb:
   shared: "{{ 'svc-db-mariadb' in group_names }}"
 # nocheck: playwright-service-flag: shared provider entity; the app itself is covered by this role's own Playwright spec
 moodle:
+  modes:
+    compose:
+      enabled: true
+    swarm:
+      enabled: true
   bond: 1
-  enabled: true
+  enabled: true # nocheck: dynamic-flag
   shared: true
-  # Self-built image. The `image`+`version` pair is the PHP base the
-  # Dockerfile builds FROM (php:8.3-fpm) — this is also what GHCR
-  # image-mirror discovery picks up, so the base stays cached.
-  # The Moodle source itself is pinned via `branch` (Git branch on
-  # git.moodle.org, naming: stable<MAJOR>0<MINOR>, e.g. 4.5 -> stable405)
-  # and `release` (tarball version). 4.5 is LTS, security-supported
-  # until 2027-10; Moodle 5.x reorganises the code under public/* and
-  # is deferred to a follow-up requirement.
-  branch: stable405
   release: 4.5.11
   image: php
-  # Moodle 4.5 LTS rejects PHP >= 8.4 at install ("version 8.4 and higher
-  # are not supported"). Pin to 8.3 and skip auto-bumps until Moodle
-  # supports a newer line.
   # nocheck: docker-version
   version: "8.3-fpm"
+  custom: true
   name: moodle
-  min_storage: 10GB
+  min_storage: 373MB
   cpus: 1.0
   mem_reservation: 1g
   mem_limit: 2g
   pids_limit: 512
   site_titel: Academy on {{ DOMAIN_PRIMARY }}
+  performance:
+    php:
+      memory_limit: 512M
+      upload_max_filesize: 256M
+      post_max_size: 256M
   ports:
     local:
       http: 8026
+    internal:
+      http: 80
+      fpm: 9000
+  healthcheck:
+    flavor:
+      - msmtp
+      - connect
+    port_key: fpm
+  proxy:
+    service_key: nginx
   run_after:
     - web-app-keycloak
   lifecycle: beta
@@ -68,18 +81,24 @@ nginx:
   image: nginx
   version: 1.31-alpine
   name: moodle-nginx
-  min_storage: 1GB
+  min_storage: 227MB
   cpus: "0.2"
   mem_reservation: 128m
   mem_limit: 256m
   pids_limit: 256
+  ports:
+    internal:
+      http: 80
 cron:
   name: moodle-cron
+  custom: true
   min_storage: 1GB
   cpus: "0.2"
   mem_reservation: 128m
   mem_limit: 256m
   pids_limit: 256
+  # nocheck: single-replica moodle cron.php scheduler; concurrent replicas double-run scheduled tasks
+  replicas: 1
 # nocheck: playwright-service-flag — verified by web-svc-css provider spec
 css:
   bond: 1
@@ -89,3 +108,36 @@ prometheus:
   bond: 1
   enabled: "{{ 'web-app-prometheus' in group_names }}"
   shared: "{{ 'web-app-prometheus' in group_names }}"
+
+# nocheck: playwright-service-flag
+# nocheck: variants-coverage — sso-variant-tor requires the onion on in every variant, so the false polarity has no variant left to live in
+tor:
+  bond: 0.5
+  enabled: "{{ 'svc-net-tor' in group_names }}"
+  shared: true # nocheck: dynamic-flag
+# nocheck: playwright-service-flag, dynamic-flag infrastructure backup consumer
+container_backup: # nocheck: bond-baseline backup host joins outside the variant topology
+  bond: 1
+  enabled: "{{ 'svc-bkp-volume-2-local' in group_names }}"
+  shared: true
+# nocheck: playwright-service-flag  MCP pairing is proven by the role's own MCP spec, not by a per-consumer gate
+openwebui:
+  bond: 0.5
+  enabled: "{{ 'web-app-openwebui' in group_names }}"
+  shared: "{{ 'web-app-openwebui' in group_names }}"
+# nocheck: playwright-service-flag  MCP pairing is proven by the role's own MCP spec, not by a per-consumer gate
+hermes:
+  bond: 0.5
+  enabled: "{{ 'web-app-hermes' in group_names }}"
+  shared: "{{ 'web-app-hermes' in group_names }}"
+# nocheck: playwright-service-flag  MCP pairing is proven by the role's own MCP spec, not by a per-consumer gate
+openclaw:
+  bond: 0.5
+  enabled: "{{ 'web-app-openclaw' in group_names }}"
+  shared: "{{ 'web-app-openclaw' in group_names }}"
+# nocheck: playwright-service-flag  MCP pairing is proven by the role's own MCP spec, not by a per-consumer gate
+# nocheck: dynamic-flag  the entry refuses this client, so the link is off on every host and no group_names gate can decide it
+flowise:
+  enabled: false
+  shared: false
+  mcp_consumer: false

@@ -70,8 +70,6 @@ if [[ $# -gt 0 ]]; then
 	exit 2
 fi
 
-# INFINITO_DISTRO is set by scripts/meta/env/load.sh (single SPOT,
-# defaults to debian) — no local fallback here.
 INFINITO_INVENTORY_DIR="${INFINITO_INVENTORY_DIR:-}"
 
 if [[ -z "${INFINITO_INVENTORY_DIR}" ]]; then
@@ -106,12 +104,6 @@ echo ">>> Running entry.sh bootstrap inside container"
 	-- bash "${INFINITO_SRC_DIR}/scripts/tests/deploy/local/utils/entry-bootstrap.sh"
 
 echo ">>> Creating inventory for app '${apps}'"
-# RUNTIME MUST be `dev` here: the host process running this script lives
-# OUTSIDE the development compose stack, so `detect_runtime()` falls back
-# to "host". Without an explicit override the matrix-init step would bake
-# `RUNTIME=host` into host_vars and the Playwright E2E gate
-# (RUNTIME in [dev, act, github]) would never fire — kept-deploys would
-# silently skip the test stage. Mirrors apps/reinstall/selection.sh.
 "${PYTHON}" -m cli.administration.deploy.development init \
 	--apps "${apps}" \
 	--inventory-dir "${INFINITO_INVENTORY_DIR}" \
@@ -127,7 +119,6 @@ if [[ "${INFINITO_DEBUG}" == "true" ]]; then
 	deploy_cmd+=(--debug)
 fi
 
-# NOTE: --skip-cleanup keeps cleanup routines disabled during this local test run.
 deploy_cmd+=(-- --skip-backup --skip-cleanup --limit "${INFINITO_LIMIT_HOST}")
 
 echo ">>> Deploying app '${apps}'"

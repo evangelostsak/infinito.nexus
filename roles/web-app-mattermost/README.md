@@ -8,6 +8,80 @@ Deploys [Mattermost Team Edition](https://mattermost.com/) (an open-source, self
 
 This role unite your team with Mattermost, an open-source, self-hosted messaging platform that delivers secure, real-time collaboration through channels, threads, and integrations, keeping your conversations private and under your control.
 
+## Cosmos
+
+The diagram places Mattermost in the Infinito.Nexus cosmos: the components it deploys (capabilities), the central services it consumes (dependencies), and its outward reach (federation and bridged external networks).
+
+```mermaid
+flowchart LR
+    subgraph deps [Dependencies]
+        dep_svc_ai_litellm["svc-ai-litellm 🐳🐝"]
+        dep_svc_bkp_volume_2_local["svc-bkp-volume-2-local 💻"]
+        dep_svc_db_openldap["svc-db-openldap 🐳🐝"]
+        dep_svc_db_postgres["svc-db-postgres 🐳🐝"]
+        dep_svc_db_redis["svc-db-redis 🐳🐝"]
+        dep_svc_net_tor["svc-net-tor 🐳🐝"]
+        dep_web_app_dashboard["web-app-dashboard 🐳🐝"]
+        dep_web_app_hermes["web-app-hermes 🐳🐝"]
+        dep_web_app_keycloak["web-app-keycloak 🐳🐝"]
+        dep_web_app_mailu["web-app-mailu 🐳🐝"]
+        dep_web_app_matomo["web-app-matomo 🐳🐝"]
+        dep_web_app_openclaw["web-app-openclaw 🐳🐝"]
+        dep_web_app_openwebui["web-app-openwebui 🐳🐝"]
+        dep_web_app_prometheus["web-app-prometheus 🐳🐝"]
+        dep_web_app_seaweedfs["web-app-seaweedfs 🐳🐝"]
+        dep_web_svc_css["web-svc-css 💻"]
+        dep_web_svc_logout["web-svc-logout 🐳🐝"]
+    end
+    subgraph role [web-app-mattermost 🐳🐝]
+        svc_sso["sso"]
+        svc_logout["logout"]
+        svc_ldap["ldap"]
+        svc_dashboard["dashboard"]
+        svc_matomo["matomo"]
+        svc_email["email"]
+        svc_postgres["postgres"]
+        svc_mattermost["mattermost"]
+        svc_redis["redis"]
+        svc_minio["minio ❌"]
+        svc_seaweedfs["seaweedfs"]
+        svc_css["css"]
+        svc_javascript["javascript"]
+        svc_prometheus["prometheus"]
+        svc_tor["tor"]
+        svc_container_backup["container_backup"]
+        svc_litellm["litellm"]
+        svc_mattermostmcp["mattermostmcp"]
+        svc_openwebui["openwebui"]
+        svc_hermes["hermes"]
+        svc_openclaw["openclaw"]
+        svc_flowise["flowise ❌"]
+    end
+    subgraph dependents [Dependents]
+        dpt_web_app_nextcloud["web-app-nextcloud 🐳🐝"]
+    end
+    dep_svc_ai_litellm -. "0..1" .-> svc_litellm
+    dep_svc_bkp_volume_2_local -. "0..1" .-> svc_container_backup
+    dep_svc_db_openldap -- "1:1" --> svc_ldap
+    dep_svc_db_postgres -. "0..1" .-> svc_postgres
+    dep_svc_db_redis -. "0..1" .-> svc_redis
+    dep_svc_net_tor -. "0..1" .-> svc_tor
+    dep_web_app_dashboard -. "0..1" .-> svc_dashboard
+    dep_web_app_hermes -. "0..1" .-> svc_hermes
+    dep_web_app_keycloak -. "0..1" .-> svc_sso
+    dep_web_app_mailu -. "0..1" .-> svc_email
+    dep_web_app_matomo -. "0..1" .-> svc_matomo
+    dep_web_app_openclaw -. "0..1" .-> svc_openclaw
+    dep_web_app_openwebui -. "0..1" .-> svc_openwebui
+    dep_web_app_prometheus -. "0..1" .-> svc_prometheus
+    dep_web_app_seaweedfs -. "0..1" .-> svc_seaweedfs
+    dep_web_svc_css -. "0..1" .-> svc_css
+    dep_web_svc_logout -. "0..1" .-> svc_logout
+    svc_sso -. "0..1" .-> dpt_web_app_nextcloud
+```
+
+Solid `1:1` edges are fixed relationships; dashed `0..1` edges are conditional (enabled only in matching deployments); red `0..0` edges are turned off in this role. Node markers show the role's deploy modes (💻 host, 🐳 compose, 🐝 swarm); ❌ marks a service that is explicitly turned off, and ⚙️ an Ansible role dependency declared in `meta/main.yml`.
+
 ## Features
 
 - Single-container deployment via Docker Compose
@@ -16,6 +90,45 @@ This role unite your team with Mattermost, an open-source, self-hosted messaging
 - Email notifications via Mailu (optional)
 - Persistent storage for config, data, logs, and plugins
 - Accessible at `https://mattermost.<your-domain>`
+
+## Quick Setup
+
+### Development
+
+Clone, set up the workstation, and deploy Mattermost onto the local stack:
+
+```bash
+git clone https://github.com/infinito-nexus/core.git
+cd core
+make onboard
+make compose-deploy mode=reinstall apps=web-app-mattermost full_cycle=false
+```
+
+### Production
+
+Run the published image to provision the inventory and deploy Mattermost to a managed server (the mounted volume persists the inventory):
+
+```bash
+APP=web-app-mattermost
+HOST=<your-server>
+DOMAIN=<your-domain>
+TLS_MODE=self_signed
+SSH_PUBLIC_KEY="<your-ssh-public-key>"
+
+docker run --rm -it \
+  -v "$PWD/inventories:/etc/infinito.nexus/inventories" \
+  -e APP="$APP" -e HOST="$HOST" -e DOMAIN="$DOMAIN" -e TLS_MODE="$TLS_MODE" -e SSH_PUBLIC_KEY="$SSH_PUBLIC_KEY" \
+  ghcr.io/infinito-nexus/core/debian bash -c '
+    INVENTORY=/etc/infinito.nexus/inventories/production
+    infinito administration inventory provision "$INVENTORY" \
+      --inventory-file "$INVENTORY/devices.yml" \
+      --host "$HOST" \
+      --include "$APP" \
+      --vars "{\"TLS_MODE\": \"$TLS_MODE\", \"DOMAIN_PRIMARY\": \"$DOMAIN\", \"users\": {\"administrator\": {\"authorized_keys\": [\"$SSH_PUBLIC_KEY\"]}}}" &&
+    infinito administration deploy dedicated "$INVENTORY/devices.yml" \
+      --password-file "$INVENTORY/.password" \
+      --diff -vv'
+```
 
 ## SSO / Authentication
 
@@ -27,6 +140,58 @@ The login button in the UI will read "SSO with Infinito.Nexus" (renamed via inje
 
 To enable SSO, set `services.sso.enabled: true` (the default) in your inventory and ensure `OIDC.CLIENT.SECRET` is configured.
 
+## MCP Server
+
+Mattermost exposes a Model Context Protocol server through the prepackaged Agents plugin (`mattermost-ai`), which ships inside the pinned `mattermost/mattermost-team-edition` image.
+
+| Property | Value |
+|----------|-------|
+| Endpoint | `/mcp` on the `mattermostmcp` sidecar; the adapter reaches `/plugins/mattermost-ai/mcp-server/mcp` on the `mattermost` service upstream |
+| Health path | `/plugins/mattermost-ai/mcp-server/.well-known/oauth-protected-resource` |
+| Transport | `streamable_http` (stateless); SSE is not served |
+| Auth | `Authorization: Bearer <personal access token>` |
+| Subject | The token owner; tool calls run with that account's Mattermost permissions |
+| Exposure | `internal` |
+
+### Default state
+
+`mcp.enabled` resolves to `true` only when `web-app-hermes`, `web-app-openclaw` or `web-app-openwebui` is part of the same deployment, and is `false` otherwise. While it is `true` the deploy:
+
+- sets `MM_SERVICESETTINGS_ENABLEUSERACCESSTOKENS=true`,
+- enables the `mattermost-ai` plugin through `mmctl --local`,
+- sets `mcp.enablePluginServer` in the plugin's active `agents_confighistory` row and reloads the plugin,
+- mints a personal access token for the administrator account and persists it with `sys-token-store` under `users.administrator.tokens['web-app-mattermost']`.
+
+While it is `false` the route is not registered and the endpoint answers `404`. Unauthenticated requests to the enabled endpoint answer `401` with a `WWW-Authenticate: Bearer resource_metadata="<health path URL>"` header.
+
+### Authorization subject
+
+`auth_subject: administrator`: Mattermost bounds a call by the account the token
+belongs to. This deployment mints that personal access token for the
+administrator account, so calls arrive with that account's rights whoever asked.
+Reaching the tool server is gated on the role's `mcp` RBAC group.
+
+### Tool categories
+
+The endpoint serves the Agents plugin's native Mattermost tool catalog:
+
+- channels: list, read, create, update, archive,
+- posts: search, read, create, update, delete,
+- direct messages: read and send,
+- users and teams: look up, add members, update profiles,
+- files: list, read, upload.
+
+The catalog includes mutating entries (`create`, `update`, `archive`, `delete`,
+`send`, `upload`). The Agents plugin exposes no filter, scope or permission flag
+that removes them, so `mcp.tools.mutating_tools_enabled: false` records
+the deployment's intent rather than an enforced state. Every call is bounded by
+the permissions of the account the bearer token belongs to, which here is the
+administrator.
+
+### How to disable
+
+Remove the MCP client roles, or pin `mcp.enabled: false` for this role. The Agents plugin's MCP server is then left switched off and no personal access token is issued.
+
 ## Configuration
 
 Key settings in `meta/services.yml` and `meta/server.yml`:
@@ -36,21 +201,26 @@ Key settings in `meta/services.yml` and `meta/server.yml`:
 | `services.sso.enabled` | `true` | Enable Keycloak SSO via GitLab OAuth2 |
 | `services.postgres.shared` | `true` | Use the shared PostgreSQL service instead of a role-local one |
 | `services.mattermost.version` | `latest` | Docker image tag |
-| `server.domains.canonical` | `mattermost.{{ DOMAIN_PRIMARY }}` | Public domain |
+| `domains.canonical` | `mattermost.{{ DOMAIN_PRIMARY }}` | Public domain |
 
 ## Addons
 
-This role declares no addons (it ships no `meta/addons/` directory). Mattermost **Team Edition** manages plugin install and enablement at runtime; there is no declarative per-plugin install path in this role. Plugins are operator-managed and persisted through the named plugin volumes (`plugins`, `client-plugins`) declared in `meta/volumes.yml`. No addon bridges any in-repo service.
+This role declares no addons (it ships no `meta/addons/` directory). Mattermost **Team Edition** manages plugin install and enablement at runtime; there is no declarative per-plugin install path in this role. Plugins are operator-managed. The named volumes `plugins` and `client-plugins` declared in `meta/volumes.yml` are node-local derived copies that every replica extracts for itself from the image's prepackaged bundles; an uploaded bundle persists in the file store, not in them. No addon bridges any in-repo service.
 
 ## References
 
-- [Mattermost Docker Install](https://docs.mattermost.com/install/install-docker.html)
-- [Mattermost Configuration Settings](https://docs.mattermost.com/configure/configuration-settings.html)
-- [GitLab SSO in Mattermost](https://docs.mattermost.com/deployment/sso-gitlab.html)
+- [Mattermost Docker Install](https://docs.mattermost.com/deployment-guide/server/deploy-containers.html)
+- [Mattermost Configuration Settings](https://docs.mattermost.com/administration-guide/configure/configuration-settings.html)
+- [GitLab SSO in Mattermost](https://docs.mattermost.com/administration-guide/onboard/sso-gitlab.html)
+
+## Persona contract opt-outs
+
+This role declares `PERSONA_ADMINISTRATOR_BLOCKED` and `PERSONA_BIBER_BLOCKED` in `templates/playwright.env.j2` for the same mechanism. Mattermost Team Edition ships no native OIDC provider, so the role piggybacks Keycloak onto the GitLab OAuth slot (`MM_GITLABSETTINGS_*` in `templates/env.j2`); the resulting entry point is `a[href='/oauth/gitlab/login']`, relabelled "SSO with Infinito.Nexus" by `templates/javascript.js.j2`, which the shared helper's name-based login matcher does not recognise. Mattermost v11+ also serves a `/landing` interstitial to unauthenticated visitors that only clears once `localStorage.__landingPageSeen__` is seeded before navigation, and the shared helper has no init-script hook to do that.
+
+The journey is covered bespoke in `files/playwright/test-sso-login.js`, which seeds the landing flag, clicks the GitLab-slot link, verifies the channel view, and signs out via `/logout`; `files/playwright/test-biber-dm-administrator.js` adds the peer exchange. The path back to the generic personas is an SSO control whose accessible name matches the shared matcher.
 
 ## Credits
 
-Developed and maintained by **Kevin Veen-Birkenbach**.
-Learn more at [veen.world](https://www.veen.world).
-Part of the [Infinito.Nexus Project](https://s.infinito.nexus/code).
+Implemented by **[Alejandro Roman Ibanez](https://github.com/AlejandroRomanIbanez)**.
+Part of the [Infinito.Nexus Project](https://s.infinito.nexus/code) and maintained by [Kevin Veen-Birkenbach](https://www.veen.world).
 Licensed under the [Infinito.Nexus Community License (Non-Commercial)](https://s.infinito.nexus/license).

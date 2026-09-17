@@ -1,30 +1,25 @@
 ---
-- name: Gather OS facts (ensure we know distribution)
+- name: 📊 Gather OS facts (ensure we know distribution)
   ansible.builtin.setup:
   when: ansible_facts is not defined
 
-- name: Ensure mhwd is installed on Manjaro
-  package:
-    name: mhwd
-    state: present
+- name: ✅ Ensure mhwd is installed on Manjaro
+  package_install:
+    id: mhwd
   become: true
-  when:
-    - ansible_facts['distribution'] is defined
-    - ansible_facts['distribution'] in ['ManjaroLinux', 'Manjaro']
-  register: mhwd_install
 
-- name: Detect mhwd command
+- name: 🔍 Detect mhwd command
   ansible.builtin.stat:
     path: /usr/bin/mhwd
   register: mhwd_binary
 
-- name: Install nonfree drivers via mhwd (Manjaro only)
+- name: 📦 Install nonfree drivers via mhwd (Manjaro only)
   ansible.builtin.shell: mhwd -a pci nonfree 0300
   become: true
   when:
     - mhwd_binary.stat.exists
 
-- name: Warn when mhwd is not available
+- name: ⚠️ Warn when mhwd is not available
   ansible.builtin.debug:
     msg: >
       Skipping proprietary GPU driver installation: `mhwd` not found.

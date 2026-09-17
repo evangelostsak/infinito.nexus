@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Suggest free per-role subnets based on the live role tree.
 
-Walks every ``roles/*/meta/server.yml``, collects occupied
-``networks.local.subnet`` assignments, picks the smallest CIDR prefix that
+Walks every ``roles/*/meta/networks.yml``, collects occupied
+``local.subnet`` assignments, picks the smallest CIDR prefix that
 fits the requested client count, and proposes free sub-blocks gap-first.
 
 Usage:
@@ -24,8 +24,6 @@ from utils.meta.scan import iter_subnets
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-# Prefix length thresholds — smallest prefix that still fits N clients.
-# Each entry is (max_clients, prefix_length).
 _PREFIX_THRESHOLDS: tuple[tuple[int, int], ...] = (
     (2, 30),
     (6, 29),
@@ -62,8 +60,6 @@ def umbrella_blocks_for(prefix: int) -> list[ipaddress.IPv4Network]:
         return []
     umbrellas: set[ipaddress.IPv4Network] = set()
     for net in occupied:
-        # The umbrella block is the closest enclosing /24 (or coarser).
-        # For prefixes <= 24 the umbrella is the network itself.
         umbrella_prefix = min(prefix, 24)
         umbrellas.add(net.supernet(new_prefix=umbrella_prefix))
     return sorted(umbrellas, key=lambda n: int(n.network_address))

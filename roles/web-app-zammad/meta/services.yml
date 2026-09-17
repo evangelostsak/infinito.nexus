@@ -1,5 +1,9 @@
 ---
-# nocheck: seaweedfs-required — object storage not implemented for this role
+litellm:
+  bond: 0.5
+  enabled: "{{ ('svc-ai-litellm' in group_names) and (LITELLM_CHAT_MODEL_SERVED | bool) }}"
+  shared: "{{ 'svc-ai-litellm' in group_names }}"
+# nocheck: seaweedfs-required - object storage not implemented for this role
 sso:
   bond: 1
   enabled: "{{ 'web-app-keycloak' in group_names }}"
@@ -29,41 +33,53 @@ prometheus:
   bond: 1
   enabled: "{{ 'web-app-prometheus' in group_names }}"
   shared: "{{ 'web-app-prometheus' in group_names }}"
-# nocheck: playwright-service-flag — css consumer, no Playwright surface (provider: web-svc-css)
+# nocheck: playwright-service-flag - css consumer, no Playwright surface (provider: web-svc-css)
 css:
   bond: 1
   enabled: "{{ 'web-svc-css' in group_names }}"
   shared: "{{ 'web-svc-css' in group_names }}"
 # nocheck: shared
 # nocheck: dynamic-flag
-# nocheck: playwright-service-flag — DB engine, covered by role-local integration tests
+# nocheck: playwright-service-flag - DB engine, covered by role-local integration tests
 postgres:
   bond: 1
   enabled: true
   shared: "{{ 'svc-db-postgres' in group_names }}"
 # nocheck: shared
 # nocheck: dynamic-flag
-# nocheck: playwright-service-flag — DB engine, covered by role-local integration tests
+# nocheck: playwright-service-flag - DB engine, covered by role-local integration tests
 redis:
   bond: 1
   enabled: true
   shared: "{{ 'svc-db-redis' in group_names }}"
 # nocheck: shared
 # nocheck: dynamic-flag
-# nocheck: playwright-service-flag — DB engine, covered by role-local integration tests
+# nocheck: playwright-service-flag - DB engine, covered by role-local integration tests
 memcached:
   bond: 1
   enabled: true
   shared: "{{ 'svc-db-memcached' in group_names }}"
 # nocheck: playwright-service-flag: shared provider entity; the app itself is covered by this role's own Playwright spec
 zammad:
+  modes:
+    compose:
+      enabled: true
+    swarm:
+      enabled: true
   bond: 1
   enabled: true
   shared: true
+  # nocheck: default-placement-manager  embedded elasticsearch engine state; node-local in swarm
+  placement: manager
   image: ghcr.io/zammad/zammad
-  version: "6.5.0"
-  min_storage: 15GB
+  version: "7.1.2"
+  name: zammad-railsserver
+  min_storage: 520MB
+  proxy:
+    service_key: nginx
   ports:
+    internal:
+      http: 8080
     local:
       http: 8077
   run_after:
@@ -74,12 +90,113 @@ zammad:
   mem_reservation: 1g
   mem_limit: 2g
   pids_limit: 1024
-# nocheck: playwright-service-flag — internal sub-component (bundled search)
+railsserver:
+  healthcheck:
+    flavor: connect
+  name: zammad-railsserver
+  ports:
+    internal:
+      http: 3000
+  cpus: "1.0"
+  mem_reservation: 1g
+  mem_limit: 2g
+  pids_limit: 1024
+websocket:
+  name: zammad-websocket
+  ports:
+    internal:
+      http: 6042
+  cpus: "0.5"
+  mem_reservation: 256m
+  mem_limit: 512m
+  pids_limit: 512
+# nocheck: playwright-service-flag - internal sub-component (bundled search)
 search:
   image: docker.elastic.co/elasticsearch/elasticsearch
   version: "8.13.4"
-  min_storage: 5GB
+  min_storage: 839MB
   cpus: "1.0"
   mem_reservation: 1g
   mem_limit: 2g
   pids_limit: 512
+elasticsearch:
+  name: zammad-elasticsearch
+  ports:
+    internal:
+      http: 9200
+  cpus: "1.0"
+  mem_reservation: 1g
+  mem_limit: 2g
+  pids_limit: 512
+init:
+  name: zammad-init
+  cpus: "1.0"
+  mem_reservation: 256m
+  mem_limit: 1g
+  pids_limit: 1024
+scheduler:
+  name: zammad-scheduler
+  cpus: "1.0"
+  mem_reservation: 256m
+  mem_limit: 1536m
+  pids_limit: 1024
+  # nocheck: single-replica zammad background scheduler; one instance enqueues recurring jobs
+  replicas: 1
+nginx:
+  name: zammad-nginx
+  cpus: "0.5"
+  mem_reservation: 64m
+  mem_limit: 512m
+  pids_limit: 512
+
+# nocheck: playwright-service-flag
+# nocheck: variants-coverage — sso-variant-tor requires the onion on in every variant, so the false polarity has no variant left to live in
+tor:
+  bond: 0.5
+  enabled: "{{ 'svc-net-tor' in group_names }}"
+  shared: true # nocheck: dynamic-flag
+# nocheck: dynamic-flag
+# nocheck: playwright-service-flag, dynamic-flag infrastructure backup consumer
+container_backup: # nocheck: bond-baseline backup host joins outside the variant topology
+  bond: 1
+  enabled: "{{ 'svc-bkp-volume-2-local' in group_names }}"
+  shared: true
+# nocheck: playwright-service-flag  internal adapter sidecar, covered by the role's MCP guest spec
+# nocheck: dockerfile-custom  the Dockerfile is owned by svc-ai-mcp-adapter and staged per instance, so every adapter-backed provider shares one audited build
+# nocheck: dynamic-flag  the sidecar tracks this role's own mcp flag, not another role's presence; a group_names expression would decide its exposure from an unrelated deployment
+zammadmcp:
+  enabled: "{{ lookup('config', 'web-app-zammad', 'mcp.enabled') | bool }}"
+  shared: false
+  image: python
+  # nocheck: docker-version  base of the self-built stdlib adapter, not the served application
+  version: "3.13.15-slim"
+  custom: true
+  name: zammadmcp
+  cpus: "0.25"
+  mem_reservation: 16m
+  mem_limit: 24m
+  pids_limit: 64
+  ports:
+    internal:
+      http: 8080
+# nocheck: playwright-service-flag  MCP pairing is proven by the role's own MCP spec, not by a per-consumer gate
+openwebui:
+  bond: 0.5
+  enabled: "{{ 'web-app-openwebui' in group_names }}"
+  shared: "{{ 'web-app-openwebui' in group_names }}"
+# nocheck: playwright-service-flag  MCP pairing is proven by the role's own MCP spec, not by a per-consumer gate
+hermes:
+  bond: 0.5
+  enabled: "{{ 'web-app-hermes' in group_names }}"
+  shared: "{{ 'web-app-hermes' in group_names }}"
+# nocheck: playwright-service-flag  MCP pairing is proven by the role's own MCP spec, not by a per-consumer gate
+openclaw:
+  bond: 0.5
+  enabled: "{{ 'web-app-openclaw' in group_names }}"
+  shared: "{{ 'web-app-openclaw' in group_names }}"
+# nocheck: playwright-service-flag  MCP pairing is proven by the role's own MCP spec, not by a per-consumer gate
+# nocheck: dynamic-flag  the entry refuses this client, so the link is off on every host and no group_names gate can decide it
+flowise:
+  enabled: false
+  shared: false
+  mcp_consumer: false

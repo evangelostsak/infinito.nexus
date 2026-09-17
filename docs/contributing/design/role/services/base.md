@@ -110,7 +110,7 @@ Loading decides whether the provider role is deployed at all.
 - queries the ordered discovered service list
 - checks `lookup('service', service_key).required`
 - skips roles already protected by `run_once_*`
-- loads services through [load_app.yml](../../../../../tasks/utils/load_app.yml)
+- loads services through [load/app.yml](../../../../../tasks/utils/load/app.yml)
 
 Frontend service probe/load helper:
 
@@ -219,9 +219,9 @@ The `lookup('database', ...)` API is the convenience accessor for database conne
 | [main.yml](../../../../../roles/sys-service-loader/tasks/main.yml) | Single shared-service loader entry point |
 | [load_service.yml](../../../../../roles/sys-service-loader/tasks/load_service.yml) | Per-service load helper used by the central service loader |
 | [01_constructor.yml](../../../../../tasks/stages/01_constructor.yml) | Calls the service loader during constructor |
-| [load_app.yml](../../../../../tasks/utils/load_app.yml) | Run-once role loader |
-| [test_service_registry.py](../../../../../tests/unit/utils/roles/applications/services/test_registry.py) | Unit tests for discovery, buckets, and `run_after` ordering |
-| [test_service.py](../../../../../tests/unit/plugins/lookup/test_service.py) | Unit tests for `lookup('service', ...)` |
+| [load/app.yml](../../../../../tasks/utils/load/app.yml) | Run-once role loader |
+| [test_service_registry.py](../../../../../tests/unit/python/utils/roles/applications/services/test_registry.py) | Unit tests for discovery, buckets, and `run_after` ordering |
+| [test_service.py](../../../../../tests/unit/python/plugins/lookup/test_service.py) | Unit tests for `lookup('service', ...)` |
 | [test_resolvable.py](../../../../../tests/integration/infrastructure/services/test_resolvable.py) | Integration checks for discovered service resolution |
 | [test_canonical.py](../../../../../tests/integration/infrastructure/services/test_canonical.py) | Canonical alias consistency checks |
 | [test_transitive_dependencies.py](../../../../../tests/integration/infrastructure/services/test_transitive_dependencies.py) | Integration coverage for transitive dependency resolution |

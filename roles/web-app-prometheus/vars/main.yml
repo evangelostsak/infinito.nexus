@@ -1,50 +1,45 @@
 ---
-# General
 application_id: "web-app-prometheus"
 
-# Docker
-container_port: "{{ lookup('config', application_id, 'services.prometheus.ports.local.http') }}"
-
-# Prometheus
-PROMETHEUS_VERSION: "{{ lookup('config', application_id, 'services.prometheus.version') }}"
-PROMETHEUS_IMAGE: "{{ lookup('config', application_id, 'services.prometheus.image') }}"
 PROMETHEUS_CONTAINER: "{{ lookup('config', application_id, 'services.prometheus.name') }}"
 
-## Volumes
-PROMETHEUS_VOLUME_DATA: "{{ lookup('config', application_id, 'volumes.data') }}"
-ALERTMANAGER_VOLUME_DATA: "{{ lookup('config', application_id, 'volumes.alertmanager_data') }}"
-
-## Config
 PROMETHEUS_CONFIG_HOST: "{{ [ lookup('container', application_id, 'directories.config'), 'prometheus.yml' ] | path_join }}"
-PROMETHEUS_CONFIG_DOCKER: "/etc/prometheus/prometheus.yml"
+PROMETHEUS_CONFIG_DOCKER: "{{ lookup('volume', 'web-app-prometheus', 'prometheus_config').target }}"
 BLACKBOX_CONFIG_HOST: "{{ [ lookup('container', application_id, 'directories.config'), 'blackbox.yml' ] | path_join }}"
-BLACKBOX_CONFIG_DOCKER: "/etc/blackbox_exporter/config.yml"
+BLACKBOX_CONFIG_DOCKER: "{{ lookup('volume', 'web-app-prometheus', 'blackbox_config').target }}"
 
-# Alertmanager
-ALERTMANAGER_VERSION: "{{ lookup('config', application_id, 'services.alertmanager.version') }}"
-ALERTMANAGER_IMAGE: "{{ lookup('config', application_id, 'services.alertmanager.image') }}"
 ALERTMANAGER_CONTAINER: "{{ lookup('config', application_id, 'services.alertmanager.name') }}"
 ALERTMANAGER_CONFIG_HOST: "{{ [ lookup('container', application_id, 'directories.config'), 'alertmanager.yml' ] | path_join }}"
-ALERTMANAGER_CONFIG_DOCKER: "/etc/alertmanager/alertmanager.yml"
+ALERTMANAGER_CONFIG_DOCKER: "{{ lookup('volume', 'web-app-prometheus', 'alertmanager_config').target }}"
 ALERT_RULES_CONFIG_HOST: "{{ [ lookup('container', application_id, 'directories.config'), 'alert_rules.yml' ] | path_join }}"
-ALERT_RULES_CONFIG_DOCKER: "/etc/prometheus/alert_rules.yml"
+ALERT_RULES_CONFIG_DOCKER: "{{ lookup('volume', 'web-app-prometheus', 'alert_rules').target }}"
 
-# Alertmanager — communication channels
-ALERTMANAGER_TELEGRAM_BOT_TOKEN: "{{ lookup('config', application_id, 'credentials.alerting_telegram_bot_token', '') }}"
+ALERTMANAGER_TELEGRAM_BOT_TOKEN: "{{ lookup('config', application_id, 'secrets.credentials.alerting_telegram_bot_token', '') }}"
 ALERTMANAGER_TELEGRAM_CHAT_ID: "{{ lookup('config', application_id, 'services.prometheus.alerting.telegram.chat_id') }}"
-ALERTMANAGER_MATTERMOST_WEBHOOK_URL: "{{ lookup('config', application_id, 'credentials.alerting_mattermost_webhook_url', '') }}"
+ALERTMANAGER_MATTERMOST_WEBHOOK_URL: "{{ lookup('config', application_id, 'secrets.credentials.alerting_mattermost_webhook_url', '') }}"
 
-# Blackbox Exporter
-BLACKBOX_VERSION: "{{ lookup('config', application_id, 'services.blackbox-exporter.version') }}"
-BLACKBOX_IMAGE: "{{ lookup('config', application_id, 'services.blackbox-exporter.image') }}"
 BLACKBOX_CONTAINER: "{{ lookup('config', application_id, 'services.blackbox-exporter.name') }}"
 
-# cAdvisor
-CADVISOR_VERSION: "{{ lookup('config', application_id, 'services.cadvisor.version') }}"
-CADVISOR_IMAGE: "{{ lookup('config', application_id, 'services.cadvisor.image') }}"
 CADVISOR_CONTAINER: "{{ lookup('config', application_id, 'services.cadvisor.name') }}"
 
-# Node Exporter
-NODE_EXPORTER_VERSION: "{{ lookup('config', application_id, 'services.node-exporter.version') }}"
-NODE_EXPORTER_IMAGE: "{{ lookup('config', application_id, 'services.node-exporter.image') }}"
 NODE_EXPORTER_CONTAINER: "{{ lookup('config', application_id, 'services.node-exporter.name') }}"
+PROMETHEUS_QUERY_TIMEOUT: "{{ (lookup('config', application_id, 'mcp.limits.timeout_seconds') | int * 2) ~ 's' }}"
+
+PROMETHEUS_MCP_ENABLED: "{{ lookup('config', application_id, 'services.prometheusmcp.enabled') | bool }}"
+PROMETHEUS_MCP_SERVICE_KEY: "prometheusmcp"
+PROMETHEUS_MCP_CONTAINER: "{{ lookup('config', application_id, 'services.prometheusmcp.name') }}"
+PROMETHEUS_MCP_PORT: "{{ lookup('config', application_id, 'services.prometheusmcp.ports.internal.http') }}"
+PROMETHEUS_MCP_BEARER: "{{ lookup('config', application_id, 'secrets.credentials.mcp_bearer') }}"
+PROMETHEUS_MCP_INSTANCE_DIR: "{{ [lookup('container', application_id, 'directories.instance'), 'mcp'] | path_join }}"
+PROMETHEUS_MCP_UPSTREAM_HOST: "{{ lookup('config', application_id, 'services.prometheus.name') }}"
+PROMETHEUS_MCP_UPSTREAM_PORT: "{{ lookup('config', application_id, 'services.prometheus.ports.internal.http') }}"
+PROMETHEUS_MCP_UPSTREAM_URL: "http://{{ PROMETHEUS_MCP_UPSTREAM_HOST }}:{{ PROMETHEUS_MCP_UPSTREAM_PORT }}"
+PROMETHEUS_MCP_CONTRACT:
+  provider: "{{ application_id }}"
+  upstream_url: "{{ PROMETHEUS_MCP_UPSTREAM_URL }}"
+  auth_subject: "{{ lookup('config', application_id, 'mcp.auth_subject') }}"
+  mutating_tools_enabled: "{{ lookup('config', application_id, 'mcp.tools.mutating_tools_enabled') | bool }}"
+  tools: "{{ lookup('file', 'mcp/tools.json') | from_json }}"
+  limits: "{{ lookup('config', application_id, 'mcp.limits') }}"
+  schema_sha256: "{{ lookup('config', application_id, 'mcp.tools.schema_sha256') }}"
+PROMETHEUS_MCP_UPSTREAM_KEY: ""

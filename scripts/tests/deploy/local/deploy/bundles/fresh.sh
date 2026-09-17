@@ -18,7 +18,6 @@ set -euo pipefail
 #   full_cycle         false (default) | true (set by `full_cycle=`)
 #   INFINITO_DISTRO             arch|debian|ubuntu|fedora|centos
 #   INFINITO_INVENTORY_DIR      /etc/inventories/local-full-server (typical)
-#   INFINITO_DEPLOY_TYPE   server|workstation|universal
 
 : "${bundles:?bundles must be set (e.g. bundles=education-suite,startup-essentials)}"
 
@@ -38,5 +37,4 @@ echo "apps        = ${apps}"
 echo "full_cycle  = ${full_cycle:-false}"
 echo
 
-# Delegate to the selection deploy; that script already cycles the stack (down + up).
 exec bash "${SCRIPT_DIR}/../apps/reinstall/selection.sh"

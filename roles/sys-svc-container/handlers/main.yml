@@ -1,25 +1,23 @@
 ---
-- name: Ensure Docker daemon is running on host
+- name: 🔄 Ensure Docker daemon is running on host
   ansible.builtin.service:
     name: docker.service
     state: restarted
     enabled: true
-  listen: container manager restart
+  listen: container-manager-restart
 
-- name: Ensure Docker-In-Docker DNS works
-  ansible.builtin.script: "{{ role_path }}/files/test-dns.sh"
+- name: 💬 Ensure Docker-In-Docker DNS works
+  ansible.builtin.script: "{{ role_path }}/files/shell/test-dns.sh"
   register: docker_in_docker_dns_check
   until: docker_in_docker_dns_check is succeeded
   retries: 7
   delay: 20
-  listen: container manager restart
-  run_once: true
+  listen: container-manager-restart
   when:
     - DOCKER_IN_CONTAINER | bool
-    - MODE_DEBUG | bool
+    - networks.internet.dns | length > 0
   environment:
     BUSYBOX_IMAGE: "{{ lookup('config', 'sys-svc-container', 'services.busybox.image') }}:{{ lookup('config', 'sys-svc-container', 'services.busybox.version') }}"
-    NODE_IMAGE: "{{ lookup('config', 'sys-svc-container', 'services.node.image') }}:{{ lookup('config', 'sys-svc-container', 'services.node.version') }}"
-    DNS_IP: "{{ networks.internet.dns }}"
+    NODE_IMAGE: "{{ '' if DEPLOYMENT_MODE == 'swarm' else lookup('config', 'sys-svc-container', 'services.node.image') ~ ':' ~ lookup('config', 'sys-svc-container',
+      'services.node.version') }}"
     DOMAIN: "{{ DOMAIN_PRIMARY }}"
-    IP4: "{{ networks.internet.ip4 }}"

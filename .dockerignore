@@ -3,6 +3,9 @@
 # NEVER TOUCH THE .dockerignore, BECAUSE IT ANYHOW WILL BE OVERWRITTEN
 
 site.retry
+.cache
+.ansible/
+.stack-torn-down
 *__pycache__
 compose.cache.override.yml
 venv
@@ -16,17 +19,20 @@ roles/importer_result.json
 build/*
 .ruff_cache
 .agents
+.claude/skills/
+.claude-*
 collections/
 .env
+.onion-identity/
+custom.env
 logs/
 job-logs.txt
-.claude/skills
-.claude/agents
-.claude/commands
-.claude/hooks
-.claude/settings.local.json
 *.lock
 node_modules/
+vendor/
+.phpunit.result.cache
+inventories/production/
+/core.*
 
 # No-op for Git (ignored implicitly), but Docker needs .git in its ignore-list — keeps make dockerignore as a pure cat of this file.
 .git
@@ -34,6 +40,7 @@ compose/coredns/Corefile
 compose/Corefile
 
 # Host shell / editor / tooling state accidentally surfaced inside this working copy
+.ansible
 .bash_profile
 .bashrc
 .gitconfig
@@ -45,4 +52,3 @@ compose/Corefile
 .vscode
 .zprofile
 .zshrc
-

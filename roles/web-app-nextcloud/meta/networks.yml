@@ -1,0 +1,11 @@
+---
+local:
+  subnet: 192.168.41.0/24
+overlay:
+  modes: [compose, swarm]
+  topology: shared_net
+  aliases: ["proxy"]
+  consumer:
+    kind: mcp_client
+  proxy_resolvable: true
+  proxy_aliases: ["{{ lookup('domain', 'web-app-nextcloud') }}"]

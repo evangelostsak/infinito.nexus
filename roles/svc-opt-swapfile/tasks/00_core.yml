@@ -1,0 +1,17 @@
+---
+- name: 📦 Install '
+  include_role:
+    name: sys-pip-install
+  vars:
+    # TODO: switch to the PyPI name 'swap-forge' once it is published
+    package_name: "git+{{ SWAPFILE_REPO }}@{{ SWAPFILE_REF }}"
+    global_install: true
+
+- name: ▶️ Execute create swapfile script
+  shell: "{{ SWAPFILE_PKG }} '{{ SWAPFILE_SIZE }}'"
+  become: true
+  # rationale: async; no register and no notify, and nothing in the repo reads swap state
+  async: "{{ ASYNC_TIME if ASYNC_ENABLED | bool else omit }}"
+  poll: "{{ ASYNC_POLL if ASYNC_ENABLED | bool else omit }}"
+
+- include_tasks: utils/once/flag.yml

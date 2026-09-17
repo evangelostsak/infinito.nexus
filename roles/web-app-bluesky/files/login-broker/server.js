@@ -1,3 +1,4 @@
+// nocheck: mirrored-unit-test - a standalone Express server whose module body binds a port and reads the container environment at import
 /*
  * Bluesky login-broker.
  *
@@ -52,9 +53,11 @@ const { URL } = require("node:url");
 // --- Configuration --------------------------------------------------
 
 const CONFIG = {
-  listenPort: parseInt(process.env.BROKER_PORT || "8080", 10),
+  listenPort: parseInt(process.env.BROKER_PORT, 10),
   socialAppUrl: requireEnv("SOCIAL_APP_URL"),
   pdsUrl: requireEnv("PDS_URL"),
+  // nocheck: env-default  falls through to a required lookup, not to a literal
+  pdsInternalUrl: process.env.PDS_INTERNAL_URL || requireEnv("PDS_URL"),
   pdsHandleDomain: requireEnv("PDS_HANDLE_DOMAIN"),
   pdsInviteCode: process.env.PDS_INVITE_CODE || "",
   // Optional: enables the broker to recover from `Handle already
@@ -64,9 +67,11 @@ const CONFIG = {
   // first-deploy path but a recovery is impossible.
   pdsAdminPassword: process.env.PDS_ADMIN_PASSWORD || "",
   encryptionKey: decodeKey(requireEnv("BLUESKY_BRIDGE_ENCRYPTION_KEY")),
+  // nocheck: env-default  the broker owns its own cookie, no role renders it
   handoffCookieName: process.env.HANDOFF_COOKIE_NAME || "bsky_handoff_done",
+  // nocheck: env-default  the broker owns its own cookie, no role renders it
   handoffCookieMaxAgeSec: parseInt(process.env.HANDOFF_COOKIE_MAX_AGE || "3300", 10),
-  insecureTls: (process.env.INSECURE_TLS || "false").toLowerCase() === "true",
+  insecureTls: (process.env.INSECURE_TLS || "").toLowerCase() === "true",
   logoutPath: "/sso/logout"
 };
 
@@ -80,7 +85,7 @@ function requireEnv(name) {
 
 function decodeKey(value) {
   // Accept the project-canonical `base64:<...>` prefix (algorithm
-  // `base64_prefixed_32` in meta/schema.yml) so the same vaulted
+  // `base64_prefixed_32` in meta/secrets.yml) so the same vaulted
   // value flows through the env without further mangling.
   let b64 = value || "";
   if (b64.startsWith("base64:")) b64 = b64.slice(7);
@@ -171,7 +176,7 @@ function sanitiseHandle(username) {
 }
 
 async function pdsCreateAccount({ handle, email, password }) {
-  const url = `${CONFIG.pdsUrl}/xrpc/com.atproto.server.createAccount`;
+  const url = `${CONFIG.pdsInternalUrl}/xrpc/com.atproto.server.createAccount`;
   const body = { handle, email, password };
   if (CONFIG.pdsInviteCode) {
     body.inviteCode = CONFIG.pdsInviteCode;
@@ -187,7 +192,7 @@ async function pdsCreateAccount({ handle, email, password }) {
 }
 
 async function pdsCreateSession({ handle, password }) {
-  const url = `${CONFIG.pdsUrl}/xrpc/com.atproto.server.createSession`;
+  const url = `${CONFIG.pdsInternalUrl}/xrpc/com.atproto.server.createSession`;
   const res = await fetchJson("POST", url, { body: { identifier: handle, password } });
   if (res.status < 200 || res.status >= 300) {
     throw new Error(`PDS createSession failed: status=${res.status} body=${res.raw}`);
@@ -196,7 +201,7 @@ async function pdsCreateSession({ handle, password }) {
 }
 
 async function pdsResolveHandle(handle) {
-  const url = `${CONFIG.pdsUrl}/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(handle)}`;
+  const url = `${CONFIG.pdsInternalUrl}/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(handle)}`;
   const res = await fetchJson("GET", url);
   if (res.status !== 200 || !res.body || !res.body.did) {
     throw new Error(`PDS resolveHandle failed: status=${res.status} body=${res.raw}`);
@@ -214,7 +219,7 @@ async function pdsAdminUpdatePassword(did, newPassword) {
   if (!CONFIG.pdsAdminPassword) {
     throw new Error("PDS_ADMIN_PASSWORD not configured — cannot recover from Handle already taken");
   }
-  const url = `${CONFIG.pdsUrl}/xrpc/com.atproto.admin.updateAccountPassword`;
+  const url = `${CONFIG.pdsInternalUrl}/xrpc/com.atproto.admin.updateAccountPassword`;
   const auth = Buffer.from(`admin:${CONFIG.pdsAdminPassword}`).toString("base64");
   const res = await fetchJson("POST", url, {
     headers: { Authorization: `Basic ${auth}` },
@@ -478,5 +483,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(CONFIG.listenPort, () => {
-  console.log(`[broker] listening on ${CONFIG.listenPort}, social-app=${CONFIG.socialAppUrl}, pds=${CONFIG.pdsUrl}`);
+  console.log(`[broker] listening on ${CONFIG.listenPort}, social-app=${CONFIG.socialAppUrl}, pds=${CONFIG.pdsUrl}, pds-internal=${CONFIG.pdsInternalUrl}`);
 });

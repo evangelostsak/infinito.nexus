@@ -1,0 +1,15 @@
+---
+- name: "✅ Ensure mu-plugins directory exists inside the container"
+  shell: >
+    container exec -u {{ WORDPRESS_USER }} {{ WORDPRESS_CONTAINER_ADDRESS }}
+    mkdir -p {{ WORDPRESS_MU_PLUGINS_DIR }}
+  changed_when: false
+
+- name: "🔁 Iterate through declared WordPress mu-plugins"
+  include_tasks: utils/install/mu_plugin.yml
+  loop: "{{ WORDPRESS_MU_PLUGINS }}"
+  loop_control:
+    loop_var: wordpress_mu_plugin
+    label: "{{ wordpress_mu_plugin.key }}"
+  vars:
+    mu_plugin_name: "{{ wordpress_mu_plugin.key }}"

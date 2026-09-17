@@ -1,12 +1,21 @@
 ---
-- name: "Load destruction roles"
-  include_tasks: "./tasks/groups/{{ destruction_group }}-roles.yml"
-  loop:
-    - svc-opt # Load optimation services
+- name: "🧩 Load destruction roles"
+  include_tasks: ./tasks/utils/setup/group.yml
+  loop: "{{ lookup('stage_groups', 'destructor') }}"
   loop_control:
-    loop_var: destruction_group
-    label: "{{ destruction_group }}-roles.yml"
+    loop_var: role_group
+    label: "{{ role_group }}"
 
-- name: "Finalize services"
+- name: "🛠️ Finalize services"
   include_role:
     name: sys-service-terminator
+
+- name: 🧪 Run CLI tests for deployed roles
+  include_role:
+    name: test-e2e-cli
+  when: RUNTIME in ['dev', 'act', 'github']
+
+- name: "🔓 Unlock all timers"
+  include_role:
+    name: sys-service-terminator
+    tasks_from: 02_unlock.yml

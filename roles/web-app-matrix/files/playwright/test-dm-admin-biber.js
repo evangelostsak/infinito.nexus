@@ -1,19 +1,12 @@
-const { test, expect } = require("@playwright/test");
+const { test, expect } = require("./onion-test");
+const { resolveTimeout } = require("./timeouts");
+
+// Synapse refills rc_login on its own clock, so the onion multiplier must not stretch these waits.
+const RC_LOGIN_DRAIN_MS = 120_000;
+const RC_LOGIN_REFILL_MS = 30_000;
 
 exports.register = function (shared) {
   test.describe("matrix DM", () => {
-    // rc_login exhaustion used to be the dominant failure mode here (retries
-    // burned through Synapse's default burst of 3), which is why this block
-    // previously set retries=0. The 120s drain wait before admin's signin
-    // below made that obsolete. The dominant failure mode is now transient
-    // CI infra pressure — browser processes getting OOM-killed under the
-    // combined load of Synapse + Element + bridges + Keycloak + Mailu +
-    // Matomo on a standard runner surfaces as "Target page, context or
-    // browser has been closed" mid-navigation. Allow a single retry so those
-    // transient crashes don't fail the suite. Cap at 1 (not the config-wide
-    // 2) so a genuinely broken test can't burn 3× the DM budget (~9m).
-    test.describe.configure({ retries: 1 });
-
     test("administrator and biber can exchange a direct message in element", async ({ browser }) => {
       shared.skipUnlessServiceEnabled("sso");
       const {
@@ -41,17 +34,17 @@ exports.register = function (shared) {
       // test's state machine isn't forced to spend most of its deadline
       // cycling through consent↔M_LIMIT_EXCEEDED retries. Running the DM
       // test in isolation doesn't need this, but the extra wait is cheap.
-      await adminPage.waitForTimeout(120_000);
+      await adminPage.waitForTimeout(RC_LOGIN_DRAIN_MS);
       await shared.signInViaElement(adminPage, adminUsername, adminPassword, "administrator");
       // Same reasoning between admin and biber: two back-to-back SSO
       // logins easily exhaust rc_login. 30s lets the burst refill.
-      await adminPage.waitForTimeout(30_000);
+      await adminPage.waitForTimeout(RC_LOGIN_REFILL_MS);
       await shared.signInViaElement(biberPage, biberUsername, biberPassword, "biber");
 
       const marker = `hello-from-admin-${Date.now()}`;
       // MXIDs use the Synapse server_name (a.k.a. MATRIX_SERVER_NAME, typically
       // the bare DOMAIN_PRIMARY), not the client-facing URL host. Using the URL
-      // host (e.g. "matrix.infinito.example") yields a non-existent user and
+      // host (e.g. "matrix.<primary-domain>") yields a non-existent user and
       // Synapse returns HTTP 502 on profile lookup.
       const biberMatrixId = `@${biberUsername}:${matrixServerName}`;
 
@@ -61,15 +54,18 @@ exports.register = function (shared) {
       // button we need lives inside the profile panel specifically (there is a
       // separate "Send a Direct Message" button on the welcome screen that
       // opens a search dialog rather than directly messaging biber).
-      await adminPage.goto(`${elementBaseUrl}/#/user/${encodeURIComponent(biberMatrixId)}`);
-
       const profilePanel = adminPage.getByRole("complementary").filter({ hasText: biberMatrixId });
-      await expect(profilePanel, "admin: biber profile panel must render").toBeVisible({ timeout: 60_000 });
+      await shared.gotoElementApp(
+        adminPage,
+        `${elementBaseUrl}/#/user/${encodeURIComponent(biberMatrixId)}`,
+        profilePanel
+      );
+      await expect(profilePanel, "admin: biber profile panel must render").toBeVisible({ timeout: resolveTimeout(60_000) });
 
       const profileSendMessageButton = profilePanel
         .getByRole("button", { name: /^send message$/i })
         .first();
-      await expect(profileSendMessageButton, "admin: profile 'Send message' button must be visible").toBeVisible({ timeout: 30_000 });
+      await expect(profileSendMessageButton, "admin: profile 'Send message' button must be visible").toBeVisible({ timeout: resolveTimeout(30_000) });
       await profileSendMessageButton.click();
 
       // After clicking "Send message", Element navigates into the DM room and
@@ -77,12 +73,12 @@ exports.register = function (shared) {
       // name before looking for the composer, so we don't match a stale
       // textbox from the previous view (e.g. a search field).
       const roomHeader = adminPage.getByRole("heading", { name: /harry beaver|biber/i }).first();
-      await expect(roomHeader, "admin: DM room header with biber must render").toBeVisible({ timeout: 30_000 });
+      await expect(roomHeader, "admin: DM room header with biber must render").toBeVisible({ timeout: resolveTimeout(30_000) });
 
       const composer = adminPage
         .locator("div[role='textbox'][contenteditable='true'], textarea[aria-label*='message' i], div[aria-label*='message' i][contenteditable='true']")
         .last();
-      await expect(composer, "admin: message composer must appear").toBeVisible({ timeout: 60_000 });
+      await expect(composer, "admin: message composer must appear").toBeVisible({ timeout: resolveTimeout(60_000) });
       await composer.click();
 
       // Element keeps the DM in a pending "Send your first message to invite …"
@@ -140,7 +136,7 @@ exports.register = function (shared) {
             );
           }).catch(() => false);
         }, {
-          timeout: 120_000,
+          timeout: resolveTimeout(120_000),
           message: "biber: expected invite acceptance to produce a message composer",
         })
         .toBe(true);
@@ -148,7 +144,7 @@ exports.register = function (shared) {
       // Give admin's client a moment to observe biber's join and establish a
       // megolm session before sending the marker. Element batches outbound
       // session creation on membership events; 5s is generous.
-      await adminPage.waitForTimeout(5_000);
+      await adminPage.waitForTimeout(resolveTimeout(5_000));
       await composer.click();
       await adminPage.keyboard.type(marker);
       await adminPage.keyboard.press("Enter");
@@ -159,7 +155,7 @@ exports.register = function (shared) {
         .poll(async () => {
           return (await biberPage.locator("body").innerText().catch(() => "")).includes(marker);
         }, {
-          timeout: 120_000,
+          timeout: resolveTimeout(120_000),
           message: `biber: expected to receive message "${marker}" from administrator`,
         })
         .toBe(true);

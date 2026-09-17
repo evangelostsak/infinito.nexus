@@ -1,4 +1,3 @@
-# tests/integration/test_password_quote_in_shell_tasks.py
 from __future__ import annotations
 
 import re
@@ -6,6 +5,7 @@ import unittest
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from utils.annotations.suppress import is_suppressed_at
 from utils.cache.files import read_text
 
 from . import PROJECT_ROOT
@@ -19,8 +19,11 @@ PASSWORD_TOKEN_RE = re.compile(r"(?i)\b[a-z0-9_]*password[a-z0-9_]*\b")
 QUOTE_FILTER_RE = re.compile(r"\|\s*quote\b", re.IGNORECASE)
 
 SHELL_KEY_RE = re.compile(r"^\s*(?:ansible\.builtin\.)?shell\s*:\s*(.*)$")
+STDIN_KEY_RE = re.compile(r"^\s*stdin\s*:\s*[|>]")
 
 QUOTE_CHARS = {"'", '"'}
+
+RULE = "password-quote"
 
 
 @dataclass(frozen=True)
@@ -46,10 +49,6 @@ def _indent_level(s: str) -> int:
 
 
 def _collect_shell_blocks(text: str) -> list[tuple[int, str]]:
-    """
-    Return list of (start_line_no, block_text) for each shell: block.
-    Best-effort indentation-based collector (no YAML parsing).
-    """
     lines = text.splitlines()
     blocks: list[tuple[int, str]] = []
 
@@ -69,13 +68,11 @@ def _collect_shell_blocks(text: str) -> list[tuple[int, str]]:
         while i < len(lines):
             nxt = lines[i]
 
-            # Keep blank lines inside the block
             if nxt.strip() == "":
                 collected.append(nxt)
                 i += 1
                 continue
 
-            # Stop when indentation returns to base or less (next YAML key/item)
             if _indent_level(nxt) <= base_indent:
                 break
 
@@ -88,34 +85,64 @@ def _collect_shell_blocks(text: str) -> list[tuple[int, str]]:
 
 
 def _is_directly_wrapped_by_quotes(block: str, start: int, end: int) -> bool:
-    """
-    Heuristic: Treat as "double-quoted" when the Jinja expression is directly
-    adjacent to a quote char, e.g.:
-      --pass "{{ pw | quote }}"
-      -p"{{ pw | quote }}"
-      foo '{{ pw | quote }}'
-    This usually indicates the value will contain quotes literally.
-    """
     pre = block[start - 1] if start > 0 else ""
     post = block[end] if end < len(block) else ""
     return (pre in QUOTE_CHARS) or (post in QUOTE_CHARS)
 
 
-def _scan_shell_block(file_path: Path, start_line: int, block: str) -> list[Finding]:
+def _mask_stdin_subblocks(block: str) -> str:
+    """
+    Blank out lines belonging to a ``stdin:`` sub-block. Ansible passes
+    ``stdin:`` to the spawned process via a pipe, not through the shell:
+    Jinja inside is parsed by the target program (mariadb, psql, ...), so
+    the shell injection vector this test guards against does not apply
+    there. Preserve line numbers by replacing content with empty strings.
+    """
+    lines = block.splitlines()
+    out = list(lines)
+    i = 0
+    while i < len(lines):
+        if STDIN_KEY_RE.match(lines[i]):
+            stdin_indent = _indent_level(lines[i])
+            out[i] = ""
+            j = i + 1
+            while j < len(lines):
+                nxt = lines[j]
+                if nxt.strip() == "":
+                    out[j] = ""
+                    j += 1
+                    continue
+                if _indent_level(nxt) <= stdin_indent:
+                    break
+                out[j] = ""
+                j += 1
+            i = j
+            continue
+        i += 1
+    return "\n".join(out)
+
+
+def _scan_shell_block(
+    file_path: Path, start_line: int, block: str, file_lines: list[str]
+) -> list[Finding]:
     findings: list[Finding] = []
+    block = _mask_stdin_subblocks(block)
 
     for m in JINJA_EXPR_RE.finditer(block):
         expr = (m.group(1) or "").strip()
         if not PASSWORD_TOKEN_RE.search(expr):
             continue
 
-        # Approximate line number within block
         rel_line = block.count("\n", 0, m.start())
         line_no = start_line + rel_line
 
+        if is_suppressed_at(file_lines, line_no, RULE) or is_suppressed_at(
+            file_lines, start_line, RULE
+        ):
+            continue
+
         snippet = "{{ " + " ".join(expr.split()) + " }}"
 
-        # 1) Hard fail if missing | quote
         if not QUOTE_FILTER_RE.search(expr):
             findings.append(
                 Finding(
@@ -127,8 +154,6 @@ def _scan_shell_block(file_path: Path, start_line: int, block: str) -> list[Find
             )
             continue
 
-        # 2) Hard fail if | quote is used but the whole Jinja expression is wrapped in quotes
-        #    -> typical double-quoting like "--pass \"{{ pw | quote }}\""
         if _is_directly_wrapped_by_quotes(block, m.start(), m.end()):
             findings.append(
                 Finding(
@@ -147,7 +172,7 @@ def _scan_shell_block(file_path: Path, start_line: int, block: str) -> list[Find
 
 class TestPasswordQuoteInShellTasks(unittest.TestCase):
     def test_passwords_are_quoted_in_shell_tasks(self) -> None:
-        repo_root = PROJECT_ROOT  # tests/integration/<cluster>/ -> repo root
+        repo_root = PROJECT_ROOT
 
         all_findings: list[Finding] = []
         for yml in _iter_roles_yml_files(repo_root):
@@ -155,8 +180,9 @@ class TestPasswordQuoteInShellTasks(unittest.TestCase):
                 text = read_text(str(yml))
             except UnicodeDecodeError:
                 continue
+            lines = text.splitlines()
             for start_line, block in _collect_shell_blocks(text):
-                all_findings.extend(_scan_shell_block(yml, start_line, block))
+                all_findings.extend(_scan_shell_block(yml, start_line, block, lines))
 
         if all_findings:
             msg = "\n".join(f.format() for f in all_findings)
@@ -164,6 +190,11 @@ class TestPasswordQuoteInShellTasks(unittest.TestCase):
                 "Violations found in shell tasks (password expressions must use '| quote' "
                 "and must not be double-quoted):\n"
                 f"{msg}\n"
+                f"The token is matched anywhere in the expression, so a path or a "
+                f"filename carrying it trips this too. Suppress such a case with "
+                f"'# nocheck: {RULE} <reason>' on or above the task's shell: key -- "
+                f"not inside the scalar, where a folded block would turn the marker "
+                f"into a shell comment and swallow the rest of the command.\n"
             )
 
 
