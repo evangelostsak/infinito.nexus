@@ -1,0 +1,56 @@
+---
+- include_tasks: utils/once/flag.yml
+
+- name: "🛑 Fail when the inventory carries no mesh for this host"
+  ansible.builtin.fail:
+    msg: >-
+      {{ inventory_hostname }} is in a swarm deploy but its inventory declares
+      no WireGuard mesh. Run cli.administration.inventory.mesh over every
+      inventory of this deploy before the play; the mesh is written by that one
+      cross-host pass, never by this role.
+  when: WIREGUARD_MESH_NAMES | length == 0
+
+- name: "📦 Install the WireGuard tooling"
+  package_install:
+    id: wireguard
+
+- name: "📁 Create {{ WIREGUARD_CONFIG_DIR }}"
+  ansible.builtin.file:
+    path: "{{ WIREGUARD_CONFIG_DIR }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: "📄 Render the interface of every mesh this host belongs to"
+  ansible.builtin.template: # nocheck: stack-host-template (per-host system config; every member writes its own /etc/wireguard, and gating on the stack host would leave every spoke without an interface)
+    src: wg.conf.j2
+    dest: "{{ [WIREGUARD_CONFIG_DIR, mesh_name ~ '.conf'] | path_join }}"
+    owner: root
+    group: root
+    mode: "0600"
+  loop: "{{ WIREGUARD_MESH_NAMES }}"
+  loop_control:
+    loop_var: mesh_name
+  vars:
+    mesh: "{{ WIREGUARD_HOST_MESHES[mesh_name] }}"
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
+  register: wireguard_rendered
+
+- name: "🔀 Enable forwarding on the hub"
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    sysctl_set: true
+    state: present
+    reload: true
+  when: WIREGUARD_IS_HUB | bool
+
+- name: "🚿 Bring every rendered interface up"
+  ansible.builtin.include_tasks: utils/interface_up.yml
+  loop: "{{ WIREGUARD_MESH_NAMES }}"
+  loop_control:
+    loop_var: mesh_name
+
+- name: "✅ Gate: prove the layer works before anything depends on it"
+  ansible.builtin.include_tasks: 01_gate.yml
