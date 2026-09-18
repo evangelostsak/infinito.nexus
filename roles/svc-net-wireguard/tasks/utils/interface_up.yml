@@ -1,0 +1,16 @@
+---
+# Exception: wg-quick down on an interface that was never up exits non-zero, so
+# the teardown half is tolerated while the bring-up half is not. Restarting
+# rather than starting is deliberate: a rotated key changes the config of a
+# live interface, and wg-quick up on an already-up interface is a no-op that
+# would leave the old keys in the kernel.
+- name: "🔻 Take '{{ mesh_name }}' down when it is already up"
+  ansible.builtin.command: "wg-quick down {{ mesh_name | quote }}"
+  register: wireguard_down
+  changed_when: wireguard_down.rc == 0
+  failed_when: false
+
+- name: "🔺 Bring '{{ mesh_name }}' up"
+  ansible.builtin.command: "wg-quick up {{ mesh_name | quote }}"
+  register: wireguard_up
+  changed_when: wireguard_up.rc == 0
