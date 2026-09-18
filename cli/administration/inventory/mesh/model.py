@@ -22,6 +22,9 @@ class MeshSpec:
             this declaration changing.
         subnet: the mesh address range, as ``a.b.c.0/24``.
         listen_port: UDP port the hub listens on.
+        routed_range: the range a spoke routes through the hub. Wider than
+            ``subnet`` whenever a spoke must reach a plane it is not a member
+            of, which is the entire point of the hub being in both.
     """
 
     name: str
@@ -30,6 +33,7 @@ class MeshSpec:
     subnet: str
     listen_port: int
     spoke_group_prefixes: tuple[str, ...] = ()
+    routed_range: str = ""
 
 
 @dataclass(frozen=True)

@@ -57,6 +57,7 @@ def specs_of(group_vars_file: Path) -> list[MeshSpec]:
     if not isinstance(declared, list) or not declared:
         raise ValueError(f"{group_vars_file} declares no {MESHES_VAR}")
 
+    pool = document.get(POOL_VAR)
     specs = [
         MeshSpec(
             name=entry["name"],
@@ -65,10 +66,11 @@ def specs_of(group_vars_file: Path) -> list[MeshSpec]:
             subnet=entry["subnet"],
             listen_port=int(entry["listen_port"]),
             spoke_group_prefixes=tuple(entry.get("spoke_group_prefixes", ())),
+            routed_range=entry.get("routed_range") or pool or entry["subnet"],
         )
         for entry in declared
     ]
-    assert_no_subnet_overlap(specs, document.get(POOL_VAR))
+    assert_no_subnet_overlap(specs, pool)
     return specs
 
 

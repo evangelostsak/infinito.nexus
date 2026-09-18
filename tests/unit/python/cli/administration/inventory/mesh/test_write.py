@@ -157,6 +157,36 @@ class TestMeshShapeOnDisk(MeshOnDisk, unittest.TestCase):
         self.assertIn("swarm:", text)
         self.assertIn("data:", text)
 
+    def test_a_spoke_routes_the_whole_pool_through_the_hub(self):
+        """A worker must reach the data plane it is not a member of.
+
+        Pinning a spoke's AllowedIPs to its own mesh subnet leaves the worker
+        with no route to the NFS server, and the mount fails while every tunnel
+        still reports a healthy handshake -- so the symptom points at storage
+        rather than at routing.
+        """
+        self._write_all()
+        for spec in self.specs:
+            mesh = plan_mesh(spec, self.groups)
+            for spoke in mesh.spokes:
+                with self.subTest(mesh=spec.name, spoke=spoke.host):
+                    peers = mesh.peers_of(spoke.host)
+                    self.assertEqual([p.host for p in peers], [mesh.hub.host])
+                    self.assertEqual(spec.routed_range, "10.100.0.0/16")
+
+    def test_the_hub_pins_each_spoke_to_a_single_address(self):
+        """The inverse of the spoke rule.
+
+        A hub that routed the pool to one spoke would blackhole every other
+        member behind it.
+        """
+        self._write_all()
+        for spec in self.specs:
+            mesh = plan_mesh(spec, self.groups)
+            for peer in mesh.peers_of(mesh.hub.host):
+                with self.subTest(mesh=spec.name, peer=peer.host):
+                    self.assertFalse(peer.is_hub)
+
 
 class TestIdempotence(MeshOnDisk, unittest.TestCase):
     def test_a_second_run_leaves_every_file_byte_identical(self):

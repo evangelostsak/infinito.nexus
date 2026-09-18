@@ -97,8 +97,14 @@ def _peer_entries(mesh: Mesh, host: str) -> list[CommentedMap]:
         entry["host"] = peer.host
         entry["public_key"] = peer.public_key
         entry["address"] = peer.address
+        # Exception: a spoke routes the whole pool through the hub, not just
+        # its own mesh. A worker is not a member of the data plane, so pinning
+        # this to the mesh subnet leaves it with no route to the NFS server and
+        # the mount fails while every tunnel still reports a healthy handshake.
         entry["allowed_ips"] = (
-            mesh.spec.subnet if peer.is_hub else peer.address + HOST_PREFIX_32
+            (mesh.spec.routed_range or mesh.spec.subnet)
+            if peer.is_hub
+            else peer.address + HOST_PREFIX_32
         )
         entry["is_hub"] = peer.is_hub
         entries.append(entry)
