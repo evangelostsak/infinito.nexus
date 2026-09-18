@@ -1,0 +1,2 @@
+---
+# nocheck: info-media Self-written network infrastructure role that installs the distro WireGuard tooling and manages the swarm's tunnel interfaces; WireGuard is a kernel protocol, not a consumer-facing upstream product.
