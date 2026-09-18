@@ -3,6 +3,11 @@ application_id: "svc-net-wireguard"
 
 WIREGUARD_CONFIG_DIR: "/etc/wireguard"
 
+# Rationale: probed by path rather than by `command -v`, which is a shell
+# builtin the command module cannot exec and therefore reports missing on every
+# host. wireguard-tools installs here on every distro this role supports.
+WIREGUARD_QUICK_BINARY: "/usr/bin/wg-quick"
+
 # Rationale: the meshes this host belongs to, already resolved by
 # cli.administration.inventory.mesh. The role never plans a mesh; it renders
 # what the inventory was handed, so a host can only configure peers the single

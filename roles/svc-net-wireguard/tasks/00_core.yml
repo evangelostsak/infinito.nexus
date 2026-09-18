@@ -11,10 +11,9 @@
   when: WIREGUARD_MESH_NAMES | length == 0
 
 - name: "🔍 Check whether the WireGuard tooling is already present"
-  ansible.builtin.command: "command -v wg-quick"
+  ansible.builtin.stat:
+    path: "{{ WIREGUARD_QUICK_BINARY }}"
   register: wireguard_tooling
-  changed_when: false
-  failed_when: false
 
 # Exception: skipped when wg-quick already exists. The swarm node images ship
 # wireguard-tools, and they also carry a half-installed linux-image-rt-amd64,
@@ -23,7 +22,7 @@
 - name: "📦 Install the WireGuard tooling"
   package_install:
     id: wireguard
-  when: wireguard_tooling.rc != 0
+  when: not wireguard_tooling.stat.exists
 
 - name: "📁 Create {{ WIREGUARD_CONFIG_DIR }}"
   ansible.builtin.file:
