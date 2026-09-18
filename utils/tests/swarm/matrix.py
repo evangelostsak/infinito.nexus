@@ -147,6 +147,23 @@ def _extend_inventory(
     )
 
 
+def _write_mesh(*, inv_dir: str) -> int:
+    """Write the WireGuard meshes over both inventories of the round.
+
+    Ordered after extend_inventory, which creates the groups the meshes
+    resolve from and the sibling backup.yml the data mesh spans.
+    """
+    args = ["--inventory", f"{inv_dir}/devices.yml"]
+    args += ["--inventory", f"{inv_dir}/backup.yml"]
+    args += ["--host-vars-dir", f"{inv_dir}/host_vars"]
+    args += ["--vault-password-file", f"{inv_dir}/.password"]
+    return _run(
+        ["python3", "-m", "cli.administration.inventory.mesh", *args],
+        env=os.environ.copy(),
+        label="write wireguard meshes (cross-host credentials)",
+    )
+
+
 def _force_shared_db(*, inv_dir: str) -> int:
     env = os.environ.copy()
     env["INV_DIR"] = inv_dir
@@ -429,6 +446,8 @@ def main(argv: list[str] | None = None) -> int:
             rc = _extend_inventory(
                 app_id=app_id, inv_dir=inv_root, round_variants=round_variants
             )
+        if rc == 0:
+            rc = _write_mesh(inv_dir=inv_root)
         if rc == 0:
             rc = _write_extras(extras_path=extras_path)
         if rc == 0:
