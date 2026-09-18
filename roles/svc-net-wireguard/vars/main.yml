@@ -16,6 +16,15 @@ WIREGUARD_HOST_MESHES: "{{ lookup('config', application_id, 'meshes', {}) }}"
 
 WIREGUARD_MESH_NAMES: "{{ WIREGUARD_HOST_MESHES.keys() | list | sort }}"
 
+# Rationale: only a spoke can prove a handshake. The hub never initiates, so it
+# would be waiting on peers that have not been deployed yet.
+WIREGUARD_SPOKE_MESH_NAMES: >-
+  {{ WIREGUARD_HOST_MESHES | dict2items
+     | rejectattr('value.is_hub')
+     | map(attribute='key') | list | sort }}
+
+WIREGUARD_PING_BINARY: "/bin/ping"
+
 # Rationale: one literal lookup per declared mesh. A single lookup built from
 # the loop variable would be a dynamic config path, which the lookup validator
 # cannot resolve and therefore cannot prove correct before a deploy.
