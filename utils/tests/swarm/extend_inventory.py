@@ -58,6 +58,11 @@ def _host_topology(app_id: str) -> list[tuple[str, str]]:
     # fetch. Keep it manager-only.
     if app_id != "svc-swarm-manager" and get_role_placement(app_id) != "manager":
         app_hosts.extend((app_id, w) for w in _WORKERS)
+    # Exception: svc-net-wireguard goes on every mesh member, not only the
+    # swarm nodes that pull it as a dependency. The NFS and backup hosts are
+    # spokes of the data mesh, and without the role they never bring an
+    # interface up -- the manager then holds peers that cannot answer and the
+    # gate fails on a mesh the inventory describes correctly.
     return [
         ("svc-swarm-node", _MANAGER),
         *[("svc-swarm-node", w) for w in _WORKERS],
@@ -65,6 +70,9 @@ def _host_topology(app_id: str) -> list[tuple[str, str]]:
         ("svc-storage-nfs-client", _MANAGER),
         *[("svc-storage-nfs-client", w) for w in _WORKERS],
         ("svc-storage-nfs-server", _NFS_SERVER),
+        ("svc-net-wireguard", _MANAGER),
+        *[("svc-net-wireguard", w) for w in _WORKERS],
+        ("svc-net-wireguard", _NFS_SERVER),
         *app_hosts,
     ]
 
@@ -130,7 +138,11 @@ def main() -> int:
         "all": {
             "children": {
                 group: {"hosts": {_BACKUP: dict(_DOCKER_VARS)}}
-                for group in ("svc-bkp-remote-2-local", "svc-bkp-local-2-device")
+                for group in (
+                    "svc-bkp-remote-2-local",
+                    "svc-bkp-local-2-device",
+                    "svc-net-wireguard",
+                )
             }
         }
     }
