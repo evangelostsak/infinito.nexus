@@ -184,6 +184,10 @@ def main() -> int:
             "backend": "nfs",
             "nfs": {
                 "server": nfs_addr,
+                # Exception: the controller is not a mesh member, so it reaches
+                # the export on the lab address. Pointing it at the mesh one
+                # times out the delegated controller mount.
+                "controller_server": nfs_ip,
             },
         },
         "swarm": {
