@@ -10,9 +10,20 @@
       cross-host pass, never by this role.
   when: WIREGUARD_MESH_NAMES | length == 0
 
+- name: "🔍 Check whether the WireGuard tooling is already present"
+  ansible.builtin.command: "command -v wg-quick"
+  register: wireguard_tooling
+  changed_when: false
+  failed_when: false
+
+# Exception: skipped when wg-quick already exists. The swarm node images ship
+# wireguard-tools, and they also carry a half-installed linux-image-rt-amd64,
+# so apt refuses every install with "unmet dependencies" even when the package
+# it was asked for is already the newest version.
 - name: "📦 Install the WireGuard tooling"
   package_install:
     id: wireguard
+  when: wireguard_tooling.rc != 0
 
 - name: "📁 Create {{ WIREGUARD_CONFIG_DIR }}"
   ansible.builtin.file:
