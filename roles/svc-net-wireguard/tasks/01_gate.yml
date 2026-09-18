@@ -26,7 +26,7 @@
   register: wireguard_reachability
   changed_when: false
   failed_when: false
-  retries: 12
+  retries: 24
   delay: 5
   until: wireguard_reachability.rc == 0
 

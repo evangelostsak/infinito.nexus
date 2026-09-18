@@ -28,9 +28,19 @@ WIREGUARD_PRIVATE_KEYS:
 WIREGUARD_IS_HUB: >-
   {{ WIREGUARD_HOST_MESHES.values() | map(attribute='is_hub') | select | list | length > 0 }}
 
+# Rationale: only the peers this host can actually initiate to, which in
+# hub-and-spoke means the hub. A spoke carries the hub's Endpoint; the hub
+# carries none for its spokes and learns their addresses when they dial in, so
+# a hub that gated on reaching its spokes would be racing them. The backup host
+# makes that unarguable: it is deployed in a later play, so its interface
+# cannot exist while the cluster play runs.
+#
+# Nothing is lost. A spoke that cannot reach the hub is exactly the broken mesh
+# this gate exists to catch, and the hub's own view converges as spokes arrive.
 WIREGUARD_EXPECTED_PEERS: >-
   {{ WIREGUARD_HOST_MESHES.values()
      | map(attribute='peers')
      | flatten
+     | selectattr('is_hub')
      | map(attribute='address')
      | list }}
