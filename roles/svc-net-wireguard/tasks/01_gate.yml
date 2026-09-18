@@ -1,0 +1,63 @@
+---
+# Rationale: the layer is binary. Either every swarm deploy proceeds over the
+# mesh or none does, so this gate runs before swarm init and fails the deploy
+# rather than letting a role discover the partition later.
+- name: "🔍 Read the peer state of every interface"
+  ansible.builtin.command: "wg show {{ mesh_name | quote }} peers"
+  loop: "{{ WIREGUARD_MESH_NAMES }}"
+  loop_control:
+    loop_var: mesh_name
+  register: wireguard_peer_state
+  changed_when: false
+
+- name: "🛑 Fail when an interface carries no peer"
+  ansible.builtin.fail:
+    msg: >-
+      WireGuard interface '{{ item.mesh_name }}' on {{ inventory_hostname }}
+      came up with no peer. The mesh in this host's inventory is incomplete.
+  loop: "{{ wireguard_peer_state.results }}"
+  loop_control:
+    label: "{{ item.mesh_name }}"
+  when: (item.stdout | trim) | length == 0
+
+- name: "⏳ Reach every peer this host is configured for"
+  ansible.builtin.command: "ping -c 2 -W 2 {{ item | quote }}"
+  loop: "{{ WIREGUARD_EXPECTED_PEERS }}"
+  register: wireguard_reachability
+  changed_when: false
+  failed_when: false
+  retries: 12
+  delay: 5
+  until: wireguard_reachability.rc == 0
+
+- name: "🛑 Fail hard on any unreachable peer"
+  ansible.builtin.fail:
+    msg: >-
+      WireGuard peer {{ unreachable | map(attribute='item') | join(', ') }}
+      is unreachable from {{ inventory_hostname }}. No swarm deploy can
+      proceed over a partitioned mesh.
+  vars:
+    unreachable: >-
+      {{ wireguard_reachability.results | rejectattr('rc', 'equalto', 0) | list }}
+  when: unreachable | length > 0
+
+- name: "📏 Prove the path carries a full-size payload without fragmenting"
+  ansible.builtin.command: >-
+    ping -c 2 -W 2 -M do -s {{ WIREGUARD_OVERLAY_MTU | int - 28 }}
+    {{ item | quote }}
+  loop: "{{ WIREGUARD_EXPECTED_PEERS }}"
+  register: wireguard_mtu_probe
+  changed_when: false
+  failed_when: false
+
+- name: "🛑 Fail when the overlay MTU does not survive the tunnel"
+  ansible.builtin.fail:
+    msg: >-
+      A {{ WIREGUARD_OVERLAY_MTU | int }}-byte payload does not reach
+      {{ oversized | map(attribute='item') | join(', ') }} from
+      {{ inventory_hostname }}. Stacked VXLAN inside WireGuard needs the
+      overlay MTU at or below the tunnel's, or large payloads drop silently.
+  vars:
+    oversized: >-
+      {{ wireguard_mtu_probe.results | rejectattr('rc', 'equalto', 0) | list }}
+  when: oversized | length > 0
