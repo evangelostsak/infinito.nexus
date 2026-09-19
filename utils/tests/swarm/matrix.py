@@ -472,6 +472,11 @@ def main(argv: list[str] | None = None) -> int:
             )
         if rc == 0:
             rc = _reset_credentials(inv_dir=inv_root, round_variants=round_variants)
+        # Exception: the reset mirrors the manager's host_vars onto every node,
+        # which is right for per-host-identical credentials and wrong for a
+        # mesh, whose members must differ.
+        if rc == 0:
+            rc = _write_mesh(inv_dir=inv_root)
         if rc == 0:
             rc = _deploy(
                 app_id=app_id,
