@@ -16,8 +16,10 @@ from cli.administration.inventory.mesh.plan import plan_mesh
 from cli.administration.inventory.mesh.write import (
     existing_public_keys,
     private_key_name,
+    prune_foreign_meshes,
     write_mesh,
 )
+from utils.cache.yaml import load_yaml_any
 
 from . import PROJECT_ROOT
 
@@ -81,6 +83,20 @@ class MeshOnDisk(unittest.TestCase):
             encoding="utf-8"
         )  # nocheck: cache-read  tempdir fixture rewritten between reads in one test
 
+    def _mesh_names(self, host: str) -> list[str]:
+        """The mesh names a host's file actually declares.
+
+        Read structurally: the credential keys are named mesh_private_key_<n>,
+        so a substring check for the mesh name matches them too and would pass
+        against a file whose mesh block is empty.
+        """
+        document = load_yaml_any(str(self.host_vars / f"{host}.yml"))
+        return sorted(
+            document.get("applications", {})
+            .get("svc-net-wireguard", {})
+            .get("meshes", {})
+        )
+
     def _write_all(self, *, rotate: bool = False) -> None:
         for spec in self.specs:
             mesh = plan_mesh(
@@ -137,10 +153,10 @@ class TestMeshShapeOnDisk(MeshOnDisk, unittest.TestCase):
         self._write_all()
         for host in ("swarm-mgr-01", "swarm-wrk-01", "swarm-wrk-02"):
             with self.subTest(host=host):
-                self.assertIn("swarm:", self._text(host))
+                self.assertIn("swarm", self._mesh_names(host))
         for host in ("nfs-server", "swarm-bkp-01"):
             with self.subTest(host=host):
-                self.assertIn("data:", self._text(host))
+                self.assertIn("data", self._mesh_names(host))
 
     def test_a_worker_is_not_given_the_data_mesh(self):
         """Workers reach NFS through the hub, not as data-plane members.
@@ -149,13 +165,11 @@ class TestMeshShapeOnDisk(MeshOnDisk, unittest.TestCase):
         directly and bypass the routing the topology depends on.
         """
         self._write_all()
-        self.assertNotIn("data:", self._text("swarm-wrk-01"))
+        self.assertEqual(self._mesh_names("swarm-wrk-01"), ["swarm"])
 
     def test_the_hub_carries_both_meshes(self):
         self._write_all()
-        text = self._text("swarm-mgr-01")
-        self.assertIn("swarm:", text)
-        self.assertIn("data:", text)
+        self.assertEqual(self._mesh_names("swarm-mgr-01"), ["data", "swarm"])
 
     def test_a_spoke_routes_the_whole_pool_through_the_hub(self):
         """A worker must reach the data plane it is not a member of.
@@ -226,13 +240,42 @@ class TestIdempotence(MeshOnDisk, unittest.TestCase):
         self._write_all()
         addresses = {
             host: plan_mesh(
-                self.specs[0], self.groups, existing_public_keys(
-                    self.host_vars, list(HOSTS), "swarm"
-                )
-            ).member(host).address
+                self.specs[0],
+                self.groups,
+                existing_public_keys(self.host_vars, list(HOSTS), "swarm"),
+            )
+            .member(host)
+            .address
             for host in ("swarm-mgr-01", "swarm-wrk-01", "swarm-wrk-02")
         }
         self.assertEqual(len(set(addresses.values())), 3)
+
+    def test_a_mesh_a_host_does_not_own_is_pruned(self):
+        """Rewriting a member's own entry never removes a foreign one.
+
+        After the mirror the NFS server keeps the hub's swarm entry, brings up
+        an interface claiming 10.100.0.1, and swallows the return path for
+        every worker -- while its own data mesh looks perfectly healthy.
+        """
+        self._write_all()
+        hub_text = self._text("swarm-mgr-01")
+        (self.host_vars / "nfs-server.yml").write_text(hub_text, encoding="utf-8")
+        self.assertEqual(self._mesh_names("nfs-server"), ["data", "swarm"])
+
+        removed = prune_foreign_meshes(self.host_vars, list(HOSTS))
+        self.assertEqual(removed.get("nfs-server"), ["data", "swarm"])
+        self.assertEqual(self._mesh_names("nfs-server"), [])
+
+        self._write_all()
+        self.assertEqual(self._mesh_names("nfs-server"), ["data"])
+
+    def test_pruning_leaves_an_owned_mesh_alone(self):
+        self._write_all()
+        before = {host: self._text(host) for host in HOSTS}
+        self.assertEqual(prune_foreign_meshes(self.host_vars, list(HOSTS)), {})
+        for host in HOSTS:
+            with self.subTest(host=host):
+                self.assertEqual(self._text(host), before[host])
 
     def test_a_member_whose_credential_vanished_is_reminted(self):
         """A public key with no private key behind it is worse than no key.
