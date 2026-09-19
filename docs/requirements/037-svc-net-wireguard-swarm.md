@@ -77,11 +77,11 @@ Swarm mode only. The role is inert in compose mode. SOC and Wazuh visibility are
 - [ ] Swarm advertises and listens on its mesh address, so `docker info` on every node reports the mesh address and not an underlay or public one.
 - [ ] No swarm or NFS port is reachable from outside the mesh on any of the five hosts.
 - [ ] Phase one runs over the underlay and phase two over the mesh, and a first deploy against hosts with no tunnel completes without manual intervention.
-- [ ] Rotating every key on a redeploy does not sever the run, and the mesh converges without an operator touching a node.
+- [x] Rotating every key on a redeploy does not sever the run, and the mesh converges without an operator touching a node.
 - [ ] The gate runs between WireGuard coming up and swarm initialising, and a deliberately broken tunnel fails the deploy at that gate with a message naming the unreachable peer, before any swarm or role task runs.
 - [ ] Every swarm deploy in CI/CD carries its traffic over WireGuard, and no swarm path remains that reaches a green deploy without it.
 - [ ] The role is inert in compose mode, and a compose deploy neither installs WireGuard nor runs the gate.
-- [ ] The MTU is set deliberately for the VXLAN-inside-WireGuard path, and a full-size payload crosses the mesh without fragmentation or loss.
+- [x] The MTU is set deliberately for the VXLAN-inside-WireGuard path, and a full-size payload crosses the mesh without fragmentation or loss.
 - [x] Unit tests cover the tool as a pure function of its inputs: mesh completeness, peer-key pairing, private-key containment and rotation idempotence, none of them requiring a deploy.
 - [ ] Lint, external and integration suites pass for the role and the tool.
 
