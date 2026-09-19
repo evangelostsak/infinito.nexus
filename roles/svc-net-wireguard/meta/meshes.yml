@@ -5,6 +5,7 @@
 # mesh is generated rather than authored. Values stay empty here because the
 # writer supplies them; peers is a list, which the validator treats as opaque.
 swarm:
+  host: ""
   address: ""
   subnet: ""
   listen_port: 0
@@ -12,6 +13,7 @@ swarm:
   public_key: ""
   peers: []
 data:
+  host: ""
   address: ""
   subnet: ""
   listen_port: 0
