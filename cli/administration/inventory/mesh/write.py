@@ -75,7 +75,15 @@ def existing_public_keys(
         if not path.exists():
             continue
         document = load_document(path)
-        public_key = _mesh_entry(document, mesh_name, application_id).get("public_key")
+        entry = _mesh_entry(document, mesh_name, application_id)
+        # Exception: an entry that names a different host is not this host's
+        # key. The swarm reset mirrors one node's host_vars over every other,
+        # which is right for credentials that are identical per host and hands
+        # everyone else the hub's identity here. Without this check the mesh
+        # would be rewritten with one member's key on every node.
+        if entry.get("host") != host:
+            continue
+        public_key = entry.get("public_key")
         if not isinstance(public_key, str) or not is_valid_public_key(public_key):
             continue
         credentials = (
@@ -127,6 +135,7 @@ def write_mesh(
 
         app = ensure_map(ensure_map(document, "applications"), application_id)
         entry = ensure_map(ensure_map(app, MESHES_KEY), mesh.spec.name)
+        entry["host"] = member.host
         entry["address"] = member.address
         entry["subnet"] = mesh.spec.subnet
         entry["listen_port"] = mesh.spec.listen_port
