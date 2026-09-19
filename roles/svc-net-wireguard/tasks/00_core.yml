@@ -43,7 +43,7 @@
   loop_control:
     loop_var: mesh_name
   vars:
-    mesh: "{{ WIREGUARD_HOST_MESHES[mesh_name] }}"
+    mesh: "{{ WIREGUARD_ACTIVE_MESHES[mesh_name] }}"
   no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
   register: wireguard_rendered
 

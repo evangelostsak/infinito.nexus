@@ -14,12 +14,20 @@ WIREGUARD_QUICK_BINARY: "/usr/bin/wg-quick"
 # cross-host writer agreed on.
 WIREGUARD_HOST_MESHES: "{{ lookup('config', application_id, 'meshes', {}) }}"
 
-WIREGUARD_MESH_NAMES: "{{ WIREGUARD_HOST_MESHES.keys() | list | sort }}"
+# Rationale: meta/meshes.yml declares every mesh so the inventory validator
+# accepts the generated block, which means a host sees all of them whether or
+# not it is a member. Only an entry the writer filled in has an address, so
+# that is what separates a real membership from the declared shape.
+WIREGUARD_ACTIVE_MESHES: >-
+  {{ WIREGUARD_HOST_MESHES | dict2items
+     | selectattr('value.address') | items2dict }}
+
+WIREGUARD_MESH_NAMES: "{{ WIREGUARD_ACTIVE_MESHES.keys() | list | sort }}"
 
 # Rationale: only a spoke can prove a handshake. The hub never initiates, so it
 # would be waiting on peers that have not been deployed yet.
 WIREGUARD_SPOKE_MESH_NAMES: >-
-  {{ WIREGUARD_HOST_MESHES | dict2items
+  {{ WIREGUARD_ACTIVE_MESHES | dict2items
      | rejectattr('value.is_hub')
      | map(attribute='key') | list | sort }}
 
@@ -35,7 +43,7 @@ WIREGUARD_PRIVATE_KEYS:
 # Rationale: the hub is the only member with peers in both planes, so it is the
 # only host that has to forward between them.
 WIREGUARD_IS_HUB: >-
-  {{ WIREGUARD_HOST_MESHES.values() | map(attribute='is_hub') | select | list | length > 0 }}
+  {{ WIREGUARD_ACTIVE_MESHES.values() | map(attribute='is_hub') | select | list | length > 0 }}
 
 # Rationale: only the peers this host can actually initiate to, which in
 # hub-and-spoke means the hub. A spoke carries the hub's Endpoint; the hub
@@ -47,7 +55,7 @@ WIREGUARD_IS_HUB: >-
 # Nothing is lost. A spoke that cannot reach the hub is exactly the broken mesh
 # this gate exists to catch, and the hub's own view converges as spokes arrive.
 WIREGUARD_EXPECTED_PEERS: >-
-  {{ WIREGUARD_HOST_MESHES.values()
+  {{ WIREGUARD_ACTIVE_MESHES.values()
      | map(attribute='peers')
      | flatten
      | selectattr('is_hub')
