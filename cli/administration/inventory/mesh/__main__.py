@@ -17,7 +17,12 @@ from utils import PROJECT_ROOT
 
 from .inventory import groups_of, specs_of
 from .plan import plan_mesh
-from .write import DEFAULT_APPLICATION_ID, existing_public_keys, write_mesh
+from .write import (
+    DEFAULT_APPLICATION_ID,
+    existing_public_keys,
+    prune_foreign_meshes,
+    write_mesh,
+)
 
 DEFAULT_GROUP_VARS = PROJECT_ROOT / "group_vars/all/21_wireguard.yml"
 
@@ -87,6 +92,17 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     vault_password_file = Path(args.vault_password_file).resolve()
+    all_hosts = sorted({host for hosts in groups.values() for host in hosts})
+
+    # Exception: prune before planning. A mirrored host_vars carries another
+    # host's entry for meshes this one is not a member of, and writing a
+    # member's own entry never removes it.
+    for host, names in sorted(
+        prune_foreign_meshes(host_vars_dir, all_hosts, args.application_id).items()
+    ):
+        print(
+            f"[INFO] {host}: dropped mesh entr(ies) owned elsewhere: {', '.join(names)}"
+        )
 
     for spec in specs:
         mesh = plan_mesh(
