@@ -83,7 +83,7 @@ Swarm mode only. The role is inert in compose mode. SOC and Wazuh visibility are
 - [ ] The role is inert in compose mode, and a compose deploy neither installs WireGuard nor runs the gate.
 - [x] The MTU is set deliberately for the VXLAN-inside-WireGuard path, and a full-size payload crosses the mesh without fragmentation or loss.
 - [x] Unit tests cover the tool as a pure function of its inputs: mesh completeness, peer-key pairing, private-key containment and rotation idempotence, none of them requiring a deploy.
-- [ ] Lint, external and integration suites pass for the role and the tool.
+- [x] Lint, external and integration suites pass for the role and the tool.
 
 ## See Also
 
