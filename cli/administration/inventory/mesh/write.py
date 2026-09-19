@@ -98,6 +98,42 @@ def existing_public_keys(
     return found
 
 
+def prune_foreign_meshes(
+    host_vars_dir: Path,
+    hosts: list[str],
+    application_id: str = DEFAULT_APPLICATION_ID,
+) -> dict[str, list[str]]:
+    """Drop mesh entries a host does not own, returning what was removed.
+
+    Writing a member's own entry is not enough to undo a mirror: a host that
+    received another's host_vars keeps that host's entry for every mesh it is
+    not a member of, and brings up an interface impersonating it. The NFS
+    server ends up claiming the hub's swarm address and swallowing the return
+    path for every worker.
+    """
+    removed: dict[str, list[str]] = {}
+    for host in hosts:
+        path = host_vars_path(host_vars_dir, host)
+        if not path.exists():
+            continue
+        document = load_document(path)
+        meshes = (
+            document.get("applications", {}).get(application_id, {}).get(MESHES_KEY, {})
+        )
+        foreign = [
+            name
+            for name, entry in meshes.items()
+            if isinstance(entry, dict) and entry.get("host") not in (None, "", host)
+        ]
+        if not foreign:
+            continue
+        for name in foreign:
+            del meshes[name]
+        dump_document(path, document)
+        removed[host] = sorted(foreign)
+    return removed
+
+
 def _peer_entries(mesh: Mesh, host: str) -> list[CommentedMap]:
     entries: list[CommentedMap] = []
     for peer in mesh.peers_of(host):
