@@ -205,6 +205,35 @@ class TestIdempotence(MeshOnDisk, unittest.TestCase):
             with self.subTest(host=host):
                 self.assertNotEqual(self._text(host), before[host])
 
+    def test_a_mirrored_host_vars_is_reminted_rather_than_adopted(self):
+        """The swarm reset copies one node's host_vars over every other.
+
+        That is right for credentials identical on every host and wrong here:
+        each node would adopt the hub's key and address, every interface would
+        claim 10.100.0.1, and no tunnel would handshake. An entry naming a
+        different host has to count as unkeyed.
+        """
+        self._write_all()
+        hub_text = self._text("swarm-mgr-01")
+        for host in ("swarm-wrk-01", "swarm-wrk-02"):
+            (self.host_vars / f"{host}.yml").write_text(hub_text, encoding="utf-8")
+
+        keyed = existing_public_keys(self.host_vars, list(HOSTS), "swarm")
+        self.assertNotIn("swarm-wrk-01", keyed)
+        self.assertNotIn("swarm-wrk-02", keyed)
+        self.assertIn("swarm-mgr-01", keyed)
+
+        self._write_all()
+        addresses = {
+            host: plan_mesh(
+                self.specs[0], self.groups, existing_public_keys(
+                    self.host_vars, list(HOSTS), "swarm"
+                )
+            ).member(host).address
+            for host in ("swarm-mgr-01", "swarm-wrk-01", "swarm-wrk-02")
+        }
+        self.assertEqual(len(set(addresses.values())), 3)
+
     def test_a_member_whose_credential_vanished_is_reminted(self):
         """A public key with no private key behind it is worse than no key.
 
