@@ -1,4 +1,3 @@
-{% if 'web-app-openbao' in lookup('native_metrics_apps') %}
   - name: openbao_seal
     interval: 30s
     rules:
@@ -13,4 +12,3 @@
             OpenBao has not reported an active, unsealed core for more than 2 minutes.
             Secrets, PKI issuance and machine logins are unavailable while it is sealed.
             Check the container and confirm the static seal key reached its environment.
-{% endif %}

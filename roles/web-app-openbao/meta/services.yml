@@ -67,12 +67,11 @@ openbao:
       http: 8093
   healthcheck:
     flavor: wget
-    # Exception: an uninitialised container must report healthy or the init task can never reach it.
     path: "v1/sys/health?uninitcode=200&sealedcode=200&standbyok=true"
   run_after:
     - web-app-keycloak
     - svc-db-openldap
-  lifecycle: alpha
+  lifecycle: beta
 
 # nocheck: playwright-service-flag
 # nocheck: variants-coverage — sso-variant-tor requires the onion on in every variant, so the false polarity has no variant left to live in

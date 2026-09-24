@@ -1,0 +1,10 @@
+---
+- name: "🔍 Resolve every node that hosts an {{ application_id }} task"
+  ansible.builtin.include_tasks: utils/nodes.yml
+
+- name: "⬇️ Preload LM Studio on each hosting node"
+  ansible.builtin.include_tasks: utils/preload/node.yml
+  loop: "{{ LMSTUDIO_HOST_NODES }}"
+  loop_control:
+    loop_var: lmstudio_node
+    label: "{{ lmstudio_node }}"

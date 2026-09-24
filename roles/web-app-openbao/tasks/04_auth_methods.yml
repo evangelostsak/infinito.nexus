@@ -134,6 +134,5 @@
     loop_var: openbao_group
   vars:
     alias_mount: "ldap/"
-    # Rationale: the RBAC LDAP layout contract encodes the application into the group CN.
     alias_name: "{{ application_id }}-{{ openbao_group.item }}"
   when: OPENBAO_LDAP_ENABLED | bool

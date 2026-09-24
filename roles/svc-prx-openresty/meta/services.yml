@@ -11,6 +11,17 @@ openresty:
   enabled: true
   shared: true
   name: openresty
+  ports:
+    internal:
+      http: 80
+      https: 443
+    public:
+      http: 80
+      https: 443
+    onion:
+      http: true
+      # nocheck: onion-flag  the hidden service is already the transport encryption, and the onion address has no certificate a TLS listener could present
+      https: false
   healthcheck:
     test: ["CMD", "openresty", "-t", "-q"]
   min_storage: 264MB
@@ -20,7 +31,7 @@ openresty:
   mem_reservation: 1g
   mem_limit: 2g
   image: openresty/openresty
-  version: alpine
+  version: 1.31.1.1-alpine
   custom: true
   lifecycle: beta
   pids_limit: 256

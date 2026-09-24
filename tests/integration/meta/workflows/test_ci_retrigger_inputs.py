@@ -43,6 +43,7 @@ _VALUES = {
     "filesystem": "btrfs",
     "tor": "enforced",
     "offset": "40",
+    "chunk_size": "25",
     "chunk_gate": "false",
     "sweep": "7",
     "workspace": "true",

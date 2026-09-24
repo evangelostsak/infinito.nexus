@@ -7,7 +7,6 @@
     {% include 'roles/sys-svc-container/templates/base.yml.j2' %}
     {{ lookup('container_ports', ['openbao', 'http', DOCKER_BIND_HOST]) | indent(4) }}
     {{ lookup('container_healthcheck', service_name) | indent(4) }}
-    # Exception: no -config here; the image entrypoint appends -config=/openbao/config itself.
     command:
       - "server"
     {{ lookup('container_depends_on', application_id) | indent(4) }}

@@ -1,9 +1,6 @@
 ---
 - include_tasks: utils/once/flag.yml
 
-# Exception: must precede sys-stk-backend — that role renders env.j2, which
-# carries the previous seal key the node needs to unseal data the last deploy's
-# key wrapped. Moving it after leaves the node sealed with no way back.
 - name: "🔍 Read the credentials the previous deploy applied"
   ansible.builtin.slurp:
     src: "{{ OPENBAO_APPLIED_STATE_HOST }}"

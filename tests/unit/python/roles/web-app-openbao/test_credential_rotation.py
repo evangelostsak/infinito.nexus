@@ -1,8 +1,9 @@
 """Guards for the per-deploy credential rotation path of web-app-openbao.
 
 The platform regenerates generated-algorithm credentials on every deploy, so the
-seal key and AppRole a run is handed differ from the ones the running instance
-was configured with. Three things carry that transition, and each fails silently
+AppRole a run is handed differs from the one the running instance was configured
+with. The seal key is pinned out of that and moves only when an operator changes
+it, but the same transition then has to carry it. Each part fails silently
 rather than loudly when broken -- a sealed node and an unusable AppRole look
 identical to ordinary drift. These tests pin them.
 """
@@ -15,6 +16,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from utils.cache.files import read_text
 from utils.cache.yaml import load_yaml_any
+from utils.roles.mapping import ROLE_FILE_META_SECRETS
 
 from . import PROJECT_ROOT
 
@@ -51,6 +53,30 @@ def jinja_env(searchpath) -> Environment:
 
 def tasks_of(name: str) -> list[dict]:
     return load_yaml_any(str(TASKS_DIR / name))
+
+
+class TestWhichCredentialsRotate(unittest.TestCase):
+    """The seal key survives a deploy; the AppRole does not.
+
+    The static seal carries one generation of slack, and rotating every deploy
+    spends it continuously: a run that skips a generation leaves the raft store
+    readable only from a volume backup plus the key that wrapped it. The
+    AppRole is the opposite case -- the live authentication path, whose
+    rotation the fallback login in 01_init.yml exists to absorb.
+    """
+
+    def setUp(self):
+        self.credentials = load_yaml_any(str(ROLE_DIR / ROLE_FILE_META_SECRETS))[
+            "credentials"
+        ]
+
+    def test_the_seal_key_is_pinned(self):
+        self.assertIs(self.credentials["seal_key"].get("rotatable"), False)
+
+    def test_both_approle_credentials_still_rotate(self):
+        for name in ("approle_role_id", "approle_secret_id"):
+            with self.subTest(credential=name):
+                self.assertIsNot(self.credentials[name].get("rotatable"), False)
 
 
 class TestSealStanzaRotation(unittest.TestCase):
@@ -221,6 +247,97 @@ class TestTheSecretIdSwapIsGuarded(unittest.TestCase):
     def test_the_role_id_is_re_pinned_unconditionally(self):
         task = self._guarded("role-id")
         self.assertNotIn("when", task)
+
+
+class TestTheRecoveryKeyIsKeptAndUsable(unittest.TestCase):
+    """The one authority that does not rotate, and the way back it buys.
+
+    `bao operator init` issues a recovery key once and nothing reissues it.
+    Dropping it leaves the AppRole as the only administrative path, so a reset,
+    a replaced manager, or a run that dies between the two pins in
+    06_rotate.yml locks the instance out for good while its data stays
+    readable. sys-token-store holds it rather than the inventory, which no role
+    writes.
+    """
+
+    def setUp(self):
+        self.tasks = tasks_of("01_init.yml")
+
+    def _init_block(self) -> list[dict]:
+        return next(
+            task["block"]
+            for task in self.tasks
+            if "block" in task and "openbao_initialized" in str(task.get("when", ""))
+        )
+
+    def test_the_key_is_persisted_on_the_deploy_that_creates_it(self):
+        store = next(
+            task
+            for task in self._init_block()
+            if task.get("ansible.builtin.include_role", {}).get("name")
+            == "sys-token-store"
+        )
+        self.assertEqual(
+            store["ansible.builtin.include_role"]["tasks_from"], "write.yml"
+        )
+        self.assertIn("recovery_keys_b64", store["vars"]["sys_token_store_token"])
+
+    def test_the_key_is_loaded_before_the_logins_that_may_need_it(self):
+        load = next(
+            i
+            for i, task in enumerate(self.tasks)
+            if task.get("ansible.builtin.include_role", {}).get("tasks_from")
+            == "01_load.yml"
+        )
+        login = next(
+            i
+            for i, task in enumerate(self.tasks)
+            if task.get("register") == "openbao_approle_login"
+        )
+        self.assertLess(load, login)
+
+    def test_recovery_runs_only_when_both_logins_failed_and_a_key_exists(self):
+        block = next(
+            task
+            for task in self.tasks
+            if "openbao_approle_login_recovered" in str(task)
+        )
+        conditions = " ".join(block["when"])
+        self.assertIn("openbao_approle_login.rc != 0", conditions)
+        self.assertIn("openbao_approle_login_previous.rc", conditions)
+        self.assertIn("OPENBAO_RECOVERY_KEY", conditions)
+
+    def test_the_rebuilt_approle_is_the_one_the_inventory_holds(self):
+        """Recovering to the recorded pair would strand the deploy again.
+
+        02_auth.yml re-pins both halves to the inventory values, so the login
+        that proves recovery worked has to use those, not the applied ones.
+        """
+        block = next(
+            task
+            for task in self.tasks
+            if "openbao_approle_login_recovered" in str(task)
+        )
+        login = next(
+            task
+            for task in block["block"]
+            if task.get("register") == "openbao_approle_login_recovered"
+        )
+        self.assertIn("OPENBAO_APPROLE_ROLE_ID", login["ansible.builtin.shell"])
+        self.assertIn("OPENBAO_APPROLE_SECRET_ID", login["args"]["stdin"])
+
+    def test_the_recovery_path_ends_by_rebuilding_the_approle(self):
+        tasks = tasks_of("utils/recover.yml")
+        self.assertEqual(
+            tasks[-1]["ansible.builtin.include_tasks"],
+            "../02_auth.yml",
+            "minting a root token without re-pinning leaves the deploy no better off",
+        )
+
+    def test_a_rejected_recovery_key_fails_loudly(self):
+        tasks = tasks_of("utils/recover.yml")
+        guard = next(task for task in tasks if "ansible.builtin.fail" in task)
+        self.assertIn("complete", guard["when"])
 
 
 class TestTheRegisteredSecretIdComesFromTheLogin(unittest.TestCase):

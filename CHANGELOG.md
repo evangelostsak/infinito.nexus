@@ -1,5 +1,305 @@
 # Changelog
 
+## [14.2.0] - 2026-09-22
+
+**For Users**
+
+* **Secrets management with OpenBao.** The new *web-app-openbao* role deploys OpenBao at
+  *openbao.<domain>*. It stores application credentials, API keys and machine identities.
+  People sign in through Keycloak, or through LDAP when OpenLDAP is deployed. Their
+  *administrator*, *operator* or *reader* group decides what they can reach, and signing in
+  without one of those groups grants only the default policy. Services and automation use
+  their own AppRole identities, whose credentials change on every deploy, and no root token
+  is kept after the first deploy. A recovery key kept in the token store lets a later deploy
+  get back in if those credentials are lost. A static seal unseals the node on its own after
+  every restart. An internal PKI can be switched on, and Prometheus alerts when the node is
+  sealed or unreachable. The seal key lives only in the encrypted inventory, and a backup of
+  the store cannot be read without it, so back up the inventory together with the volume.
+  See [web-app-openbao](roles/web-app-openbao/README.md).
+
+* **LDAP import, export and Multi edit finish again in LAM.** The Content Security Policy
+  blocked the inline script that checks on LAM's background jobs, so these tools stayed
+  "in progress" forever. That script is allowed again.
+
+* **Swarm deploys no longer abort on a network that already exists.** Some networks are
+  created before their application's stack, as Prometheus does for every application it
+  scrapes. Those networks now carry the stack label, so the application's own deploy uses
+  the existing network instead of failing with "network with name <entity> already exists".
+
+**For Developers**
+
+* **Alert rules live in the role that owns the metric.** A role ships its Prometheus rules
+  in *templates/prometheus/alert_rules.yml.j2*. The new *alert_rule_roles* lookup includes
+  them only for roles that Prometheus actually scrapes, so a rules file needs no activation
+  check of its own. It must start at the *groups:* item level. OpenBao's seal alert is the
+  first rule to use it.
+
+* **Video for hand-built Playwright contexts.** A context created with
+  *browser.newContext()* ignored the project's video setting, so its artefact had a trace
+  but no video. Spread *recordVideoOptions(testInfo)* from *personas/utils/env.js* into the
+  context options to record one.
+
+* Image and dependency version jumps (net since 14.1.0):
+  * *web-app-pgadmin*: 9.17 to 9.18
+
+**Contributors**
+
+* [Evangelos Tsakoudis](https://evangelostsak.com): the OpenBao role with its seal,
+  credential rotation, recovery and RBAC end-to-end suite, role-local Prometheus alert
+  rules, and the LAM and swarm network fixes that work uncovered
+* [Alejandro Roman Ibanez](https://github.com/AlejandroRomanIbanez): video recording for
+  hand-built Playwright contexts
+* [Kevin Veen-Birkenbach](https://veen.world): review and version maintenance
+
+## [14.1.0] - 2026-09-21
+
+**For Users**
+
+* **Local models reach the gateway again.** Upstream re-pushed the *svc-ai-lmstudio* CPU
+  image with a server that listens on loopback only, so the role stayed green while litellm
+  could not connect and the AI features of Mattermost, Matrix, xWiki, Moodle and Zammad
+  failed their warm-up. The server binds the container network again and stays unpublished.
+  The model preload now waits until the daemon has finished starting, so a slow host no
+  longer ends up with a daemon that fails every later model load, and the readiness probe
+  is capped per attempt so a silent peer cannot hang it. See
+  [svc-ai-lmstudio](roles/svc-ai-lmstudio/README.md).
+
+**For Developers**
+
+* **CI deploys only the variants a change reaches.** An image bump in a provider no longer
+  redeploys the variants of its consumers that switch that provider off. The diff-derived
+  whitelist, used by the weekly update PRs, Dependabot and every other diff-driven run,
+  narrows each affected role to the variants whose round closure still reaches a changed
+  role, emitted as *role#0,2* selection tokens. A changed role and a role reached only
+  through *run_after* keep every variant. A pinned token naming a role that discovery does
+  not return now warns instead of aborting the run; role names are still checked against
+  *roles/* before the run starts.
+
+* **One instruction file for every agent.** *AGENTS.md* now holds every agent rule, and
+  *CLAUDE.md* and *GEMINI.md* are gone. The rules they carried bind every runtime anyway,
+  and the PR templates, scope tables, requirement documents and docs that named the old
+  files now name *AGENTS.md*.
+
+* Image and dependency version jumps (net since 14.0.0):
+  * *svc-ai-ollama*: 0.34.0 to 0.34.2
+  * *svc-net-tor* (Debian base): 13.6-slim to 13.7-slim
+  * *web-app-baserow*: 2.3.3 to 2.3.4
+  * *web-app-erpnext*: v16.34.2 to v16.35.0
+  * *web-app-funkwhale* (front, api): 2.0.10 to 2.0.11
+  * *web-app-jitsi* (web, prosody, jicofo, jvb): stable-9646 to stable-11031
+  * *web-app-keycloak*: 26.7.3 to 26.7.4
+  * *web-app-opentalk* (LiveKit): v1.13.6 to v1.13.7
+  * *web-app-opentalk* (RabbitMQ): 4.3.5 to 4.3.6
+  * *web-app-peertube*: v8.2.4 to v8.3.0
+  * *web-app-pihole*: 2026.07.2 to 2026.09.0
+  * *web-app-prometheus* (Alertmanager): v0.34.0 to v0.34.1
+  * Ansible collection *hetzner.hcloud*: 7.0.1 to 7.1.0
+  * *ruff* (dev): 0.16.6 to 0.16.7
+
+**Contributors**
+
+* [Kevin Veen-Birkenbach](https://veen.world): LM Studio reachability and startup,
+  variant-narrowed CI selection, the single agent instruction file, and version maintenance
+
+## [14.0.0] - 2026-09-19
+
+**For Users**
+
+* **AI assistance inside the applications you already run.** A gateway role,
+  *svc-ai-litellm*, fronts OpenAI, Anthropic and OpenRouter from declared keys, with
+  *svc-ai-ollama* and the new *svc-ai-lmstudio* serving local models from one shared
+  catalogue, so inference can stay inside the deployment. Sixteen applications use it for
+  their own built-in AI features instead of calling a vendor directly: WordPress AI Engine,
+  MediaWiki AIEditingAssistant, Moodle's AI subsystem, Zammad Smart Assist, the xWiki LLM
+  extension, Discourse AI, the Matrix ChatGPT bridge, Nextcloud, Mattermost Agents, n8n,
+  Open WebUI and Flowise. The gateway's admin UI signs in through Keycloak. See
+  [svc-ai-litellm](roles/svc-ai-litellm/README.md) and
+  [svc-ai-lmstudio](roles/svc-ai-lmstudio/README.md).
+
+* **Your tools reachable from your assistants.** About twenty applications now speak MCP.
+  Gitea, GitLab, Mattermost, Nextcloud, n8n, Baserow, Jenkins, Home Assistant, Moodle,
+  Snipe-IT and WordPress serve their own endpoints; ten more get one through a locked-down
+  sidecar. Open WebUI, Flowise and the agents discover what the deployment offers and
+  register it automatically. Access is bounded rather than assumed: blocked paths are
+  declared, every served path is gated, tools a provider calls mutating are withheld,
+  reader and writer roles are separate, and each provider authenticates callers as its own
+  service account. See [svc-ai-mcp-adapter](roles/svc-ai-mcp-adapter/README.md).
+
+* **Agents as employees, with a kernel between them and the host.** *web-app-hermes* and
+  *web-app-openclaw* deploy agents behind the single sign-on gate, wired to the gateway's
+  models and to the MCP servers discovery hands them, each proving on deploy that it can
+  actually reach them. *svc-virt-kata* runs that tier under a kernel-isolating container
+  runtime, and *svc-ai-robot* embodies an agent on a dedicated device. Every sandboxed
+  agent acts as its own platform account rather than borrowing yours. See
+  [web-app-hermes](roles/web-app-hermes/README.md),
+  [web-app-openclaw](roles/web-app-openclaw/README.md) and
+  [svc-virt-kata](roles/svc-virt-kata/README.md).
+
+* **Home automation joins the platform.** *web-app-homeassistant* deploys the automation
+  hub, exposes it as an MCP server so agents can drive it, persists the token it mints, and
+  is reachable over tor. See [web-app-homeassistant](roles/web-app-homeassistant/README.md).
+
+* **Changing a password changes it everywhere.** A user declares how its password must be
+  generated, the inventory pins one for every declared user, a new generator produces
+  API-key shapes, the deploy rotates credentials between its two passes, and a reset command
+  exists. Applications that persist an administrator password at install now realign it when
+  the declared one changes: Nextcloud, Moodle, EspoCRM, Jellyfin, Listmonk, Discourse,
+  Checkmk, xWiki, n8n, Matrix and the dedicated MariaDB and Postgres engines. Checkmk keeps
+  a 401 fatal so a wrong password cannot lock the account out.
+
+* **Onions, firewall and name resolution.** *svc-net-firewall* owns the packet filter as one
+  nftables table per role. Tor carries mail to a .onion in both deploy modes, rejects forged
+  sources on the guarded ports, and binds its dnsmasq listeners statically so a failed
+  re-enumeration can no longer drop every one of them. The deployment declares its own
+  address space once, the egress range moved out of the Docker pool, and the container
+  resolver follows the live bridge instead of a guessed address. Every host-bound port
+  requires an explicit onion decision. See
+  [svc-net-firewall](roles/svc-net-firewall/README.md).
+
+* **Application fixes you will notice.** Nextcloud installs an OnlyOffice release upstream
+  actually published, keeps social login working over tor, and makes its OIDC account an
+  administrator. Element shows invites again through the new room list. Moodle survives the
+  container roll during installation. Mattermost keeps its configuration in Postgres instead
+  of on a shared volume, and its plugin tree is per node. GitLab creates the default
+  organization a headless install never gets. Jellyfin waits for health before driving the
+  setup wizard. Keycloak registers redirect URIs only for the apps a play deploys, keeps the
+  allowed-origins claim out of the access token, and no longer caches LDAP federation past a
+  fresh grant. The platform's own health mail no longer eats the sender quota.
+
+* **Operating a deployment.** New make targets reach a single deployed application:
+  *compose-app-exec*, *compose-app-logs* and *compose-app-restart*. Diagnostics collect the
+  logs an application writes to a file, including from busybox containers. Health probes use
+  a fast start cadence with a window that outlasts a real boot, so a slow starter is no
+  longer reaped. The CSP health check accepts a status code a vhost declares instead of
+  dropping the vhost, and gives onion vhosts a navigation budget Tor can meet.
+
+**For Developers**
+
+* **MCP is declared, not wired.** A role states an *mcp* block in *meta/services.yml*, and
+  the vocabulary, discovery and rendering layer derives endpoints, clients, credentials and
+  network edges from it. A client-provider pairing is declared once, on the provider;
+  *sys-svc-mcp-reconcile* converges clients from the complete provider set; a refused pairing
+  is expressed as off rather than gated at the call site; and *svc-ai-mcp-adapter* is a
+  reusable per-provider sidecar rather than a standalone application. The contract is proven
+  on deploy, including refusal on *initialize* and the tool inventory itself. The design,
+  its delegation rules and a machine-checkable audit live under
+  [docs/contributing/design/role/services/mcp.md](docs/contributing/design/role/services/mcp.md).
+
+* **Registry and variant changes.** A variant can dictate the configuration of the providers
+  it pulls in, and an MCP round decides for itself what it carries, which is the breaking
+  change in this release. Fifteen moving pins gained names the registry can order, every MCP
+  provider is registered as a shared service, *meta/schema.yml* finished its rename to
+  *meta/secrets.yml*, role scripts are sorted into per-language folders, and *meta/addons* is
+  now an accepted declaration site for pins and plugins.
+
+* **Lints that fail closed.** Five properties that used to pass silently now fail. The PHP
+  and Ruby that roles ship are syntax-checked, and so are shell scripts that ship as Jinja
+  templates. *sys-service* owns every systemd unit a role installs. Healthcheck timings are
+  judged against what the base image was measured to hold, a variable-free healthcheck
+  belongs in *meta/services.yml*, an unenforceable NFS state layout fails at author time, a
+  sandboxed role cannot be pinned to the manager, credentials are kept out of volumes
+  declared non-secret, *no_log* is required on every task carrying one and forbidden in the
+  test roles, and a JavaScript default for an unset environment variable is rejected.
+
+* **Pins that cannot age unnoticed.** Image pins are classified and pull references built
+  from the class, a moving tag declares itself with the marker it already carries, and a
+  role's images move as one release or not at all. The updater reads addon declarations,
+  orders vendor patch counters and five-component versions, reads a release line written
+  before the number as a family, and now also watches pinned pip requirements and Ansible
+  collections. Seven roles moved off the Debian codename base onto slim, and one Ubuntu
+  mirror list with failover, a short timeout and a health test serves both the package cache
+  and the image builds. *js-yaml* was lifted to 4.3.2 for GHSA-2883-xcg3-v3hh.
+
+* **CI selects, resumes and proves.** A fourth deploy chunk stops a short priority chunk
+  stranding budget, a manual run can set the chunk size the formula would derive, and a
+  retrigger can override the chunk gate. Retriggering works by role and by what never got a
+  verdict, resumes behind the green window rather than the deployed one, retires suites the
+  source run already passed, and cancels the run before retriggering its failed roles. Each
+  role's README instructions are replayed on its smallest deploy row, in the mode its
+  *services.yml* declares. Distro images build concurrently on one runner, the matrix job
+  folds into the image job, and the deploy chunks no longer wait on the DNS test.
+
+* **Swarm, measured rather than assumed.** The deploy waits for its own update instead of
+  guessing after it, refuses to call a stack converged while it is still updating, survives a
+  task that failed and came back, reports what converged rather than only what did not, and
+  says why the convergence probe refused. Placement is constrained to a role's declared
+  platform arch, redis and memcached sidecars get a deploy block, and a run-once service no
+  longer strands the stack deploy waiting for a replica it never has. The rescue dump
+  captures the contents of the state volumes. In the test lab, workers are labelled
+  kata-capable only when the app is sandboxed, NFS detaches before the node containers die,
+  and the sandbox tier gets a second node.
+
+* **Faster gates.** Per-host setup runs once per host instead of once per application, a
+  role's volumes are answered from its own file instead of a whole-tree build, the Keycloak
+  RBAC root group resolves once rather than once per app, the Playwright fixture copy the
+  tree copy already made is dropped, logout helpers wait for a control instead of sleeping,
+  and the OIDC login helper stops waiting out probes that cannot match. Onion timeouts scale
+  by tor flavor instead of a flat multiplier, and every Playwright timeout has one source.
+
+* **Documentation and agent instructions.** Six new requirement documents cover the LLM
+  gateway and model backends, agent employees, Home Assistant, the robot role, the MCP proxy
+  expansion and native AI gateway integration. The MCP design docs are nested under their own
+  folder with an audit the lints can check. The role README template asks the reader for a
+  domain the deployment can resolve, enforces consistent Credits attribution, and drops the em
+  dash. Documentation generators are gathered under *cli/build/docs*, and a new CLI edits role
+  bonds in a matrix instead of hunting through files.
+
+* Image and dependency version jumps (net since 13.0.0):
+  * *svc-ai-ollama*: 0.32.15 to 0.34.0
+  * *svc-db-elasticsearch*: 9.5.2 to 9.5.3
+  * *svc-db-qdrant*: v1.19.0 to v1.19.1
+  * *sys-ctl-hlth-csp* (csp-checker): 2.2.1 to 3.0.4
+  * *sys-lint* (shfmt): v3.13.1 to v3.14.1
+  * *test-e2e-playwright*: v1.62.1-noble to v1.63.0-noble
+  * *web-app-bluesky* (view): 1.131.1 to 1.132.0
+  * *web-app-bookwyrm*: v0.9.2 to v0.9.3
+  * *web-app-confluence*: 10.2.15 to 10.2.18
+  * *web-app-dashboard*: 2.0.0 to 2.1.3
+  * *web-app-erpnext*: v16.32.3 to v16.34.2
+  * *web-app-espocrm*: 10.0.6 to 10.0.8
+  * *web-app-funkwhale*: 2.0.9 to 2.0.10
+  * *web-app-gitea*: 1.27.2 to 1.27.3
+  * *web-app-gitlab* (webservice, sidekiq, workhorse, gitaly, shell, rails): v19.3.0 to v19.3.2
+  * *web-app-jira*: 11.3.10 to 11.3.11
+  * *web-app-keycloak*: 26.7.2 to 26.7.3
+  * *web-app-matrix* (Synapse): v1.159.0 to v1.160.0
+  * *web-app-matrix* (Element): v1.12.26 to v1.12.28
+  * *web-app-mattermost*: 11.10.1 to 11.11.0
+  * *web-app-n8n*: 1.95.3 to 1.100.1
+  * *web-app-nextcloud* (proxy): 1.31.3-alpine to 1.31.5-alpine
+  * *web-app-opentalk* (LiveKit): v1.13.5 to v1.13.6
+  * *web-app-opentalk* (RabbitMQ): 4.3.4 to 4.3.5
+  * *web-app-penpot* (frontend, backend, exporter): 2.17.1 to 2.17.2
+  * *web-app-seaweedfs*: 4.44 to 4.46
+  * *web-app-semaphore*: v2.19.8 to v2.19.14
+  * *web-app-socialhome*: 2026.6.16 to 2026.9.18
+  * *web-app-yourls*: 1.10.4-apache to 1.10.6-apache
+  * *web-app-zammad*: 6.5.0 to 7.1.2
+  * *web-svc-coturn*: 4.17.2 to 4.18.0
+
+* Moving tags that now carry a release, one per role: *web-app-discourse* master to
+  v2026.8.0, *web-app-jenkins* lts to 2.568.3-lts, *web-app-openwebui* main to 0.11.0,
+  *web-app-pretix* stable to 2026.7.0, *web-app-xwiki* lts-postgres-tomcat to
+  17.10.13-postgres-tomcat, *web-app-pixelfed* latest to 20260917, *web-app-matrix* (upstream
+  playbook ref) master to a commit pin, *svc-db-memcached* alpine to 1.6.45-alpine,
+  *svc-db-redis* alpine to 8.10.1-alpine, *svc-prx-openresty* alpine to 1.31.1.1-alpine,
+  *svc-runner* (BuildKit) buildx-stable-1 to v0.33.0, *web-app-bigbluebutton* (dockerize)
+  latest to v0.15.1, and the nginx sidecars of *web-app-fediwall*, *web-app-littlejs*,
+  *web-app-taiga* and *web-svc-coturn* to 1.31.6-alpine. The Debian codename bases became numeric slim tags in
+  *svc-db-openldap* (12.15-slim), *svc-net-tor* (13.6-slim), *web-app-bookwyrm*,
+  *web-app-bridgy-fed*, *web-app-postmarks*, *web-app-roulette-wheel*, *web-svc-cdn* and
+  *web-svc-simpleicons*, and *web-app-flowise* is built from node 24-slim instead of pulled
+  (Flowise itself stays at 3.1.4).
+
+**Contributors**
+
+* [Kevin Veen-Birkenbach](https://veen.world): LLM gateway and model backends, the declared
+  MCP layer and its sidecar, agent employees and the kernel-isolated tier, Home Assistant,
+  credential declaration and rotation, firewall/tor/DNS ownership, variant-dictated provider
+  configuration, the fail-closed lints, CI selection and resume, swarm convergence, and
+  version maintenance
+* [Prageeth Panicker](https://github.com/pragepani): .ansible cache directory ignored
+
 ## [13.0.0] - 2026-08-26
 
 * **Tor as a first-class deployment axis.** The new *svc-net-tor* role routes onion

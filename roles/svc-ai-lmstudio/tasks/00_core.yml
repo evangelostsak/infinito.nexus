@@ -1,7 +1,19 @@
 ---
 - include_tasks: utils/once/flag.yml
 
+- name: "⬇️ Seed the shared model store before the daemons index it"
+  ansible.builtin.include_tasks:
+    file: utils/preseed.yml
+    apply:
+      delegate_to: "{{ LMSTUDIO_NFS_SERVER }}"
+      run_once: true
+  when: LMSTUDIO_PRESEED_ENABLED | bool
+
 - name: "🔧 Setup container network for {{ application_id }}"
   include_tasks: "{{ lookup('path_absolute', 'roles/sys-svc-compose/tasks/utils/network/routine.yml') }}"
   vars:
     compose_handlers_flush: true
+
+- name: "⬇️ Manager-side model pre-pull on the hosting node"
+  ansible.builtin.include_tasks: 01_manager_ops.yml
+  when: IS_STACK_HOST | bool

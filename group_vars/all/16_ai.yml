@@ -13,17 +13,43 @@ LITELLM_OPENAI_BASE_LOCAL_URL: "{{ LITELLM_BASE_LOCAL_URL }}/v1"
 
 LITELLM_BACKEND_ROLES: "{{ lookup('deployment').inventory }}"
 
-LITELLM_CHAT_MODEL: "{{ (lookup('config', 'svc-ai-ollama', 'services.ollama.preload_models') | reject('search', 'embed') | list | first) if 'svc-ai-ollama' in LITELLM_BACKEND_ROLES
-  else ('lmstudio/default' if 'svc-ai-lmstudio' in LITELLM_BACKEND_ROLES else ('openrouter/auto' if ((OPENROUTER_API_KEY | string) | length > 0) else '')) }}"
+LITELLM_OLLAMA_BACKEND: >-
+  {{ (lookup('config', 'svc-ai-litellm', 'services.ollama.enabled') | bool)
+     and (lookup('config', 'svc-ai-litellm', 'services.ollama.shared') | bool) }}
+
+LITELLM_LMSTUDIO_BACKEND: >-
+  {{ (lookup('config', 'svc-ai-litellm', 'services.lmstudio.enabled') | bool)
+     and (lookup('config', 'svc-ai-litellm', 'services.lmstudio.shared') | bool) }}
+
+AI_LOCAL_MODELS:
+  - alias: qwen2.5:0.5b
+    name: qwen2.5-0.5b-instruct
+    repo: lmstudio-community/Qwen2.5-0.5B-Instruct-GGUF
+    url: https://huggingface.co/lmstudio-community/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-0.5B-Instruct-Q8_0.gguf
+    source: https://huggingface.co/lmstudio-community/Qwen2.5-0.5B-Instruct-GGUF
+    file: Qwen2.5-0.5B-Instruct-Q8_0.gguf
+    sha256: "1d96e30253a76970864323987e3e77eeaf170312952fd61d18d343c25cfd6e52"
+    bytes: 531068224
+
+AI_REMOTE_ALIASES: >-
+  {{ ['openai/gpt-4o-mini'] * (lookup('api_enabled', 'openai') | int)
+     + ['anthropic/claude-sonnet-4-5'] * (lookup('api_enabled', 'anthropic') | int)
+     + ['openrouter/auto'] * (lookup('api_enabled', 'openrouter') | int) }}
+
+LITELLM_CHAT_MODEL: "{{ (lookup('config', 'svc-ai-ollama', 'services.ollama.preload_models') | map(attribute='alias') | reject('search', 'embed') | list | first |
+  default('')) if 'svc-ai-ollama' in LITELLM_BACKEND_ROLES else ((lookup('config', 'svc-ai-lmstudio', 'services.lmstudio.preload_models') | map(attribute='alias')
+  | reject('search', 'embed') | list | first | default('')) if 'svc-ai-lmstudio' in LITELLM_BACKEND_ROLES else (AI_REMOTE_ALIASES | first | default(''))) }}"
 
 LITELLM_CHAT_MODEL_SERVED: >-
-  {{ (('svc-ai-ollama' in LITELLM_BACKEND_ROLES)
+  {{ ((LITELLM_OLLAMA_BACKEND | bool)
       and ((lookup('config', 'svc-ai-ollama', 'services.ollama.preload_models')
-            | reject('search', 'embed') | list) | length > 0))
-     or ('svc-ai-lmstudio' in LITELLM_BACKEND_ROLES)
-     or ((OPENROUTER_API_KEY | string) | length > 0) }}
+            | map(attribute='alias') | reject('search', 'embed') | list) | length > 0))
+     or ((LITELLM_LMSTUDIO_BACKEND | bool)
+         and ((lookup('config', 'svc-ai-lmstudio', 'services.lmstudio.preload_models')
+               | map(attribute='alias') | reject('search', 'embed') | list) | length > 0))
+     or ((AI_REMOTE_ALIASES | length) > 0) }}
 
-OPENROUTER_API_KEY: ""
+LITELLM_USABLE: "{{ ('svc-ai-litellm' in group_names) and (LITELLM_CHAT_MODEL_SERVED | bool) }}"
 
 MCP_DISCOVERY: "{{ lookup('mcp_servers') }}"
 MCP_DISCOVERED_SERVERS: "{{ MCP_DISCOVERY.selected }}"

@@ -1,8 +1,8 @@
 ---
 # Re-pin the AppRole to the credentials this deploy was handed, then record what
-# was applied. The platform rotates every generated credential per deploy, so the
-# values the next deploy receives will differ from these; the state file is what
-# lets that deploy still authenticate before it re-pins in turn.
+# was applied. The AppRole rotates per deploy, so the state file is what lets the
+# next one authenticate before it re-pins in turn. The seal key is pinned and
+# normally repeats; it is recorded for the deploy after an operator changes it.
 - name: "🔑 Re-pin the RoleID to the value this deploy was handed"
   ansible.builtin.shell: > # nocheck: container-exec-resolver  runtime-resolved CID, delegated to the hosting node
     container exec {{ OPENBAO_LOCAL_CID | quote }}
@@ -11,9 +11,6 @@
   changed_when: true
   delegate_to: "{{ OPENBAO_HOST_NODE }}"
 
-# Exception: writing custom-secret-id with a SecretID the role already holds is a
-# 500 "SecretID is already registered", not a no-op, so the swap has to be gated
-# on the value actually having changed.
 - name: "🔑 Register the SecretID this deploy was handed"
   ansible.builtin.shell: > # nocheck: container-exec-resolver  runtime-resolved CID, delegated to the hosting node
     container exec -i {{ OPENBAO_LOCAL_CID | quote }}

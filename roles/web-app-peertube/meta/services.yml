@@ -61,7 +61,7 @@ peertube:
   enabled: true # nocheck: dynamic-flag
   shared: true
   name: peertube
-  version: v8.2.4
+  version: v8.3.0
   image: chocobozzz/peertube
   min_storage: 841MB
   live:
@@ -79,6 +79,9 @@ peertube:
       http: 8011
     public:
       rtmp: 1935
+    onion:
+      # nocheck: onion-flag  RTMP is an ingest the broadcaster pushes in, and the encoders that push it speak no SOCKS
+      rtmp: false
     internal:
       http: 9000
       rtmp: 1935

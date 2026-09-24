@@ -87,6 +87,8 @@ The unified schema supports:
 
 - **Nested keys.** Both flat and nested credential keys are accepted, so e.g. `recaptcha.key` and `recaptcha.secret` remain nested.
 - **`algorithm:` defaults to `plain`** when the field is omitted.
+- **`type:` (optional)** is one of `string`, `integer`, `boolean`. A supplied value of another type aborts inventory creation.
+- **`regex:` (optional)** is a pattern the supplied value MUST match in full (`re.fullmatch`). Anchors are implicit; `sk-[A-Za-z0-9]{16,}` needs no `^` or `$`.
 - **`default:` (optional)** is a Jinja string used as the credential's value when the inventory does not provide one.
   - `default:` is **NOT rendered at inventory creation time.** The literal Jinja string is written verbatim into the inventory so that referenced variables (`CAPTCHA.RECAPTCHA.KEY`, `lookup(...)`, …) resolve only at deploy/runtime when those variables are actually defined.
   - `default:` values are **NOT validated.** `validation:` only applies to user-provided values, so the schema default is exempt.
@@ -107,6 +109,58 @@ credentials:
       algorithm:   plain
       default:     "{{ CAPTCHA.RECAPTCHA.SECRET | default('') }}"
 ```
+
+### What is checked, and when 🔎
+
+`type:` and `regex:` are enforced by `validate_supplied_value()` in
+[inventory.py](../../../../../utils/manager/inventory.py) at inventory-creation
+time, on every path where a value arrives from outside:
+
+| Source | Checked |
+|---|---|
+| `--set applications.<app>.secrets.credentials.<path>=<value>` | yes |
+| A value already present in the inventory | yes |
+| The literal written from `default:` | no |
+| A value produced from `algorithm:` | no |
+
+A generated value is exempt because the algorithm that produced it is named by
+the same schema, and `generate_value()` takes no schema argument.
+
+An empty string means "not configured" and passes every check, which is what
+makes an optional provider key expressible: declare the shape, leave the value
+empty, and the consumer gates on emptiness.
+
+`validation.min_length` is declared in many role schemas but enforced nowhere.
+Do not read it as a guarantee.
+
+### Worked Example: an optional external key
+
+```yaml
+# roles/svc-ai-litellm/meta/secrets.yml
+credentials:
+  openai_api_key:
+    description: "OpenAI API key; empty leaves the openai/* models unpublished"
+    type:        "string"
+    regex:       "\\S{20,}"
+    default:     "{{ API.openai.api_key }}"
+```
+
+The `default:` points at the central `API` block in
+[group_vars/all/18_api.yml](../../../../../group_vars/all/18_api.yml), so an
+operator fills the provider in one place while the role keeps the shape the
+value must have.
+
+### Write a pattern for the paste, not for the vendor 🚫
+
+`regex:` MUST NOT pin a vendor's key prefix. OpenAI moved issuance from `sk-` to
+`sk-proj-` without notice, and Anthropic issues `sk-ant-api03-`; a schema that
+encoded either would reject a valid key and abort inventory creation, which is a
+hard failure for a value that was correct.
+
+Write the pattern against the mistakes a paste makes — a trailing newline, an
+embedded space, a truncated copy, a `<placeholder>` — and leave the provider's
+format alone. A key pasted into the wrong provider's slot is not caught here;
+it is caught at deploy time, where the route it publishes answers nothing.
 
 Flat schema entries keep the same shape:
 
@@ -159,6 +213,8 @@ All port data lives under `<entity>.ports` in `meta/services.yml` (no `ports:` s
       relay:                          # for port-ranges (coturn, BBB, nextcloud TURN)
         start: <int>
         end:   <int>
+    onion:
+      <category>: <bool>              # forward this category over the node onion
 ```
 
 ### `internal` / `local` / `public` Split 🧭
@@ -168,6 +224,7 @@ All port data lives under `<entity>.ports` in `meta/services.yml` (no `ports:` s
 | `internal` | **Internal container port.** Lives inside the container's network namespace, addressed by other containers on the same role-local network. NOT a host-bound port. Multiple roles MAY legitimately declare the same value (e.g. several nginx-based apps with `internal: { http: 80 }`). |
 | `local`    | **Localhost-bound host port.** Bound on `127.0.0.1` and only reachable through the front-proxy / SSH tunnels. The OS-level binding namespace is shared across all roles, so `local` values MUST be unique across the whole repo. |
 | `public`   | **Public-facing host port.** Bound on `0.0.0.0` and exposed to the public internet (or to whatever the operator's firewall allows). Same uniqueness rule as `local`. |
+| `onion`    | **Onion opt-in, not a port.** A category-keyed map of booleans naming which of the entity's own categories get a `HiddenServicePort` on the node onion. It declares no numbers: the port is read from `local` when the category is declared there and from `public` otherwise, matching what `container_ports` publishes. Collision detection ignores it. |
 
 ### Always Category-Keyed Maps 🗂️
 
@@ -201,6 +258,34 @@ coturn:
         start: 20000
         end:   39999
 ```
+
+### `onion` Forwarding Opt-In 🧅
+
+`ports.onion` names the categories that answer on the node onion. Only the named
+categories are forwarded.
+
+The flag is mandatory, enforced by [test_onion_port_flag.py](../../../../../tests/lint/ansible/services/test_onion_port_flag.py):
+every category declared under `local` or `public` needs a `true` or a `false`,
+and every `false` needs `# nocheck: onion-flag` plus the reason it is false.
+Four groups are settled centrally instead and take no flag: the categories a
+hidden service cannot carry (`relay`, `media`, `stun_turn`, `stun_turn_tls`),
+the proxy-fronted `http`, `sso` and `websocket`, the implicit-TLS variants
+(`smtps`, `imaps`, `pop3s`, `ldaps`), and any entity that already answers the
+question through `exposed:`.
+
+```yaml
+mailu:
+  ports:
+    public:
+      smtp:   25
+      smtps:  465
+      imap:   143
+    onion:
+      smtp: true          # 25 gets a HiddenServicePort; 465 and 143 do not
+```
+
+The forward is per-variant: `meta/variants.yml` may drop the flag, and the role
+then loses the `HiddenServicePort` in that variant.
 
 ### Multi-Entity Roles 🎛️
 

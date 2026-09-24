@@ -3,7 +3,7 @@ import io
 import unittest
 from unittest import mock
 
-from utils.tests.swarm import matrix
+from utils.tests.swarm import run
 
 
 class TestRunReporting(unittest.TestCase):
@@ -18,10 +18,10 @@ class TestRunReporting(unittest.TestCase):
     def _run_capturing(self, rc: int) -> tuple[int, str]:
         buffer = io.StringIO()
         with (
-            mock.patch.object(matrix, "_run_watched", return_value=rc) as watched,
+            mock.patch.object(run, "run_watched", return_value=rc) as watched,
             contextlib.redirect_stdout(buffer),
         ):
-            returned = matrix._run(["true"], env={"A": "b"}, label="demo phase")
+            returned = run.run_step(["true"], env={"A": "b"}, label="demo phase")
         watched.assert_called_once_with(["true"], env={"A": "b"})
         return returned, buffer.getvalue()
 

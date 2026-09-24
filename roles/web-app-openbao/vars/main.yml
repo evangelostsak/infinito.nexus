@@ -20,23 +20,22 @@ OPENBAO_SEAL_KEY: "{{ lookup('config', application_id, 'secrets.credentials.seal
 OPENBAO_APPROLE_ROLE_ID: "{{ lookup('config', application_id, 'secrets.credentials.approle_role_id') }}"
 OPENBAO_APPROLE_SECRET_ID: "{{ lookup('config', application_id, 'secrets.credentials.approle_secret_id') }}"
 
-# Rationale: the platform rotates every generated credential on each deploy, so
-# the key id is derived from the key instead of counted — upstream requires the
-# identifier to match its key, and a derived id cannot drift out of step with one.
 OPENBAO_SEAL_KEY_ID: "{{ (OPENBAO_SEAL_KEY | hash('sha256'))[:16] }}"
 
-# Rationale: what the previous deploy applied, read back before the config is
-# rendered so the node can unseal with the old key and rewrap to the new one, and
-# so the AppRole can still authenticate after its credentials rotated.
 OPENBAO_APPLIED_STATE_HOST: "{{ [lookup('container', application_id, 'directories.instance'), '.applied.json'] | path_join }}"
 OPENBAO_APPLIED: "{{ openbao_applied_state | default({}, true) }}"
 OPENBAO_SEAL_KEY_PREVIOUS: "{{ OPENBAO_APPLIED.seal_key | default('', true) }}"
 OPENBAO_SEAL_KEY_PREVIOUS_ID: "{{ (OPENBAO_SEAL_KEY_PREVIOUS | hash('sha256'))[:16] if OPENBAO_SEAL_KEY_PREVIOUS else '' }}"
 OPENBAO_SEAL_ROTATING: "{{ (OPENBAO_SEAL_KEY_PREVIOUS | length > 0) and (OPENBAO_SEAL_KEY_PREVIOUS != OPENBAO_SEAL_KEY) }}"
 
-# Rationale: resolved from the login rather than from the state file — the
-# SecretID OpenBao actually holds is whichever one was just accepted, and
-# re-registering that same value answers 500, not a no-op.
+OPENBAO_RECOVERY_USER_KEY: "administrator"
+OPENBAO_RECOVERY_TOKEN_APP: "{{ application_id }}-recovery"
+OPENBAO_RECOVERY_KEY: >-
+  {{ (sys_token_store_users | default({}, true))
+     .get(OPENBAO_RECOVERY_USER_KEY, {})
+     .get('tokens', {})
+     .get(OPENBAO_RECOVERY_TOKEN_APP, '') }}
+
 OPENBAO_SECRET_ID_REGISTERED: "{{ openbao_secret_id_registered | default('', true) }}"
 OPENBAO_SECRET_ID_ROTATING: "{{ (OPENBAO_SECRET_ID_REGISTERED | length > 0) and (OPENBAO_SECRET_ID_REGISTERED != OPENBAO_APPROLE_SECRET_ID) }}"
 OPENBAO_KV_MOUNT: "infinito"

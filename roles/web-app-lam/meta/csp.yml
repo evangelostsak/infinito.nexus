@@ -3,7 +3,7 @@ flags:
   style-src-attr:
     unsafe-inline: true # nocheck: csp-unsafe  Reason: historical, TODO: re-verify it is really required and does not open attack surface
   script-src-elem:
-    unsafe-inline: true # nocheck: csp-unsafe  Reason: LAM renders the progress driver of its asynchronous tools as an inline script; with this off, LDAP import/export and multi edit post their job, display "Status: in progress" and never poll it, so both tools hang for every user
+    unsafe-inline: true # nocheck: csp-unsafe  Reason: LAM emits inline <script> elements from 18 files (htmlJavaScript in lib/html.inc), so this was always required and only surfaced when a test first drove multi edit; hashing is not an option because one hash makes browsers ignore unsafe-inline for the whole directive and the dynamic snippets cannot be hashed
     unsafe-eval: true # nocheck: csp-unsafe  Reason: historical, TODO: re-verify it is really required and does not open attack surface
   script-src-attr:
     unsafe-inline: true # nocheck: csp-unsafe  Reason: historical, TODO: re-verify it is really required and does not open attack surface
