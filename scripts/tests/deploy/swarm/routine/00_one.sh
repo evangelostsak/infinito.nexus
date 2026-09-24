@@ -44,7 +44,7 @@ export SWARM_DRILL_ENV
 : "${INFINITO_SWARM_STEP_TIMEOUT_MINUTES:?INFINITO_SWARM_STEP_TIMEOUT_MINUTES is required}"
 : "${INFINITO_SWARM_TEARDOWN_RESERVE_SECONDS:?INFINITO_SWARM_TEARDOWN_RESERVE_SECONDS is required}"
 
-SWARM_REQUIRED_SERVICES="node nfs-server container_backup nfs_backup"
+SWARM_REQUIRED_SERVICES="node nfs-server container_backup nfs_backup wireguard"
 if [ -n "${disable:-}" ]; then
 	_keep="" _drop=""
 	IFS=', ' read -r -a _keys <<<"${disable}"
