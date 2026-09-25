@@ -10,19 +10,51 @@
       cross-host pass, never by this role.
   when: WIREGUARD_MESH_NAMES | length == 0
 
-- name: "🔍 Check whether the WireGuard tooling is already present"
-  ansible.builtin.stat:
-    path: "{{ WIREGUARD_QUICK_BINARY }}"
-  register: wireguard_tooling
-
-# Exception: skipped when wg-quick already exists. The swarm node images ship
-# wireguard-tools, and they also carry a half-installed linux-image-rt-amd64,
-# so apt refuses every install with "unmet dependencies" even when the package
-# it was asked for is already the newest version.
 - name: "📦 Install the WireGuard tooling"
   package_install:
-    id: wireguard
-  when: not wireguard_tooling.stat.exists
+    id:
+      - wireguard
+      - iproute
+      - iputils-ping
+
+- name: "📦 Install automtu via pip (system-wide)"
+  include_role:
+    name: sys-pip-install
+  vars:
+    package_name: "automtu==1.1.1"
+    global_install: true
+
+- name: "🔍 Detect the path MTU the tunnel has to fit inside"
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_python_interpreter }}"
+      - -m
+      - automtu
+      - --pmtu-target
+      - "{{ WIREGUARD_PMTU_TARGETS | join(',') }}"
+      - --pmtu-policy
+      - min
+      - --print-mtu
+      - effective
+  register: wireguard_pmtu
+  changed_when: false
+
+- name: "✅ Assert automtu returned an integer MTU"
+  ansible.builtin.assert:
+    that:
+      - wireguard_pmtu.stdout is match('^[0-9]+$')
+      - (wireguard_pmtu.stdout | int) >= 576
+      - (wireguard_pmtu.stdout | int) <= 9000
+    fail_msg: "automtu returned unexpected MTU output: '{{ wireguard_pmtu.stdout | default('') }}'"
+
+- name: "🔧 Derive the tunnel and overlay MTUs from the measured path"
+  ansible.builtin.set_fact:
+    wireguard_mtu: "{{ wireguard_pmtu.stdout | int - WIREGUARD_HEADER_BYTES | int }}"
+    wireguard_overlay_mtu: >-
+      {{ wireguard_pmtu.stdout | int
+         - WIREGUARD_HEADER_BYTES | int
+         - WIREGUARD_VXLAN_HEADER_BYTES | int }}
+  changed_when: false
 
 - name: "📁 Create {{ WIREGUARD_CONFIG_DIR }}"
   ansible.builtin.file:
