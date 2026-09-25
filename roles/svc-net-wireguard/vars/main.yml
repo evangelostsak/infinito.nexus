@@ -6,7 +6,6 @@ WIREGUARD_CONFIG_DIR: "/etc/wireguard"
 # Rationale: probed by path rather than by `command -v`, which is a shell
 # builtin the command module cannot exec and therefore reports missing on every
 # host. wireguard-tools installs here on every distro this role supports.
-WIREGUARD_QUICK_BINARY: "/usr/bin/wg-quick"
 
 # Rationale: the meshes this host belongs to, already resolved by
 # cli.administration.inventory.mesh. The role never plans a mesh; it renders
@@ -33,12 +32,7 @@ WIREGUARD_SPOKE_MESH_NAMES: >-
 
 WIREGUARD_PING_BINARY: "/bin/ping"
 
-# Rationale: one literal lookup per declared mesh. A single lookup built from
-# the loop variable would be a dynamic config path, which the lookup validator
-# cannot resolve and therefore cannot prove correct before a deploy.
-WIREGUARD_PRIVATE_KEYS:
-  swarm: "{{ lookup('config', application_id, 'secrets.credentials.mesh_private_key_swarm', '') }}"
-  data: "{{ lookup('config', application_id, 'secrets.credentials.mesh_private_key_data', '') }}"
+WIREGUARD_PRIVATE_KEY: "{{ lookup('config', application_id, 'secrets.credentials.mesh_private_key', '') }}"
 
 # Rationale: the hub is the only member with peers in both planes, so it is the
 # only host that has to forward between them.
@@ -61,3 +55,13 @@ WIREGUARD_EXPECTED_PEERS: >-
      | selectattr('is_hub')
      | map(attribute='address')
      | list }}
+
+WIREGUARD_HEADER_BYTES: 60
+WIREGUARD_VXLAN_HEADER_BYTES: 50
+
+WIREGUARD_PMTU_TARGETS: >-
+  {{ (WIREGUARD_ACTIVE_MESHES.values()
+      | map(attribute='peers') | flatten
+      | selectattr('is_hub')
+      | map(attribute='host') | list)
+     | default(NETWORK_PUBLIC_DNS_RESOLVERS, true) }}
