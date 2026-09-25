@@ -325,6 +325,7 @@ jobs:
         env:
           variant: ${{ matrix.variant }}
           disable: ${{ matrix.disable || inputs.disable }}
+          INFINITO_SWARM_VPN: ${{ matrix.vpn }}
         run: ./scripts/tests/deploy/distros.sh "${{ env.SCRIPTS }}/00_one.sh" 2>&1 | tee "/tmp/ansible-${{ matrix.apps }}.log"
 
       - name: 🚀 Deploy app
