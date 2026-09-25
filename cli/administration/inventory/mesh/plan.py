@@ -21,8 +21,16 @@ HUB_OFFSET = 1
 SPOKE_OFFSET = 10
 
 
-def members_of(spec: MeshSpec, groups: dict[str, list[str]]) -> tuple[str, list[str]]:
+def members_of(
+    spec: MeshSpec, groups: dict[str, list[str]], controller: str | None = None
+) -> tuple[str, list[str]]:
     """The hub and the spokes ``spec`` selects out of ``groups``.
+
+    ``controller`` joins as an ordinary spoke. It is named rather than resolved
+    from a group because the Ansible controller is not a swarm member and has
+    no role group of its own -- inventing one would put a non-role name into
+    group_names, where every service and placement lookup would then have to
+    special-case it.
 
     Raises when the hub group does not resolve to exactly one host: a mesh with
     no hub has no routes, and a mesh with two hubs silently splits in half.
@@ -47,6 +55,8 @@ def members_of(spec: MeshSpec, groups: dict[str, list[str]]) -> tuple[str, list[
         for host in groups.get(group, []):
             if host != hub and host not in spokes:
                 spokes.append(host)
+    if controller and controller != hub and controller not in spokes:
+        spokes.append(controller)
     return hub, sorted(spokes)
 
 
@@ -64,6 +74,7 @@ def plan_mesh(
     existing_public_keys: dict[str, str] | None = None,
     *,
     rotate: bool = False,
+    controller: str | None = None,
 ) -> Mesh:
     """Resolve ``spec`` into a mesh whose members are addressed and keyed.
 
@@ -77,9 +88,11 @@ def plan_mesh(
         groups: inventory group name to member hostnames.
         existing_public_keys: hostname to already-issued public key.
         rotate: mint a fresh keypair for every member.
+        controller: host to admit as an extra spoke, so the machine driving the
+            deploy can reach the mesh it just created.
     """
     held = {} if rotate else dict(existing_public_keys or {})
-    hub, spokes = members_of(spec, groups)
+    hub, spokes = members_of(spec, groups, controller)
 
     def member(host: str, offset: int, is_hub: bool) -> MeshMember:
         address = _address(spec.subnet, offset)
