@@ -63,6 +63,18 @@ def main(argv: list[str] | None = None) -> int:
         help="application block the mesh is written under",
     )
     parser.add_argument(
+        "--controller",
+        help=(
+            "host to admit as an extra spoke of --controller-mesh, so the "
+            "machine driving the deploy can reach the mesh it just created"
+        ),
+    )
+    parser.add_argument(
+        "--controller-mesh",
+        default="swarm",
+        help="mesh --controller joins; ignored when --controller is unset",
+    )
+    parser.add_argument(
         "--rotate",
         action="store_true",
         help="mint a fresh keypair for every member instead of reusing",
@@ -117,6 +129,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.application_id,
             ),
             rotate=args.rotate,
+            controller=(args.controller if spec.name == args.controller_mesh else None),
         )
         written = write_mesh(
             mesh, host_vars_dir, vault_password_file, args.application_id
