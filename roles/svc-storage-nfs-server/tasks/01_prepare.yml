@@ -58,7 +58,7 @@
           | select('defined')
           | list)
          or [ansible_facts.default_ipv4.address | default('127.0.0.1')])
-        + ([WIREGUARD_SUBNET_POOL] if (WIREGUARD_ENABLED | bool) else [])
+        + ((WIREGUARD_SUBNET_POOLS | list) if (WIREGUARD_ENABLED | bool) else [])
       }}
 
 - name: "✅ Assert at least one allowed IP was resolved"
