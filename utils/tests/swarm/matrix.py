@@ -26,6 +26,7 @@ import sys
 from utils import PROJECT_ROOT
 from utils.storage.constrained import host_storage_constrained
 from utils.tests.swarm.derive_includes import derive_includes, variant_scope
+from utils.tests.swarm.extend_inventory import mesh_enabled
 from utils.tests.swarm.run import DISK_FLOOR_MB, run_step
 from utils.tests.swarm.write.extras import ensure_swarm_keypairs
 
@@ -69,8 +70,11 @@ def _write_mesh(*, inv_dir: str) -> int:
     """Write the WireGuard meshes over both inventories of the round.
 
     Ordered after extend_inventory, which creates the groups the meshes
-    resolve from and the sibling backup.yml the data mesh spans.
+    resolve from and the sibling backup.yml the data mesh spans. A no-op when
+    the run's vpn axis is off, because the groups are then absent entirely.
     """
+    if not mesh_enabled():
+        return 0
     args = ["--inventory", f"{inv_dir}/devices.yml"]
     args += ["--inventory", f"{inv_dir}/backup.yml"]
     args += ["--host-vars-dir", f"{inv_dir}/host_vars"]
