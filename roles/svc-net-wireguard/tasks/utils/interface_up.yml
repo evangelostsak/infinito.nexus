@@ -1,16 +1,29 @@
 ---
-# Exception: wg-quick down on an interface that was never up exits non-zero, so
-# the teardown half is tolerated while the bring-up half is not. Restarting
-# rather than starting is deliberate: a rotated key changes the config of a
-# live interface, and wg-quick up on an already-up interface is a no-op that
-# would leave the old keys in the kernel.
-- name: "🔻 Take '{{ mesh_name }}' down when it is already up"
-  ansible.builtin.command: "wg-quick down {{ mesh_name | quote }}"
-  register: wireguard_down
-  changed_when: wireguard_down.rc == 0
+# An interface that is already up is reconfigured in place with `wg syncconf`,
+# never torn down. Once Ansible reaches a host over the mesh, `wg-quick down`
+# on that interface kills the connection carrying the play, and the `up` that
+# would restore it never runs. syncconf applies new keys and peers to the live
+# interface, so a rotated mesh converges without dropping the session that is
+# rotating it. `wg-quick strip` renders the config without the wg-quick-only
+# directives that `wg` itself rejects.
+- name: "🔍 Check whether '{{ mesh_name }}' is already up"
+  ansible.builtin.command: "wg show {{ mesh_name | quote }}"
+  register: wireguard_present
+  changed_when: false
   failed_when: false
 
 - name: "🔺 Bring '{{ mesh_name }}' up"
   ansible.builtin.command: "wg-quick up {{ mesh_name | quote }}"
   register: wireguard_up
   changed_when: wireguard_up.rc == 0
+  when: wireguard_present.rc != 0
+
+- name: "♻️ Reconfigure the live '{{ mesh_name }}' in place"
+  ansible.builtin.shell: >
+    set -o pipefail && wg syncconf {{ mesh_name | quote }}
+    <(wg-quick strip {{ mesh_name | quote }})
+  args:
+    executable: /bin/bash
+  register: wireguard_synced
+  changed_when: wireguard_synced.rc == 0
+  when: wireguard_present.rc == 0
