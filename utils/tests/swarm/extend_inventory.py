@@ -25,6 +25,7 @@ Optional ``INFINITO_APP_VARIANTS`` (consumed by ``derive_includes``).
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from utils import PROJECT_ROOT
@@ -43,6 +44,14 @@ _DOCKER_VARS: dict[str, str] = {
 _NAMES = parse_static_env(PROJECT_ROOT / "default.env")
 _PREFIX = f"{os.environ['SWARM_NAME']}-" if os.environ.get("SWARM_NAME") else ""
 _MANAGER = f"{_PREFIX}{_NAMES['INFINITO_SWARM_MGR_NAME']}"
+
+
+_CONTROLLER = "localhost"
+
+_LOCAL_VARS: dict[str, str] = {
+    "ansible_connection": "local",
+    "ansible_python_interpreter": sys.executable,
+}
 
 
 def mesh_enabled() -> bool:
@@ -80,6 +89,7 @@ def _host_topology(app_id: str) -> list[tuple[str, str]]:
             ("svc-net-wireguard", _MANAGER),
             *[("svc-net-wireguard", w) for w in _WORKERS],
             ("svc-net-wireguard", _NFS_SERVER),
+            ("svc-net-wireguard", _CONTROLLER),
         ]
     return [
         ("svc-swarm-node", _MANAGER),
@@ -145,7 +155,9 @@ def main() -> int:
 
     for group, host in group_hosts:
         children.setdefault(group, {}).setdefault("hosts", {})
-        children[group]["hosts"][host] = dict(_DOCKER_VARS)
+        children[group]["hosts"][host] = dict(
+            _LOCAL_VARS if host == _CONTROLLER else _DOCKER_VARS
+        )
 
     dump_yaml(str(inv_path), inv)
     print(inv_path.read_text())  # nocheck: cache-read — re-reads the file just written
