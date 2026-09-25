@@ -9,14 +9,13 @@ both files have been read.
 from __future__ import annotations
 
 import ipaddress
-from typing import TYPE_CHECKING, Any
+import re
+from pathlib import Path
+from typing import Any
 
 from utils.cache.yaml import load_yaml_any
 
 from .model import MeshSpec
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 MESHES_VAR = "WIREGUARD_MESHES"
 POOL_VAR = "WIREGUARD_SUBNET_POOL"
@@ -57,7 +56,7 @@ def specs_of(group_vars_file: Path) -> list[MeshSpec]:
     if not isinstance(declared, list) or not declared:
         raise ValueError(f"{group_vars_file} declares no {MESHES_VAR}")
 
-    pool = document.get(POOL_VAR)
+    pool = _resolve_pool(document.get(POOL_VAR), group_vars_file)
     specs = [
         MeshSpec(
             name=entry["name"],
@@ -72,6 +71,31 @@ def specs_of(group_vars_file: Path) -> list[MeshSpec]:
     ]
     assert_no_subnet_overlap(specs, pool)
     return specs
+
+
+_REFERENCE = re.compile(r"^\s*\{\{\s*(?P<name>[A-Z0-9_]+)\s*\}\}\s*$")
+
+
+def _resolve_pool(pool: object, group_vars_file: Path) -> str | None:
+    """The literal pool, following one ``{{ VAR }}`` hop into its SPOT.
+
+    The pool is declared once under ``NETWORK_*`` beside every other range the
+    platform allocates, and referenced from the mesh file. Ansible resolves
+    that at play time; this runs before the play, so the reference is followed
+    here rather than duplicating the value.
+    """
+    if not isinstance(pool, str):
+        return None
+    match = _REFERENCE.match(pool)
+    if match is None:
+        return pool
+    name = match.group("name")
+    for sibling in sorted(Path(group_vars_file).parent.glob("*.yml")):
+        document = load_yaml_any(str(sibling), default_if_missing={})
+        value = (document or {}).get(name)
+        if isinstance(value, str) and not _REFERENCE.match(value):
+            return value
+    raise ValueError(f"{group_vars_file} references {name}, which no sibling defines")
 
 
 def assert_no_subnet_overlap(specs: list[MeshSpec], pool: str | None) -> None:
