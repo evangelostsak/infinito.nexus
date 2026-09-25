@@ -35,9 +35,17 @@ MESHES_KEY = "meshes"
 HOST_PREFIX_32 = "/32"
 
 
-def private_key_name(mesh_name: str) -> str:
-    """The credential key a member's own secret half is stored under."""
-    return f"mesh_private_key_{mesh_name}"
+PRIVATE_KEY_NAME = "mesh_private_key"
+
+
+def private_key_name(mesh_name: str | None = None) -> str:
+    """The credential key a member's own secret half is stored under.
+
+    One key per host, not per mesh: a host presents the same identity on every
+    plane it belongs to, so the hub does not carry two identities and the
+    writer has one credential to keep in step.
+    """
+    return PRIVATE_KEY_NAME
 
 
 def host_vars_path(host_vars_dir: Path, host: str) -> Path:
@@ -68,6 +76,14 @@ def existing_public_keys(
     A host whose stored credential has gone missing is reported as unkeyed, so
     the pair is reminted together instead of leaving a public key that no
     private key answers for.
+
+    One key per host: the identity recorded on any plane this host owns is the
+    identity it presents on every other, so a member already keyed by an
+    earlier mesh keeps that key rather than minting a second one. An entry
+    naming a different host is not this host's key at all -- the swarm reset
+    mirrors one node's host_vars over every other, which is right for
+    credentials that are identical per host and hands everyone else the hub's
+    identity here.
     """
     found: dict[str, str] = {}
     for host in hosts:
@@ -75,16 +91,27 @@ def existing_public_keys(
         if not path.exists():
             continue
         document = load_document(path)
-        entry = _mesh_entry(document, mesh_name, application_id)
-        # Exception: an entry that names a different host is not this host's
-        # key. The swarm reset mirrors one node's host_vars over every other,
-        # which is right for credentials that are identical per host and hands
-        # everyone else the hub's identity here. Without this check the mesh
-        # would be rewritten with one member's key on every node.
-        if entry.get("host") != host:
-            continue
-        public_key = entry.get("public_key")
-        if not isinstance(public_key, str) or not is_valid_public_key(public_key):
+        meshes = (
+            document.get("applications", {}).get(application_id, {}).get(MESHES_KEY, {})
+        )
+        owned = [
+            entry
+            for entry in (
+                _mesh_entry(document, mesh_name, application_id),
+                *meshes.values(),
+            )
+            if isinstance(entry, dict) and entry.get("host") == host
+        ]
+        public_key = next(
+            (
+                entry["public_key"]
+                for entry in owned
+                if isinstance(entry.get("public_key"), str)
+                and is_valid_public_key(entry["public_key"])
+            ),
+            None,
+        )
+        if public_key is None:
             continue
         credentials = (
             document.get("applications", {})
@@ -92,7 +119,7 @@ def existing_public_keys(
             .get(SECRETS_KEY, {})
             .get(CREDENTIALS_KEY, {})
         )
-        if private_key_name(mesh_name) not in credentials:
+        if private_key_name() not in credentials:
             continue
         found[host] = public_key
     return found
@@ -163,7 +190,7 @@ def write_mesh(
 ) -> list[Path]:
     """Write ``mesh`` into every member's host_vars and return the paths."""
     written: list[Path] = []
-    key_name = private_key_name(mesh.spec.name)
+    key_name = private_key_name()
 
     for member in mesh.members:
         path = host_vars_path(host_vars_dir, member.host)
