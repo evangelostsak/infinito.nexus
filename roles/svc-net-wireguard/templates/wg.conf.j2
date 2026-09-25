@@ -1,7 +1,7 @@
 [Interface]
 Address = {{ mesh.address }}/{{ mesh.subnet.split('/')[1] }}
-PrivateKey = {{ WIREGUARD_PRIVATE_KEYS[mesh_name] }}
-MTU = {{ WIREGUARD_MTU | int }}
+PrivateKey = {{ WIREGUARD_PRIVATE_KEY }}
+MTU = {{ wireguard_mtu | int }}
 {% if mesh.is_hub %}
 ListenPort = {{ mesh.listen_port | int }}
 {% endif %}
