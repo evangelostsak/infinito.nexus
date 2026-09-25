@@ -1,6 +1,8 @@
 ---
 WIREGUARD_SUBNET_POOL: "{{ NETWORK_MESH_POOL }}"
 
+WIREGUARD_SUBNET_POOLS: "{{ [WIREGUARD_SUBNET_POOL] }}"
+
 WIREGUARD_MESHES:
   - name: swarm
     hub_group: svc-swarm-manager
