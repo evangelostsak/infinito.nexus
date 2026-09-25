@@ -52,6 +52,11 @@ from utils.github.variant.tor import (
     tor_states,
     wants_tor,
 )
+from utils.github.variant.vpn import (
+    MESH_GLYPH_MODES,
+    rotated_vpn,
+    vpn_states,
+)
 from utils.roles.display import VARIANT_SEPARATOR, display_names
 from utils.symbol_glossary import to_emoji, to_word
 
@@ -64,7 +69,10 @@ MODES = ("compose", "swarm", "host")
 LOCAL_GLYPH = to_emoji("test_host")
 
 _AXIS_GLYPHS = (
-    "".join(to_emoji(word) for word in ("tor", "clearnet", "priority", "instructions"))
+    "".join(
+        to_emoji(word)
+        for word in ("tor", "clearnet", "vpn", "direct", "priority", "instructions")
+    )
     + LOCAL_GLYPH
 )
 
@@ -78,6 +86,8 @@ LABEL_RE = re.compile(
     r"^.*(?P<mode>" + _alternation(MODES) + r")️?"
     r"(?P<tor>" + re.escape(to_emoji("tor")) + r")?"
     r"(?:" + re.escape(to_emoji("clearnet")) + r"|" + re.escape(LOCAL_GLYPH) + r")?️?"
+    r"(?P<vpn>" + re.escape(to_emoji("vpn")) + r")?️?"
+    r"(?:" + re.escape(to_emoji("direct")) + r")?️?"
     r"(?P<distro>" + _alternation(DISTROS) + r")?️?"
     r"(?P<filesystem>" + _alternation(FILESYSTEMS) + r")?️?"
     r"[" + re.escape(_AXIS_GLYPHS) + r"️\s]*"
@@ -100,6 +110,7 @@ class Label(NamedTuple):
     tor: bool
     distro: str = ""
     filesystem: str = ""
+    vpn: bool = False
 
 
 def parse_label(name: str) -> Label | None:
@@ -133,6 +144,7 @@ def parse_label(name: str) -> Label | None:
         match.group("tor") is not None,
         to_word(match.group("distro") or ""),
         to_word(match.group("filesystem") or ""),
+        match.group("vpn") is not None,
     )
 
 
@@ -165,7 +177,13 @@ def pick_mode(offered: Sequence[str], position: int, sweep: int) -> str:
 
 
 def artifact_slug(
-    mode: str, app: str, variant: str, tor: bool, distro: str = "", filesystem: str = ""
+    mode: str,
+    app: str,
+    variant: str,
+    tor: bool,
+    distro: str = "",
+    filesystem: str = "",
+    vpn: bool = False,
 ) -> str:
     """What identifies one deploy job's artifacts.
 
@@ -177,7 +195,7 @@ def artifact_slug(
     name one row on two distros (``role#0%debian role#0%fedora``), and those
     are two deploys of one mode, variant and onion state.
     """
-    shards = (variant, "tor" if tor else "", distro, filesystem)
+    shards = (variant, "tor" if tor else "", "vpn" if vpn else "", distro, filesystem)
     return f"{mode}-{app}" + "".join(f"-{shard}" for shard in shards if shard)
 
 
@@ -326,6 +344,7 @@ def assign(
         pin_tor = row.get("pin_tor")
         pin_distro = row.get("pin_distro")
         pin_filesystem = row.get("pin_filesystem")
+        pin_vpn = row.get("pin_vpn")
         check_pins(
             app,
             variant_csv,
@@ -341,11 +360,13 @@ def assign(
         )
         if priority:
             picked = [
-                (mode, state)
+                (mode, state, meshed)
                 for mode, state in combinations(
                     offered, capable=capable, tor_mode=tor_mode
                 )
                 if pin_mode in (None, mode) and pin_tor in (None, state)
+                for meshed in vpn_states(mode)
+                if pin_vpn in (None, meshed)
             ]
         else:
             mode = pin_mode or pick_mode(
@@ -354,7 +375,11 @@ def assign(
                 sweep,
             )
             picked = [
-                (mode, state)
+                (
+                    mode,
+                    state,
+                    rotated_vpn(mode, position=position, sweep=sweep, pin=pin_vpn),
+                )
                 for state in _rotated_tor(
                     mode,
                     capable=capable,
@@ -365,9 +390,9 @@ def assign(
                 )
             ]
         if app == provider:
-            picked = [(mode, enabled) for mode, enabled in picked if enabled]
+            picked = [entry for entry in picked if entry[1]]
         label = codec.encode(app, variant_csv)
-        for step, (mode, enabled) in enumerate(picked):
+        for step, (mode, enabled, meshed) in enumerate(picked):
             distro = pin_distro or rotate(distros, position + step, sweep)
             filesystem = pin_filesystem or rotate(
                 filesystems, (position + step) // len(distros), sweep
@@ -379,6 +404,11 @@ def assign(
                     if mode in TOR_DEPLOY_MODES
                     else LOCAL_GLYPH
                 )
+                + (
+                    to_emoji("vpn" if meshed else "direct")
+                    if mode in MESH_GLYPH_MODES
+                    else ""
+                )
                 + to_emoji(distro)
                 + to_emoji(filesystem)
             )
@@ -388,6 +418,7 @@ def assign(
                     "variant": variant_csv,
                     "mode": mode,
                     "tor": "true" if enabled else "false",
+                    "vpn": "true" if meshed else "false",
                     "distro": distro,
                     "filesystem": filesystem,
                     "enforce_filesystem": "true"
@@ -400,7 +431,7 @@ def assign(
                     "covered": str(row.get("covered_by", 0)),
                     "clone": "true" if row.get("clone") else "false",
                     "artifact": artifact_slug(
-                        mode, app, variant_csv, enabled, distro, filesystem
+                        mode, app, variant_csv, enabled, distro, filesystem, meshed
                     ),
                     "label": f"{glyphs}{label}"
                     + (f" {to_emoji('priority')}" if priority else ""),
