@@ -1,10 +1,4 @@
 ---
-# nocheck: required-by-coverage
-# nocheck: dynamic-flag  WireGuard is mandatory for every swarm deploy and svc-swarm-node exists only in one, so a group-gated flag would describe a state the deploy must never reach
-wireguard:
-  enabled: true
-  shared: true
-  bond: 1
 node:
   modes:
     host:
@@ -12,8 +6,6 @@ node:
   name: swarm
   lifecycle: beta
   bond: 1
-  run_after:
-    - svc-net-wireguard
   enabled: true
   shared: true
   min_storage: "100MB"
