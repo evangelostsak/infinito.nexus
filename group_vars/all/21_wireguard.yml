@@ -1,10 +1,5 @@
 ---
-# Exception: 10.100.0.0/16 is picked to clear every range the platform already
-# allocates. Docker holds 10.208.0.0/12, nested Docker 192.168.67.0/24 and
-# 192.168.68.0/22, the swarm lab 192.168.244.0/24, and per-role subnets sit in
-# the lower 192.168.0.0/16. An overlap here surfaces as unroutable peers long
-# after the deploy reports green.
-WIREGUARD_SUBNET_POOL: "10.100.0.0/16"
+WIREGUARD_SUBNET_POOL: "{{ NETWORK_MESH_POOL }}"
 
 WIREGUARD_MESHES:
   - name: swarm
@@ -23,10 +18,3 @@ WIREGUARD_MESHES:
     listen_port: 51821
 
 WIREGUARD_ENABLED: "{{ DEPLOYMENT_MODE == 'swarm' }}"
-
-# Exception: the overlay stacks VXLAN inside WireGuard. 1500 on the underlay
-# leaves 1420 after the WireGuard header and 1370 after VXLAN; a path that
-# exceeds it drops large payloads only, which reads as flaky CI rather than as
-# a misconfiguration.
-WIREGUARD_MTU: 1420
-WIREGUARD_OVERLAY_MTU: 1370
