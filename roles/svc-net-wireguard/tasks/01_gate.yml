@@ -58,7 +58,7 @@
 - name: "📏 Prove the path carries a full-size payload without fragmenting"
   ansible.builtin.command: >-
     {{ WIREGUARD_PING_BINARY }} -c 2 -W 2 -M do
-    -s {{ WIREGUARD_OVERLAY_MTU | int - 28 }} {{ item | quote }}
+    -s {{ wireguard_overlay_mtu | int - 28 }} {{ item | quote }}
   loop: "{{ WIREGUARD_EXPECTED_PEERS }}"
   register: wireguard_mtu_probe
   changed_when: false
@@ -68,7 +68,7 @@
 - name: "🛑 Fail when the overlay MTU does not survive the tunnel"
   ansible.builtin.fail:
     msg: >-
-      A {{ WIREGUARD_OVERLAY_MTU | int }}-byte payload does not reach
+      A {{ wireguard_overlay_mtu | int }}-byte payload does not reach
       {{ oversized | map(attribute='item') | join(', ') }} from
       {{ inventory_hostname }}. Stacked VXLAN inside WireGuard needs the
       overlay MTU at or below the tunnel's, or large payloads drop silently.
