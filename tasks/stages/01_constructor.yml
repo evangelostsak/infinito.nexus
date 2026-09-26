@@ -111,6 +111,17 @@
   ansible.builtin.include_role:
     name: user-root
 
+# Exception: the mesh carries Ansible itself once the transport moves, and it
+# logs in as the administrator. A worker earns no host-type stage of its own,
+# so without this the account exists on the manager alone and every other node
+# refuses the key.
+- name: 🎬 init administrator on every host the mesh has to reach
+  ansible.builtin.include_role:
+    name: user-administrator
+  when:
+    - WIREGUARD_ENABLED | bool
+    - "'svc-swarm-node' in group_names"
+
 # Exception: ahead of the dist-upgrade, and ahead of the swarm bootstrap far
 # below. The mesh is the transport the rest of the deploy is meant to run over,
 # so it comes up before anything else touches the host; installing after the
