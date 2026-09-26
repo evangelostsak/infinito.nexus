@@ -1,9 +1,10 @@
 """The mesh steps of one swarm-matrix round.
 
-Three things happen around the deploy passes when the run carries the mesh:
-the cross-host writer mints it, the controller is brought onto it, and the
-inventory is moved onto it so the pass that follows connects over the tunnel.
-All three are no-ops when the run's vpn axis is off.
+Four things happen around the deploy passes when the run carries the mesh: the
+cross-host writer mints it, the nodes converge on what it minted, the
+controller is brought onto it, and the inventory is moved onto it so the pass
+that follows connects over the tunnel. All four are no-ops when the run's vpn
+axis is off.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from utils.tests.swarm.run import run_step
 
 _MESH_NAME = "swarm"
 _CONTROLLER = "localhost"
+_PLAYBOOK = "playbook-mesh.yml"
 _DEFAULT_ADMIN_KEY = "/tmp/swarm-nfs-admin.key"  # noqa: S108 - ephemeral swarm-test path, overridable via KEY_PATH
 
 _LAB_ADDRESSES = {
@@ -62,6 +64,30 @@ def write_mesh(*, inv_dir: str) -> int:
     )
 
 
+def converge_mesh(*, inv_dir: str) -> int:
+    """Re-render the nodes' interfaces after the round re-minted their keys.
+
+    The rotation gate mirrors one host's host_vars over every other, so the
+    write that follows it mints a fresh keypair for every host whose own entry
+    the mirror overwrote. Until each node carries the new set, the hub still
+    authorises the keys of the first pass and turns the controller away.
+    """
+    if not mesh_enabled():
+        return 0
+    return run_step(
+        [
+            "ansible-playbook",
+            "-i",
+            f"{inv_dir}/devices.yml",
+            "--vault-password-file",
+            f"{inv_dir}/.password",
+            _PLAYBOOK,
+        ],
+        env=os.environ.copy(),
+        label="converge the mesh on every node",
+    )
+
+
 def mesh_controller(*, inv_dir: str) -> int:
     """Bring the controller's own interface up before the transport moves.
 
@@ -93,7 +119,7 @@ def mesh_controller(*, inv_dir: str) -> int:
             f"{inv_dir}/.password",
             "-e",
             json.dumps({"MESH_PEER_ADDRESSES": _lab_hosts()}),
-            "playbook-mesh-controller.yml",
+            _PLAYBOOK,
         ],
         env=os.environ.copy(),
         label="put the deploy controller on the mesh",
