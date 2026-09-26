@@ -1,17 +1,6 @@
 ---
-# Bring the machine driving the deploy onto the mesh, so the pass that follows
-# can reach the nodes over it.
-#
-# Separate from playbook.yml on purpose. The controller is not a managed host:
-# it runs the deploy rather than being deployed to, and the main play targets
-# `all` with `become: true`, so putting the controller in that inventory hands
-# it the whole host bootstrap -- package installs, docker, the DNS check that
-# expects the test domain to resolve. It needs one interface, not a build-out.
-#
-# That one-host inventory is also why the play sets WIREGUARD_ENABLED itself:
-# the variable derives from DEPLOYMENT_MODE, which counts the members of
-# svc-swarm-node, and an inventory holding only the controller has no such
-# group. Left derived, it reads `compose` and the role skips itself.
+# Param: MESH_PEER_ADDRESSES -- name-to-address map written to /etc/hosts
+# before the role runs; empty (the default) leaves /etc/hosts alone.
 - name: "🔒 Put the deploy controller on the mesh"
   hosts: all
   connection: local
@@ -22,5 +11,15 @@
     - name: "🔓 Get apt ready before the first apt task"
       ansible.builtin.include_tasks: "./tasks/utils/apt/ready.yml"
       when: ansible_facts['os_family'] == 'Debian'
+
+    - name: "📛 Resolve the mesh peers this host dials"
+      ansible.builtin.blockinfile:
+        path: /etc/hosts
+        marker: "# {mark} infinito mesh peers"
+        block: |
+          {% for name, address in MESH_PEER_ADDRESSES | dictsort %}
+          {{ address }} {{ name }}
+          {% endfor %}
+      when: MESH_PEER_ADDRESSES | default({}) | length > 0
   roles:
     - svc-net-wireguard
