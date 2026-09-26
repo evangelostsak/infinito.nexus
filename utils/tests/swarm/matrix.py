@@ -22,12 +22,15 @@ import argparse
 import json
 import os
 import sys
-from pathlib import Path
 
 from utils import PROJECT_ROOT
 from utils.storage.constrained import host_storage_constrained
 from utils.tests.swarm.derive_includes import derive_includes, variant_scope
-from utils.tests.swarm.extend_inventory import mesh_enabled
+from utils.tests.swarm.mesh import (
+    mesh_controller,
+    switch_to_mesh_transport,
+    write_mesh,
+)
 from utils.tests.swarm.run import DISK_FLOOR_MB, run_step
 from utils.tests.swarm.write.extras import ensure_swarm_keypairs
 
@@ -35,9 +38,6 @@ _SWARM_DIR = PROJECT_ROOT / "scripts" / "tests" / "deploy" / "swarm"
 _SWARM_SCRIPTS = _SWARM_DIR / "routine"
 _ROLES_DIR = str(PROJECT_ROOT / "roles")
 _SWARM_EXTRAS_VARS = "inventories/development/swarm.yml"
-_MESH_NAME = "swarm"
-_CONTROLLER = "localhost"
-_DEFAULT_ADMIN_KEY = "/tmp/swarm-nfs-admin.key"  # noqa: S108 - ephemeral swarm-test path, overridable via KEY_PATH
 _DEFAULT_INVENTORY_DIR = "/tmp/inv"  # noqa: S108 - ephemeral swarm-test inventory base in CI
 
 
@@ -68,56 +68,6 @@ def _extend_inventory(
         env=env,
         label="extend inventory (workers + group memberships)",
     )
-
-
-def _write_mesh(*, inv_dir: str) -> int:
-    """Write the WireGuard meshes over both inventories of the round.
-
-    Ordered after extend_inventory, which creates the groups the meshes
-    resolve from and the sibling backup.yml the data mesh spans. A no-op when
-    the run's vpn axis is off, because the groups are then absent entirely.
-    """
-    if not mesh_enabled():
-        return 0
-    args = ["--inventory", f"{inv_dir}/devices.yml"]
-    args += ["--inventory", f"{inv_dir}/backup.yml"]
-    args += ["--host-vars-dir", f"{inv_dir}/host_vars"]
-    args += ["--vault-password-file", f"{inv_dir}/.password"]
-    args += ["--controller", _CONTROLLER, "--controller-mesh", _MESH_NAME]
-    return run_step(
-        ["python3", "-m", "cli.administration.inventory.mesh", *args],
-        env=os.environ.copy(),
-        label="write wireguard meshes (cross-host credentials)",
-    )
-
-
-def _switch_to_mesh(*, inv_dir: str) -> int:
-    """Point the inventory at the mesh before the pass that must use it.
-
-    The first pass reaches the nodes over the container connection, because it
-    is what brings the mesh up. Every pass after it connects over the mesh, so
-    a broken tunnel fails the deploy at the connection instead of letting a
-    role quietly fall back to the underlay.
-    """
-    if not mesh_enabled():
-        return 0
-    from cli.administration.inventory.mesh.transport import switch_to_mesh
-
-    host_vars = Path(inv_dir) / "host_vars"
-    hosts = sorted(path.stem for path in host_vars.glob("*.yml"))
-    switched = switch_to_mesh(
-        host_vars,
-        hosts,
-        _MESH_NAME,
-        user="administrator",
-        private_key_file=os.environ.get("KEY_PATH") or _DEFAULT_ADMIN_KEY,
-    )
-    for host, address in sorted(switched.items()):
-        print(f"[INFO] {host}: ansible now connects over {address}", flush=True)
-    if not switched:
-        print("[FATAL] no host holds a mesh address to switch to", file=sys.stderr)
-        return 1
-    return 0
 
 
 def _force_shared_db(*, inv_dir: str) -> int:
@@ -414,7 +364,7 @@ def main(argv: list[str] | None = None) -> int:
                 app_id=app_id, inv_dir=inv_root, round_variants=round_variants
             )
         if rc == 0:
-            rc = _write_mesh(inv_dir=inv_root)
+            rc = write_mesh(inv_dir=inv_root)
         if rc == 0:
             rc = _write_extras(extras_path=extras_path)
         if rc == 0:
@@ -442,9 +392,11 @@ def main(argv: list[str] | None = None) -> int:
                 app_id=app_id, inv_dir=inv_root, round_variants=round_variants
             )
         if rc == 0:
-            rc = _write_mesh(inv_dir=inv_root)
+            rc = write_mesh(inv_dir=inv_root)
         if rc == 0:
-            rc = _switch_to_mesh(inv_dir=inv_root)
+            rc = mesh_controller(inv_dir=inv_root)
+        if rc == 0:
+            rc = switch_to_mesh_transport(inv_dir=inv_root)
         if rc == 0:
             rc = _deploy(
                 app_id=app_id,
