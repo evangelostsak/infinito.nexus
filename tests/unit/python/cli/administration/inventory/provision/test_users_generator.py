@@ -15,6 +15,10 @@ from cli.administration.inventory.provision.passwords import (
     generate_declared_user_password,
     generate_user_password,
 )
+from cli.administration.inventory.provision.ruamel_io import (
+    dump_document,
+    vault_value,
+)
 from cli.administration.inventory.provision.users_generator import (
     generate_user_passwords,
     required_user_policies,
@@ -501,7 +505,37 @@ class TestDeclaredPasswordPolicy(unittest.TestCase):
                 required_user_policies(roles_dir, ["web-app-a"]),
             )
 
-    def test_a_password_the_role_states_outright_gets_no_random_pin(self):
+    def test_a_password_pointing_at_another_value_is_pinned_to_it(self):
+        yaml_rt = _yaml()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            roles_dir = tmpdir / "roles"
+            _write_role_users(
+                roles_dir,
+                "web-app-a",
+                'bot:\n  password: "{{ ansible_become_password }}"\n',
+            )
+            vault_pw_file = tmpdir / ".password"
+            vault_pw_file.write_text("s3cr3t-vault-password\n", encoding="utf-8")
+            host_vars_file = tmpdir / "host.yml"
+            host_vars_file.write_text(
+                "ansible_become_password: the-become-secret\n", encoding="utf-8"
+            )
+
+            generate_user_passwords(
+                roles_dir=roles_dir,
+                application_ids=["web-app-a"],
+                host_vars_file=host_vars_file,
+                vault_password_file=vault_pw_file,
+            )
+
+            with host_vars_file.open("r", encoding="utf-8") as handle:
+                doc = yaml_rt.load(handle)
+
+        self.assertEqual("the-become-secret", doc["users"]["bot"]["password"])
+
+    def test_the_referenced_value_keeps_its_vault_tag(self):
+        yaml_rt = _yaml()
         with tempfile.TemporaryDirectory() as tmp:
             tmpdir = Path(tmp)
             roles_dir = tmpdir / "roles"
@@ -514,15 +548,55 @@ class TestDeclaredPasswordPolicy(unittest.TestCase):
             vault_pw_file.write_text("s3cr3t-vault-password\n", encoding="utf-8")
             host_vars_file = tmpdir / "host.yml"
 
-            count = generate_user_passwords(
+            seed = CommentedMap()
+            seed["ansible_become_password"] = vault_value(
+                vault_pw_file, "the-become-secret", "ansible_become_password"
+            )
+            dump_document(host_vars_file, seed)
+
+            generate_user_passwords(
                 roles_dir=roles_dir,
                 application_ids=["web-app-a"],
                 host_vars_file=host_vars_file,
                 vault_password_file=vault_pw_file,
             )
 
-        self.assertEqual(0, count)
-        self.assertFalse(host_vars_file.exists())
+            written = read_text(host_vars_file)
+            with host_vars_file.open("r", encoding="utf-8") as handle:
+                doc = yaml_rt.load(handle)
+
+        self.assertEqual(
+            "!vault", getattr(doc["users"]["bot"]["password"], "tag", None)
+        )
+        self.assertEqual(2, written.count("$ANSIBLE_VAULT;1.1;AES256"))
+
+    def test_a_password_pointing_at_nothing_falls_back_to_a_fresh_one(self):
+        yaml_rt = _yaml()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            roles_dir = tmpdir / "roles"
+            _write_role_users(
+                roles_dir,
+                "web-app-a",
+                'bot:\n  password: "{{ ansible_become_password }}"\n',
+            )
+            vault_pw_file = tmpdir / ".password"
+            vault_pw_file.write_text("s3cr3t-vault-password\n", encoding="utf-8")
+            host_vars_file = tmpdir / "host.yml"
+
+            generate_user_passwords(
+                roles_dir=roles_dir,
+                application_ids=["web-app-a"],
+                host_vars_file=host_vars_file,
+                vault_password_file=vault_pw_file,
+            )
+
+            with host_vars_file.open("r", encoding="utf-8") as handle:
+                doc = yaml_rt.load(handle)
+
+        self.assertEqual(
+            "!vault", getattr(doc["users"]["bot"]["password"], "tag", None)
+        )
 
     def test_two_roles_disagreeing_on_one_account_abort(self):
         with tempfile.TemporaryDirectory() as tmpdir:
