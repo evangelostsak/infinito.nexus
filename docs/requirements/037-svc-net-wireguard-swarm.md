@@ -52,6 +52,8 @@ The deploy is therefore split at an explicit seam, and the seam falls between tw
 
 The rewrite is a step between the passes rather than a fact set during a play, because a play cannot change the transport it is already running over.
 
+The rotation gate sits in that same seam and mints a fresh keypair for every host it touches, which leaves each node authorising the keys of the first pass while the inventory already holds the next set. The nodes therefore converge on the new keys before the controller joins and before the transport moves; a controller that dialled the hub first would present a key the hub has not been told about yet.
+
 The Ansible controller is a mesh member. It is not a swarm node and joins no cluster, but it holds an address and routes the pool through the hub, so the second pass reaches every host over the tunnel rather than through a gateway hop. It is named explicitly rather than resolved from an inventory group: it has no role group of its own, and inventing one would put a non-role name into `group_names`, where every service and placement lookup would have to special-case it.
 
 That makes the mesh load-bearing rather than merely present. If it is broken the deploy cannot reach a single host, so no role can quietly fall back to the underlay it was supposed to stop using.
@@ -87,7 +89,7 @@ Swarm mode only, and there only when the run's `vpn` axis asks for it. The role 
 - [ ] The first pass runs over the pre-existing transport and the second over the mesh, against hosts that had no tunnel when the deploy started, without manual intervention.
 - [ ] The Ansible controller holds a mesh address and reaches every member over the tunnel, while joining no swarm cluster.
 - [ ] Reconfiguring a live interface does not drop the connection the play is running over, so a key rotation converges on a host Ansible is reaching through the mesh.
-- [x] Rotating every key on a redeploy does not sever the run, and the mesh converges without an operator touching a node.
+- [ ] Rotating every key on a redeploy does not sever the run, and the mesh converges without an operator touching a node.
 - [ ] The gate runs between WireGuard coming up and swarm initialising, and a deliberately broken tunnel fails the deploy at that gate with a message naming the unreachable peer, before any swarm or role task runs.
 - [ ] A swarm deploy with the mesh on carries every path over it, and a regression in the layer fails the deploy rather than falling back.
 - [ ] A swarm deploy with the mesh off omits the role from the inventory entirely and still reaches a green deploy, so nothing in the swarm path depends on the mesh being present.
