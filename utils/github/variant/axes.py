@@ -13,8 +13,9 @@ cover the combinations instead of sampling them:
   modes on consecutive sweeps.
 
 * **tor** -- whether the row deploys behind the node onion. Driven by
-  ``sweep // 2`` so it does NOT flip in lockstep with the mode; a row walks
-  all four mode/tor combinations over four sweeps instead of only two.
+  ``sweep // 2`` so it does NOT flip in lockstep with the mode.
+
+* **vpn** -- whether a swarm row carries the WireGuard mesh, in ``vpn.py``.
 
 * **distro** -- which declared distribution the row deploys on. Per row rather
   than per run, so one sweep proves every distribution instead of proving one
@@ -22,12 +23,11 @@ cover the combinations instead of sampling them:
   exact distribution it died on.
 
 * **filesystem** -- which kind the row's docker data root runs on. The two
-  read the row's position like an odometer: the distro is the low digit and
-  the filesystem the high one, so consecutive rows walk every pairing rather
-  than a diagonal through it. Turning both on the position directly would
-  cover only ``n`` of the ``n x m`` pairs whenever the two pools happen to be
-  the same length, and no sweep would unlock it, because the sweep shifts both
-  by the same amount.
+  read the row's position like an odometer, the distro as the low digit, so
+  consecutive rows walk every pairing rather than a diagonal through it.
+  Turning both on the position directly would cover only ``n`` of the
+  ``n x m`` pairs whenever the pools are the same length, and no sweep would
+  unlock it.
 
 A row's position is its index in the uncapped discovery order, not its index
 inside a chunk, so slicing the list into chunks never changes what a row is
@@ -39,11 +39,20 @@ than repeating one pair.
 from __future__ import annotations
 
 import os
-import re
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING
 
 from utils.github.variant import instructions
-from utils.github.variant.pools import DISTROS, FILESYSTEMS, rotate
+from utils.github.variant.label import (  # noqa: F401 - re-exported for callers
+    LABEL_RE,
+    LOCAL_GLYPH,
+    Label,
+    parse_label,
+)
+from utils.github.variant.pools import (  # noqa: F401 - re-exported for callers
+    DISTROS,
+    FILESYSTEMS,
+    rotate,
+)
 from utils.github.variant.tor import (
     TOR_DEPLOY_MODES,
     combinations,
@@ -58,94 +67,13 @@ from utils.github.variant.vpn import (
     vpn_states,
 )
 from utils.roles.display import VARIANT_SEPARATOR, display_names
-from utils.symbol_glossary import to_emoji, to_word
+from utils.symbol_glossary import to_emoji
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
     from typing import Any
 
 MODES = ("compose", "swarm", "host")
-
-LOCAL_GLYPH = to_emoji("test_host")
-
-_AXIS_GLYPHS = (
-    "".join(
-        to_emoji(word)
-        for word in ("tor", "clearnet", "vpn", "direct", "priority", "instructions")
-    )
-    + LOCAL_GLYPH
-)
-
-
-def _alternation(words: Sequence[str]) -> str:
-    """A regex alternation over the glyphs of *words*."""
-    return "|".join(re.escape(to_emoji(word)) for word in words)
-
-
-LABEL_RE = re.compile(
-    r"^.*(?P<mode>" + _alternation(MODES) + r")️?"
-    r"(?P<tor>" + re.escape(to_emoji("tor")) + r")?"
-    r"(?:" + re.escape(to_emoji("clearnet")) + r"|" + re.escape(LOCAL_GLYPH) + r")?️?"
-    r"(?P<vpn>" + re.escape(to_emoji("vpn")) + r")?️?"
-    r"(?:" + re.escape(to_emoji("direct")) + r")?️?"
-    r"(?P<distro>" + _alternation(DISTROS) + r")?️?"
-    r"(?P<filesystem>" + _alternation(FILESYSTEMS) + r")?️?"
-    r"[" + re.escape(_AXIS_GLYPHS) + r"️\s]*"
-    r"(?P<name>.+?)"
-    r"(?:" + re.escape(VARIANT_SEPARATOR) + r"(?P<variant>[0-9,]+))?"
-    r"[" + re.escape(_AXIS_GLYPHS) + r"️\s]*$"
-)
-"""The leading ``.*`` is greedy on purpose: it anchors on the LAST mode glyph.
-A reusable-workflow caller path can carry a mode glyph of its own (``z / 💻
-Host / 💻 sys-front-proxy``), and matching the first one would swallow the
-caller name into the role."""
-
-
-class Label(NamedTuple):
-    """One deploy job title, taken apart."""
-
-    mode: str
-    name: str
-    variant: str
-    tor: bool
-    distro: str = ""
-    filesystem: str = ""
-    vpn: bool = False
-
-
-def parse_label(name: str) -> Label | None:
-    """Take a deploy job title apart.
-
-    The inverse of what :func:`assign` builds, kept next to it so the two
-    cannot drift: consumers that hand-rolled their own regex over raw role
-    ids silently matched nothing once job titles carried display names, and
-    every failure went unreported.
-
-    Args:
-        name: the job title, with or without a reusable-workflow caller path
-            in front of it.
-
-    Returns:
-        ``None`` when the title carries no deploy row. ``name`` is the display
-        name, returned unresolved -- callers decode it through
-        ``utils.roles.display``, which is what knows the role tree. ``tor``,
-        ``distro`` and ``filesystem`` matter because a priority role runs the
-        same mode and variant several times over, and only the glyphs tell
-        those jobs apart -- a retrigger built from the title alone would
-        otherwise replay a different combination than the one that failed.
-    """
-    match = LABEL_RE.match(name.strip())
-    if match is None:
-        return None
-    return Label(
-        to_word(match.group("mode")),
-        match.group("name").strip(),
-        match.group("variant") or "",
-        match.group("tor") is not None,
-        to_word(match.group("distro") or ""),
-        to_word(match.group("filesystem") or ""),
-        match.group("vpn") is not None,
-    )
 
 
 def resolve_sweep(raw: str | None = None) -> int:
@@ -287,6 +215,7 @@ def assign(
     tor_mode: str,
     distros: Sequence[str],
     filesystems: Sequence[str],
+    vpn_mode: str = "auto",
     variants_per_app: Mapping[str, Sequence[Mapping[str, Any]]] | None = None,
 ) -> list[dict[str, str]]:
     """Turn ordered discovery rows into CI matrix entries.
@@ -305,12 +234,12 @@ def assign(
         distros: the distributions this run may draw from
             (:func:`resolve_pool`).
         filesystems: the docker data-root kinds this run may draw from. A pool
-            of exactly one, like a token that pins the kind, is a human naming
-            it: the entry then carries ``enforce_filesystem``, and a host that
-            cannot serve it fails instead of substituting one. A wider pool
-            leaves the row's kind a preference, because the matrix narrows
-            every row to one kind and reading that as a demand would fail rows
-            for conditions the applying step is built to tolerate.
+            of exactly one is a human naming it: the entry then carries
+            ``enforce_filesystem`` and a host that cannot serve it fails
+            instead of substituting one. A wider pool leaves the kind a
+            preference, because the matrix narrows every row to one anyway.
+        vpn_mode: ``enforced`` meshes every swarm row, ``disabled`` none,
+            ``auto`` rotates.
         variants_per_app: rendered variant configs per app, so a variant that
             switches the tor gate off is never counted capable.
 
@@ -320,11 +249,10 @@ def assign(
         discovery ``id`` and the ``covered`` id of the earlier row that already
         embeds it (``0``: nothing does), so a reader of the plan can tell a
         redundant row from a unique one without a second query. A regular row
-        yields
-        exactly one -- the rotation picks its combination for this sweep. A
-        priority row yields every combination :func:`combinations` allows, so
-        the roles a run is told to prove are proven everywhere at once rather
-        than sampled over four sweeps. ``disable`` carries the provider tokens
+        yields exactly one. A priority row yields every combination
+        :func:`combinations` allows, so the roles a run is told to prove are
+        proven everywhere at once rather than sampled over four sweeps.
+        ``disable`` carries the provider tokens
         the deploy drill switches off; a row without tor disables the provider
         so no dependency edge can pull it back into the closure. The provider's
         own rows therefore never take the clearnet state: disabling tor there
@@ -365,7 +293,7 @@ def assign(
                     offered, capable=capable, tor_mode=tor_mode
                 )
                 if pin_mode in (None, mode) and pin_tor in (None, state)
-                for meshed in vpn_states(mode)
+                for meshed in vpn_states(mode, vpn_mode=vpn_mode)
                 if pin_vpn in (None, meshed)
             ]
         else:
@@ -378,7 +306,13 @@ def assign(
                 (
                     mode,
                     state,
-                    rotated_vpn(mode, position=position, sweep=sweep, pin=pin_vpn),
+                    rotated_vpn(
+                        mode,
+                        position=position,
+                        sweep=sweep,
+                        pin=pin_vpn,
+                        vpn_mode=vpn_mode,
+                    ),
                 )
                 for state in _rotated_tor(
                     mode,
