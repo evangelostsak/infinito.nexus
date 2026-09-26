@@ -1,9 +1,8 @@
 ---
 # Param: MESH_PEER_ADDRESSES -- name-to-address map written to /etc/hosts
 # before the role runs; empty (the default) leaves /etc/hosts alone.
-- name: "🔒 Put the deploy controller on the mesh"
+- name: "🔒 Bring every host of this inventory onto the mesh"
   hosts: all
-  connection: local
   become: true
   vars:
     WIREGUARD_ENABLED: true
