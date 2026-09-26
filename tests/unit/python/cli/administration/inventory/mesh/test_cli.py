@@ -16,6 +16,8 @@ from .test_write import (
     VAULT_PASSWORD,
 )
 
+CONTROLLER = "deploy-controller"
+
 
 class TestMeshCli(unittest.TestCase):
     def setUp(self):
@@ -73,6 +75,18 @@ class TestMeshCli(unittest.TestCase):
     def test_restricting_to_one_mesh_leaves_the_other_unwritten(self):
         self.assertEqual(main(self._argv("--mesh", "swarm")), 0)
         self.assertNotIn("data:", self._text("nfs-server"))
+
+    def test_the_controller_is_pruned_although_no_group_holds_it(self):
+        argv = self._argv("--controller", CONTROLLER, "--controller-mesh", "swarm")
+        self.assertEqual(main(argv), 0)
+        (self.host_vars / f"{CONTROLLER}.yml").write_text(
+            self._text("swarm-mgr-01"), encoding="utf-8"
+        )
+
+        self.assertEqual(main(argv), 0)
+        text = self._text(CONTROLLER)
+        self.assertIn("swarm:", text)
+        self.assertNotIn("data:", text)
 
     def test_a_rerun_is_a_no_op(self):
         self.assertEqual(main(self._argv()), 0)
