@@ -1,0 +1,15 @@
+---
+# Bring the machine driving the deploy onto the mesh, so the pass that follows
+# can reach the nodes over it.
+#
+# Separate from playbook.yml on purpose. The controller is not a managed host:
+# it runs the deploy rather than being deployed to, and the main play targets
+# `all` with `become: true`, so putting the controller in that inventory hands
+# it the whole host bootstrap -- package installs, docker, the DNS check that
+# expects the test domain to resolve. It needs one interface, not a build-out.
+- name: "🔒 Put the deploy controller on the mesh"
+  hosts: all
+  connection: local
+  become: true
+  roles:
+    - svc-net-wireguard
