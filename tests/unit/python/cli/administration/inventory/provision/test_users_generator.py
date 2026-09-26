@@ -475,10 +475,54 @@ class TestDeclaredPasswordPolicy(unittest.TestCase):
                     "bot": {
                         "algorithm": "strong_password",
                         "validation": "[^A-Za-z0-9]",
+                        "value": None,
                     }
                 },
                 required_user_policies(roles_dir, ["web-app-a"]),
             )
+
+    def test_a_password_the_role_states_outright_is_carried_not_a_policy(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            roles_dir = Path(tmpdir)
+            _write_role_users(
+                roles_dir,
+                "web-app-a",
+                'bot:\n  password: "{{ ansible_become_password }}"\n',
+            )
+
+            self.assertEqual(
+                {
+                    "bot": {
+                        "algorithm": None,
+                        "validation": None,
+                        "value": "{{ ansible_become_password }}",
+                    }
+                },
+                required_user_policies(roles_dir, ["web-app-a"]),
+            )
+
+    def test_a_password_the_role_states_outright_gets_no_random_pin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            roles_dir = tmpdir / "roles"
+            _write_role_users(
+                roles_dir,
+                "web-app-a",
+                'bot:\n  password: "{{ ansible_become_password }}"\n',
+            )
+            vault_pw_file = tmpdir / ".password"
+            vault_pw_file.write_text("s3cr3t-vault-password\n", encoding="utf-8")
+            host_vars_file = tmpdir / "host.yml"
+
+            count = generate_user_passwords(
+                roles_dir=roles_dir,
+                application_ids=["web-app-a"],
+                host_vars_file=host_vars_file,
+                vault_password_file=vault_pw_file,
+            )
+
+        self.assertEqual(0, count)
+        self.assertFalse(host_vars_file.exists())
 
     def test_two_roles_disagreeing_on_one_account_abort(self):
         with tempfile.TemporaryDirectory() as tmpdir:
