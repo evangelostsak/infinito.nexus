@@ -27,6 +27,7 @@ from utils import PROJECT_ROOT
 from utils.storage.constrained import host_storage_constrained
 from utils.tests.swarm.derive_includes import derive_includes, variant_scope
 from utils.tests.swarm.mesh import (
+    converge_mesh,
     mesh_controller,
     switch_to_mesh_transport,
     write_mesh,
@@ -393,6 +394,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         if rc == 0:
             rc = write_mesh(inv_dir=inv_root)
+        if rc == 0:
+            rc = converge_mesh(inv_dir=inv_root)
         if rc == 0:
             rc = mesh_controller(inv_dir=inv_root)
         if rc == 0:
