@@ -10,7 +10,9 @@ that are already generated there.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import copy
+import re
+from typing import TYPE_CHECKING, Any
 
 from utils.cache.yaml import load_yaml_any
 from utils.roles.mapping import ROLE_FILE_META_USERS
@@ -20,6 +22,8 @@ from .ruamel_io import dump_document, ensure_map, load_document, vault_value
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from ruamel.yaml.comments import CommentedMap
 
 
 def required_user_policies(
@@ -78,6 +82,24 @@ def required_user_policies(
     return dict(sorted(policies.items()))
 
 
+_REFERENCE_RE = re.compile(r"^\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}$")
+
+
+def _referenced_value(document: CommentedMap, declared: str | None) -> Any:
+    """Return the host_vars value a declared password points at, if it does.
+
+    A role states `password: "{{ ansible_become_password }}"` to say the
+    account shares an existing secret. Pinning a fresh one over it would give
+    the account a password nothing else holds, and carrying the expression
+    through unresolved would hand it the literal text.
+    """
+    match = _REFERENCE_RE.match(declared) if isinstance(declared, str) else None
+    if match is None:
+        return None
+    value = document.get(match.group(1))
+    return copy.deepcopy(value) if value is not None else None
+
+
 def generate_user_passwords(
     roles_dir: Path,
     application_ids: list[str],
@@ -86,9 +108,9 @@ def generate_user_passwords(
 ) -> int:
     """Write a vaulted password for every required user that has none yet.
 
-    A user whose role declares the password as a value rather than a policy is
-    left alone: the role has already said where the password comes from, and
-    pinning a random one over it gives the account a secret nothing else holds.
+    A user whose role points its password at another host_vars value gets that
+    value pinned instead of a fresh one, so the account and whatever else reads
+    that secret stay in step.
 
     Args:
         roles_dir: directory the roles live in.
@@ -109,7 +131,12 @@ def generate_user_passwords(
     generated = 0
     for username, policy in policies.items():
         user_doc = ensure_map(users_doc, username)
-        if user_doc.get("password") or policy["value"]:
+        if user_doc.get("password"):
+            continue
+        referenced = _referenced_value(document, policy["value"])
+        if referenced is not None:
+            user_doc["password"] = referenced
+            generated += 1
             continue
         user_doc["password"] = vault_value(
             vault_password_file,
