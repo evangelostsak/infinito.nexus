@@ -109,13 +109,15 @@ class Pin(NamedTuple):
         """Whether the token narrows anything at all beyond the role name."""
         return bool(self.variants) or any(
             axis is not None
-            for axis in (self.mode, self.tor, self.distro, self.filesystem)
+            for axis in (self.mode, self.tor, self.distro, self.filesystem, self.vpn)
         )
 
     @property
-    def axes(self) -> tuple[str | None, bool | None, str | None, str | None]:
+    def axes(
+        self,
+    ) -> tuple[str | None, bool | None, str | None, str | None, bool | None]:
         """What the token narrows, as the key two tokens are equal under."""
-        return (self.mode, self.tor, self.distro, self.filesystem)
+        return (self.mode, self.tor, self.distro, self.filesystem, self.vpn)
 
 
 def describe(pin: Pin) -> str:
