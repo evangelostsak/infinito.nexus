@@ -11,5 +11,9 @@
   hosts: all
   connection: local
   become: true
+  pre_tasks:
+    - name: "🔓 Get apt ready before the first apt task"
+      ansible.builtin.include_tasks: "./tasks/utils/apt/ready.yml"
+      when: ansible_facts['os_family'] == 'Debian'
   roles:
     - svc-net-wireguard
