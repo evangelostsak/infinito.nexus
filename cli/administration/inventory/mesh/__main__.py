@@ -104,7 +104,10 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     vault_password_file = Path(args.vault_password_file).resolve()
-    all_hosts = sorted({host for hosts in groups.values() for host in hosts})
+    all_hosts = sorted(
+        {host for hosts in groups.values() for host in hosts}
+        | ({args.controller} if args.controller else set())
+    )
 
     # Exception: prune before planning. A mirrored host_vars carries another
     # host's entry for meshes this one is not a member of, and writing a
