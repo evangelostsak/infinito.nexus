@@ -57,9 +57,14 @@ def required_user_policies(
                 {
                     "algorithm": declared.get("algorithm"),
                     "validation": declared.get("validation"),
+                    "value": None,
                 }
                 if isinstance(declared, dict)
-                else {"algorithm": None, "validation": None}
+                else {
+                    "algorithm": None,
+                    "validation": None,
+                    "value": declared if isinstance(declared, str) else None,
+                }
             )
             known = policies.get(name)
             if known is not None and known != policy and any(policy.values()):
@@ -81,6 +86,10 @@ def generate_user_passwords(
 ) -> int:
     """Write a vaulted password for every required user that has none yet.
 
+    A user whose role declares the password as a value rather than a policy is
+    left alone: the role has already said where the password comes from, and
+    pinning a random one over it gives the account a secret nothing else holds.
+
     Args:
         roles_dir: directory the roles live in.
         application_ids: the roles resolved into this inventory.
@@ -100,7 +109,7 @@ def generate_user_passwords(
     generated = 0
     for username, policy in policies.items():
         user_doc = ensure_map(users_doc, username)
-        if user_doc.get("password"):
+        if user_doc.get("password") or policy["value"]:
             continue
         user_doc["password"] = vault_value(
             vault_password_file,
