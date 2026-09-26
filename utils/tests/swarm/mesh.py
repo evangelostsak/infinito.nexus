@@ -8,6 +8,7 @@ All three are no-ops when the run's vpn axis is off.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -19,6 +20,25 @@ from utils.tests.swarm.run import run_step
 _MESH_NAME = "swarm"
 _CONTROLLER = "localhost"
 _DEFAULT_ADMIN_KEY = "/tmp/swarm-nfs-admin.key"  # noqa: S108 - ephemeral swarm-test path, overridable via KEY_PATH
+
+_LAB_ADDRESSES = {
+    "MGR": "INFINITO_SWARM_MGR_IP",
+    "WRK1": "INFINITO_SWARM_WRK1_IP",
+    "WRK2": "INFINITO_SWARM_WRK2_IP",
+    "NFS_SERVER": "INFINITO_SWARM_NFS_IP",
+    "BACKUP_NODE": "INFINITO_SWARM_BACKUP_IP",
+}
+
+
+def _lab_hosts() -> dict[str, str]:
+    """Name to address for every lab node, as compose's extra_hosts spells it."""
+    resolved = {}
+    for name_var, address_var in _LAB_ADDRESSES.items():
+        name = os.environ.get(name_var, "").strip()
+        address = os.environ.get(address_var, "").strip()
+        if name and address:
+            resolved[name] = address
+    return resolved
 
 
 def write_mesh(*, inv_dir: str) -> int:
@@ -71,6 +91,8 @@ def mesh_controller(*, inv_dir: str) -> int:
             str(inventory),
             "--vault-password-file",
             f"{inv_dir}/.password",
+            "-e",
+            json.dumps({"MESH_PEER_ADDRESSES": _lab_hosts()}),
             "playbook-mesh-controller.yml",
         ],
         env=os.environ.copy(),
