@@ -1,6 +1,4 @@
 ---
-# Param: MESH_PEER_ADDRESSES -- name-to-address map written to /etc/hosts
-# before the role runs; empty (the default) leaves /etc/hosts alone.
 - name: "🔒 Bring every host of this inventory onto the mesh"
   hosts: all
   become: true
@@ -10,15 +8,5 @@
     - name: "🔓 Get apt ready before the first apt task"
       ansible.builtin.include_tasks: "./tasks/utils/apt/ready.yml"
       when: ansible_facts['os_family'] == 'Debian'
-
-    - name: "📛 Resolve the mesh peers this host dials"
-      ansible.builtin.blockinfile:
-        path: /etc/hosts
-        marker: "# {mark} infinito mesh peers"
-        block: |
-          {% for name, address in MESH_PEER_ADDRESSES | dictsort %}
-          {{ address }} {{ name }}
-          {% endfor %}
-      when: MESH_PEER_ADDRESSES | default({}) | length > 0
   roles:
     - svc-net-wireguard
