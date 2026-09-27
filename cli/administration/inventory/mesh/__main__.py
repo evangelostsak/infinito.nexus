@@ -27,6 +27,17 @@ from .write import (
 DEFAULT_GROUP_VARS = PROJECT_ROOT / "group_vars/all/21_wireguard.yml"
 
 
+def parse_endpoints(pairs: list[str]) -> dict[str, str]:
+    """Turn ``HOST=ADDRESS`` arguments into the map the planner takes."""
+    endpoints: dict[str, str] = {}
+    for pair in pairs:
+        host, separator, address = pair.partition("=")
+        if not separator or not host.strip() or not address.strip():
+            raise SystemExit(f"--endpoint expects HOST=ADDRESS, got {pair!r}")
+        endpoints[host.strip()] = address.strip()
+    return endpoints
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Write correlated mesh credentials into every member's host_vars."
@@ -73,6 +84,17 @@ def main(argv: list[str] | None = None) -> int:
         "--controller-mesh",
         default="swarm",
         help="mesh --controller joins; ignored when --controller is unset",
+    )
+    parser.add_argument(
+        "--endpoint",
+        action="append",
+        default=[],
+        metavar="HOST=ADDRESS",
+        help=(
+            "underlay address peers dial for HOST, for a topology whose "
+            "inventory names do not resolve on every member. Repeatable; a "
+            "host left out is dialled by its inventory name"
+        ),
     )
     parser.add_argument(
         "--rotate",
@@ -133,6 +155,7 @@ def main(argv: list[str] | None = None) -> int:
             ),
             rotate=args.rotate,
             controller=(args.controller if spec.name == args.controller_mesh else None),
+            endpoints=parse_endpoints(args.endpoint),
         )
         written = write_mesh(
             mesh, host_vars_dir, vault_password_file, args.application_id
