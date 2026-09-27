@@ -56,6 +56,8 @@ The rotation gate sits in that same seam and mints a fresh keypair for every hos
 
 The Ansible controller is a mesh member. It is not a swarm node and joins no cluster, but it holds an address and routes the pool through the hub, so the second pass reaches every host over the tunnel rather than through a gateway hop. It is named explicitly rather than resolved from an inventory group: it has no role group of its own, and inventing one would put a non-role name into `group_names`, where every service and placement lookup would have to special-case it.
 
+A peer is dialled at the underlay address the table above pins, not at its inventory name. The two are the same wherever inventory names resolve for every member, which is why the address is only stated where they do not — the controller sits outside the lab network and resolves none of its names, and an endpoint that cannot be resolved fails the interface rather than the lookup.
+
 That makes the mesh load-bearing rather than merely present. If it is broken the deploy cannot reach a single host, so no role can quietly fall back to the underlay it was supposed to stop using.
 
 ### The gate is binary
