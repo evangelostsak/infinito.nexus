@@ -75,6 +75,7 @@ def plan_mesh(
     *,
     rotate: bool = False,
     controller: str | None = None,
+    endpoints: dict[str, str] | None = None,
 ) -> Mesh:
     """Resolve ``spec`` into a mesh whose members are addressed and keyed.
 
@@ -90,12 +91,17 @@ def plan_mesh(
         rotate: mint a fresh keypair for every member.
         controller: host to admit as an extra spoke, so the machine driving the
             deploy can reach the mesh it just created.
+        endpoints: hostname to the underlay address its peers dial. A host
+            left out keeps its hostname, which is what every peer already
+            resolves and routes to wherever inventory names are real names.
     """
     held = {} if rotate else dict(existing_public_keys or {})
+    underlay = dict(endpoints or {})
     hub, spokes = members_of(spec, groups, controller)
 
     def member(host: str, offset: int, is_hub: bool) -> MeshMember:
         address = _address(spec.subnet, offset)
+        endpoint = underlay.get(host, host)
         if host in held:
             return MeshMember(
                 host=host,
@@ -103,6 +109,7 @@ def plan_mesh(
                 private_key=None,
                 public_key=held[host],
                 is_hub=is_hub,
+                endpoint=endpoint,
             )
         private_key = generate_private_key()
         return MeshMember(
@@ -111,6 +118,7 @@ def plan_mesh(
             private_key=private_key,
             public_key=public_key_of(private_key),
             is_hub=is_hub,
+            endpoint=endpoint,
         )
 
     members = [member(hub, HUB_OFFSET, True)]
