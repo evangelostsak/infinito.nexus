@@ -43,6 +43,8 @@ class MeshMember:
     Args:
         host: inventory hostname.
         address: the member's address inside the mesh subnet.
+        endpoint: the underlay address its peers dial, which is the hostname
+            itself wherever that already resolves and routes.
         private_key: the member's own secret half, or None when the member
             already holds one that must not be rewritten.
         public_key: the half its peers receive.
@@ -54,6 +56,7 @@ class MeshMember:
     private_key: str | None
     public_key: str
     is_hub: bool
+    endpoint: str = ""
 
 
 @dataclass(frozen=True)
