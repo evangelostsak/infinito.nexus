@@ -88,6 +88,21 @@ class TestMeshCli(unittest.TestCase):
         self.assertIn("swarm:", text)
         self.assertNotIn("data:", text)
 
+    def test_an_endpoint_replaces_the_hostname_peers_dial(self):
+        argv = self._argv("--endpoint", "swarm-mgr-01=192.168.244.10")
+        self.assertEqual(main(argv), 0)
+        text = self._text("swarm-wrk-01")
+        self.assertIn("endpoint: 192.168.244.10", text)
+        self.assertIn("host: swarm-mgr-01", text)
+
+    def test_a_host_without_an_endpoint_is_dialled_by_name(self):
+        self.assertEqual(main(self._argv()), 0)
+        self.assertIn("endpoint: swarm-mgr-01", self._text("swarm-wrk-01"))
+
+    def test_a_malformed_endpoint_aborts(self):
+        with self.assertRaises(SystemExit):
+            main(self._argv("--endpoint", "swarm-mgr-01"))
+
     def test_a_rerun_is_a_no_op(self):
         self.assertEqual(main(self._argv()), 0)
         before = {host: self._text(host) for host in HOSTS}
