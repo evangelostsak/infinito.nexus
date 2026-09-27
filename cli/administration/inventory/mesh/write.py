@@ -166,6 +166,7 @@ def _peer_entries(mesh: Mesh, host: str) -> list[CommentedMap]:
     for peer in mesh.peers_of(host):
         entry = CommentedMap()
         entry["host"] = peer.host
+        entry["endpoint"] = peer.endpoint or peer.host
         entry["public_key"] = peer.public_key
         entry["address"] = peer.address
         # Exception: a spoke routes the whole pool through the hub, not just
