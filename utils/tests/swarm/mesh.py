@@ -9,7 +9,6 @@ axis is off.
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 from pathlib import Path
@@ -32,15 +31,20 @@ _LAB_ADDRESSES = {
 }
 
 
-def _lab_hosts() -> dict[str, str]:
-    """Name to address for every lab node, as compose's extra_hosts spells it."""
-    resolved = {}
+def _lab_endpoints() -> list[str]:
+    """`--endpoint` argument per lab node, from the topology default.env names.
+
+    A node is reached by container name over the docker connection, which only
+    the lab network resolves. The controller is not on it, so the address the
+    topology already pins is what every peer dials.
+    """
+    arguments: list[str] = []
     for name_var, address_var in _LAB_ADDRESSES.items():
         name = os.environ.get(name_var, "").strip()
         address = os.environ.get(address_var, "").strip()
         if name and address:
-            resolved[name] = address
-    return resolved
+            arguments += ["--endpoint", f"{name}={address}"]
+    return arguments
 
 
 def write_mesh(*, inv_dir: str) -> int:
@@ -57,6 +61,7 @@ def write_mesh(*, inv_dir: str) -> int:
     args += ["--host-vars-dir", f"{inv_dir}/host_vars"]
     args += ["--vault-password-file", f"{inv_dir}/.password"]
     args += ["--controller", _CONTROLLER, "--controller-mesh", _MESH_NAME]
+    args += _lab_endpoints()
     return run_step(
         ["python3", "-m", "cli.administration.inventory.mesh", *args],
         env=os.environ.copy(),
@@ -117,8 +122,6 @@ def mesh_controller(*, inv_dir: str) -> int:
             str(inventory),
             "--vault-password-file",
             f"{inv_dir}/.password",
-            "-e",
-            json.dumps({"MESH_PEER_ADDRESSES": _lab_hosts()}),
             _PLAYBOOK,
         ],
         env=os.environ.copy(),
