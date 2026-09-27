@@ -22,6 +22,12 @@ NOT into the extras file: extra-vars replace the whole inventory
 carries the same hazard for the same reason, and its authorized_keys travel
 the same merge channel. The deploy-facing twin ``<OUT_PATH stem>.deploy.yml``
 therefore carries everything except ``applications`` and ``users``.
+
+``ansible_become_password`` rides that twin so the passes that connect over
+ssh escalate with the password the administrator account was actually given.
+The account is created from ``users.administrator.password``, which this
+inventory states outright, while the value ansible would otherwise send is
+generated per host and never reaches the account.
 """
 
 from __future__ import annotations
@@ -199,6 +205,8 @@ def main() -> int:
         "users": default_users,
         "applications": device_applications_overrides(),
     }
+    if admin.get("password"):
+        extras["ansible_become_password"] = admin["password"]
 
     dump_yaml(str(out_path), extras)
     deploy_extras = {
