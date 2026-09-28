@@ -136,13 +136,20 @@ def switch_to_mesh_transport(*, inv_dir: str) -> int:
     is what brings the mesh up. Every pass after it connects over the mesh, so
     a broken tunnel fails the deploy at the connection instead of letting a
     role quietly fall back to the underlay.
+
+    The controller keeps its own transport. It holds a mesh address and routes
+    the pool, but it is the machine running the play: pointed at itself over
+    ssh, every task a role delegates to it would dial its own tunnel address
+    instead of staying local.
     """
     if not mesh_enabled():
         return 0
     from cli.administration.inventory.mesh.transport import switch_to_mesh
 
     host_vars = Path(inv_dir) / "host_vars"
-    hosts = sorted(path.stem for path in host_vars.glob("*.yml"))
+    hosts = sorted(
+        path.stem for path in host_vars.glob("*.yml") if path.stem != _CONTROLLER
+    )
     switched = switch_to_mesh(
         host_vars,
         hosts,
