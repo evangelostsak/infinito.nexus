@@ -106,11 +106,8 @@ def _reset_credentials(
     subprocess each for credentials provision never generated. Every declared
     user password still rotates, so PASS 2 has to carry all of them.
 
-    The mesh block is kept out of the mirror. The cross-host writer mints an
-    address and a keypair per host, so copying one node's block onto the rest
-    leaves them holding an identity that is not theirs, and the write that
-    follows mints a fresh set for everyone -- re-keying tunnels the deploy is
-    already running services over.
+    The mesh block is kept out of the mirror: the cross-host writer mints an
+    address and a keypair per host, which the copy would overwrite.
     """
     return run_step(
         [
@@ -401,7 +398,7 @@ def main(argv: list[str] | None = None) -> int:
                 app_id=app_id, inv_dir=inv_root, round_variants=round_variants
             )
         if rc == 0:
-            rc = write_mesh(inv_dir=inv_root)
+            rc = write_mesh(inv_dir=inv_root, rotate=True)
         if rc == 0:
             rc = converge_mesh(inv_dir=inv_root)
         if rc == 0:
