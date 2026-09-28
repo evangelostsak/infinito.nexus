@@ -131,9 +131,6 @@ def main(argv: list[str] | None = None) -> int:
         | ({args.controller} if args.controller else set())
     )
 
-    # Exception: prune before planning. A mirrored host_vars carries another
-    # host's entry for meshes this one is not a member of, and writing a
-    # member's own entry never removes it.
     for host, names in sorted(
         prune_foreign_meshes(host_vars_dir, all_hosts, args.application_id).items()
     ):
