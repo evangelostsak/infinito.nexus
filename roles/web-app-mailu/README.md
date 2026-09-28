@@ -149,7 +149,7 @@ docker run --rm -it \
 ## Further Resources
 
 - [Mailu Official Website](https://mailu.io/)
-- [Mailu compose setup guide](https://mailu.io/1.7/compose/setup.html)
+- [Mailu compose setup guide](https://mailu.io/master/setup.html)
 - [SysPass issue #1299](https://github.com/nuxsmin/sysPass/issues/1299)
 - [Mailu issue #1719](https://github.com/Mailu/Mailu/issues/1719)
 - [Mailu issue #1171](https://github.com/Mailu/Mailu/issues/1171)
