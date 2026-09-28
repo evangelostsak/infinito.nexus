@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Exception: the state is tagged rather than printed bare. Ansible allocates a
-# pty whenever become needs a password, and a pty merges stderr into stdout, so
-# a caller matching the whole stream would read login noise as the answer.
 set -eu
 : "${DIR_VAR_LIB:?DIR_VAR_LIB required}"
 
