@@ -149,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.rotate
             else existing_public_keys(
                 host_vars_dir,
-                [host for hosts in groups.values() for host in hosts],
+                all_hosts,
                 spec.name,
                 args.application_id,
             ),
