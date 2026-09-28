@@ -1,7 +1,4 @@
 ---
-# Rationale: the layer is binary. Either every swarm deploy proceeds over the
-# mesh or none does, so this gate runs before swarm init and fails the deploy
-# rather than letting a role discover the partition later.
 - name: "🔍 Read the peer state of every interface"
   ansible.builtin.command: "wg show {{ mesh_name | quote }} peers"
   loop: "{{ WIREGUARD_MESH_NAMES }}"
@@ -20,9 +17,6 @@
     label: "{{ item.mesh_name }}"
   when: (item.stdout | trim) | length == 0
 
-# Exception: the handshake is the proof, not a ping. wg reports it directly, it
-# needs no tooling the host might not carry, and it stays true where ICMP is
-# filtered. A peer that has never completed one reports a literal 0.
 - name: "⏳ Wait until every spoke interface has handshaked with its hub"
   ansible.builtin.command: "wg show {{ mesh_name | quote }} latest-handshakes"
   loop: "{{ WIREGUARD_SPOKE_MESH_NAMES }}"
@@ -46,10 +40,6 @@
     label: "{{ item.mesh_name }}"
   when: (item.stdout | default('\t0')) is search('\t0')
 
-# Exception: ping is optional tooling, so the MTU probe is skipped rather than
-# failed when it is absent. The handshake above already proves the tunnel; this
-# only proves the path carries a full-size frame, which is the VXLAN-inside-
-# WireGuard trap.
 - name: "🔍 Check whether ping is available for the MTU probe"
   ansible.builtin.stat:
     path: "{{ WIREGUARD_PING_BINARY }}"
