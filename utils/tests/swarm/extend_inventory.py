@@ -72,10 +72,6 @@ def _host_topology(app_id: str) -> list[tuple[str, str]]:
         app_hosts.extend((app_id, w) for w in _WORKERS)
     mesh_hosts: list[tuple[str, str]] = []
     if mesh_enabled():
-        # Exception: the mesh spans every member, not only the swarm nodes that
-        # pull the role as a dependency. The NFS and backup hosts are spokes of
-        # the data mesh, and without the role they never bring an interface up
-        # -- the manager then holds peers that cannot answer.
         mesh_hosts = [
             ("svc-net-wireguard", _MANAGER),
             *[("svc-net-wireguard", w) for w in _WORKERS],
