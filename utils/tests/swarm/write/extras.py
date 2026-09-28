@@ -21,13 +21,9 @@ NOT into the extras file: extra-vars replace the whole inventory
 ``applications`` dict and would strip every generated credential. ``users``
 carries the same hazard for the same reason, and its authorized_keys travel
 the same merge channel. The deploy-facing twin ``<OUT_PATH stem>.deploy.yml``
-therefore carries everything except ``applications`` and ``users``.
-
-``ansible_become_password`` rides that twin so the passes that connect over
-ssh escalate with the password the administrator account was actually given.
-The account is created from ``users.administrator.password``, which this
-inventory states outright, while the value ansible would otherwise send is
-generated per host and never reaches the account.
+therefore carries everything except ``applications`` and ``users``, plus
+``ansible_become_password`` so a pass connecting over ssh escalates with the
+password the administrator account holds.
 """
 
 from __future__ import annotations
@@ -160,9 +156,6 @@ def main() -> int:
     mgr = os.environ["MGR"]
     out_path = Path(os.environ.get("OUT_PATH", "/tmp/swarm-nfs-extras.yml"))  # noqa: S108 - ephemeral swarm-test path, overridable via OUT_PATH
 
-    # Exception: swarm and NFS must be addressed on the mesh, not the underlay.
-    # Pinning them to the lab addresses leaves every tunnel up and carrying
-    # nothing, because both sides keep talking over 192.168.244.0/24.
     host_vars_dir = out_path.parent / "host_vars"
     mgr_addr = _mesh_address(host_vars_dir, mgr, "swarm", mgr_ip)
     nfs_addr = _mesh_address(
@@ -190,9 +183,6 @@ def main() -> int:
             "backend": "nfs",
             "nfs": {
                 "server": nfs_addr,
-                # Exception: the controller is not a mesh member, so it reaches
-                # the export on the lab address. Pointing it at the mesh one
-                # times out the delegated controller mount.
                 "controller_server": nfs_ip,
             },
         },
