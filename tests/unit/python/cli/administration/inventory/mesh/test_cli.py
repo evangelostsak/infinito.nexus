@@ -103,6 +103,14 @@ class TestMeshCli(unittest.TestCase):
         with self.assertRaises(SystemExit):
             main(self._argv("--endpoint", "swarm-mgr-01"))
 
+    def test_a_rerun_keeps_the_controller_key_too(self):
+        argv = self._argv("--controller", CONTROLLER, "--controller-mesh", "swarm")
+        self.assertEqual(main(argv), 0)
+        before = self._text(CONTROLLER)
+
+        self.assertEqual(main(argv), 0)
+        self.assertEqual(self._text(CONTROLLER), before)
+
     def test_a_rerun_is_a_no_op(self):
         self.assertEqual(main(self._argv()), 0)
         before = {host: self._text(host) for host in HOSTS}
