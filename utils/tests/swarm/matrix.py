@@ -105,6 +105,12 @@ def _reset_credentials(
     an application block per mirror artefact, and rotating those costs one
     subprocess each for credentials provision never generated. Every declared
     user password still rotates, so PASS 2 has to carry all of them.
+
+    The mesh block is kept out of the mirror. The cross-host writer mints an
+    address and a keypair per host, so copying one node's block onto the rest
+    leaves them holding an identity that is not theirs, and the write that
+    follows mints a fresh set for everyone -- re-keying tunnels the deploy is
+    already running services over.
     """
     return run_step(
         [
@@ -122,6 +128,8 @@ def _reset_credentials(
             "--app-variants",
             json.dumps(round_variants, sort_keys=True),
             "--mirror",
+            "--mirror-keep",
+            "applications.svc-net-wireguard",
             "--backup",
             "--except",
             "administrator",
