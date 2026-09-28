@@ -52,7 +52,7 @@ The deploy is therefore split at an explicit seam, and the seam falls between tw
 
 The rewrite is a step between the passes rather than a fact set during a play, because a play cannot change the transport it is already running over.
 
-The rotation gate sits in that same seam and mints a fresh keypair for every host it touches, which leaves each node authorising the keys of the first pass while the inventory already holds the next set. The nodes therefore converge on the new keys before the controller joins and before the transport moves; a controller that dialled the hub first would present a key the hub has not been told about yet.
+The seam also rotates the mesh. The round mints a fresh keypair for every member between the passes, which leaves each node authorising the keys of the first pass while the inventory already holds the next set. The nodes therefore converge on the new keys before the controller joins and before the transport moves; a controller that dialled the hub first would present a key the hub has not been told about yet. The rotation is asked for rather than inherited, so the two criteria below are exercised on every round instead of resting on whatever the credential mirror happened to disturb.
 
 The Ansible controller is a mesh member. It is not a swarm node and joins no cluster, but it holds an address and routes the pool through the hub, so the second pass reaches every host over the tunnel rather than through a gateway hop. It is named explicitly rather than resolved from an inventory group: it has no role group of its own, and inventing one would put a non-role name into `group_names`, where every service and placement lookup would have to special-case it.
 
