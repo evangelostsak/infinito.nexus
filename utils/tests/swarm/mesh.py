@@ -32,12 +32,7 @@ _LAB_ADDRESSES = {
 
 
 def _lab_endpoints() -> list[str]:
-    """`--endpoint` argument per lab node, from the topology default.env names.
-
-    A node is reached by container name over the docker connection, which only
-    the lab network resolves. The controller is not on it, so the address the
-    topology already pins is what every peer dials.
-    """
+    """`--endpoint` argument per lab node, from the topology default.env names."""
     arguments: list[str] = []
     for name_var, address_var in _LAB_ADDRESSES.items():
         name = os.environ.get(name_var, "").strip()
@@ -47,12 +42,16 @@ def _lab_endpoints() -> list[str]:
     return arguments
 
 
-def write_mesh(*, inv_dir: str) -> int:
+def write_mesh(*, inv_dir: str, rotate: bool = False) -> int:
     """Write the WireGuard meshes over both inventories of the round.
 
     Ordered after extend_inventory, which creates the groups the meshes
     resolve from and the sibling backup.yml the data mesh spans. A no-op when
     the run's vpn axis is off, because the groups are then absent entirely.
+
+    Args:
+        inv_dir: inventory directory of the round.
+        rotate: mint a fresh keypair for every member.
     """
     if not mesh_enabled():
         return 0
@@ -62,20 +61,22 @@ def write_mesh(*, inv_dir: str) -> int:
     args += ["--vault-password-file", f"{inv_dir}/.password"]
     args += ["--controller", _CONTROLLER, "--controller-mesh", _MESH_NAME]
     args += _lab_endpoints()
+    if rotate:
+        args += ["--rotate"]
+    label = "rotate the wireguard meshes" if rotate else "write wireguard meshes"
     return run_step(
         ["python3", "-m", "cli.administration.inventory.mesh", *args],
         env=os.environ.copy(),
-        label="write wireguard meshes (cross-host credentials)",
+        label=f"{label} (cross-host credentials)",
     )
 
 
 def converge_mesh(*, inv_dir: str) -> int:
-    """Re-render the nodes' interfaces after the round re-minted their keys.
+    """Carry the rotated keys to every node before the transport moves.
 
-    The rotation gate mirrors one host's host_vars over every other, so the
-    write that follows it mints a fresh keypair for every host whose own entry
-    the mirror overwrote. Until each node carries the new set, the hub still
-    authorises the keys of the first pass and turns the controller away.
+    The write before this one rotates the mesh, so each node still authorises
+    the previous set until it re-renders. Reaching them over the container
+    connection is what proves a rotation converges without an operator.
     """
     if not mesh_enabled():
         return 0
@@ -132,15 +133,7 @@ def mesh_controller(*, inv_dir: str) -> int:
 def switch_to_mesh_transport(*, inv_dir: str) -> int:
     """Point the inventory at the mesh before the pass that must use it.
 
-    The first pass reaches the nodes over the container connection, because it
-    is what brings the mesh up. Every pass after it connects over the mesh, so
-    a broken tunnel fails the deploy at the connection instead of letting a
-    role quietly fall back to the underlay.
-
-    The controller keeps its own transport. It holds a mesh address and routes
-    the pool, but it is the machine running the play: pointed at itself over
-    ssh, every task a role delegates to it would dial its own tunnel address
-    instead of staying local.
+    The controller keeps its own transport: it is the machine running the play.
     """
     if not mesh_enabled():
         return 0
