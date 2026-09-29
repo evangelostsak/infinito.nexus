@@ -138,22 +138,27 @@ def main(argv: list[str] | None = None) -> int:
             f"[INFO] {host}: dropped mesh entr(ies) owned elsewhere: {', '.join(names)}"
         )
 
+    keyed_here: dict[str, str] = {}
     for spec in specs:
-        mesh = plan_mesh(
-            spec,
-            groups,
-            None
+        held = (
+            {}
             if args.rotate
             else existing_public_keys(
                 host_vars_dir,
                 all_hosts,
                 spec.name,
                 args.application_id,
-            ),
-            rotate=args.rotate,
+            )
+        )
+        held.update(keyed_here)
+        mesh = plan_mesh(
+            spec,
+            groups,
+            held,
             controller=(args.controller if spec.name == args.controller_mesh else None),
             endpoints=parse_endpoints(args.endpoint),
         )
+        keyed_here.update({member.host: member.public_key for member in mesh.members})
         written = write_mesh(
             mesh, host_vars_dir, vault_password_file, args.application_id
         )
