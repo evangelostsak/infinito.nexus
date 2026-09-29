@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -110,6 +111,20 @@ class TestMeshCli(unittest.TestCase):
 
         self.assertEqual(main(argv), 0)
         self.assertEqual(self._text(CONTROLLER), before)
+
+    def test_a_rotation_gives_a_host_one_key_across_every_mesh(self):
+        self.assertEqual(main(self._argv()), 0)
+        self.assertEqual(main(self._argv("--rotate")), 0)
+
+        hub = self._text("swarm-mgr-01")
+        own = re.findall(r"^        public_key: (\S+)$", hub, re.MULTILINE)
+        spoke_peers = re.findall(
+            r"^          public_key: (\S+)$", self._text("swarm-wrk-01"), re.MULTILINE
+        )
+
+        self.assertEqual(2, len(own))
+        self.assertEqual(1, len(set(own)))
+        self.assertIn(own[0], spoke_peers)
 
     def test_a_rerun_is_a_no_op(self):
         self.assertEqual(main(self._argv()), 0)
