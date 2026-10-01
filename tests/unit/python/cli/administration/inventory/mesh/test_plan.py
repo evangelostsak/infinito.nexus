@@ -96,6 +96,61 @@ class TestAddressing(unittest.TestCase):
         self.assertEqual(swarm & data, set())
 
 
+class TestAddressPersistence(unittest.TestCase):
+    """A member keeps the address it already answers on.
+
+    `wg syncconf` carries keys and peers onto a live interface and never its
+    address, so a member whose address is recomputed keeps answering on the
+    old one while the rest of the mesh and the inventory have moved to the
+    new one. The deploy then loses exactly the hosts that were already up.
+    """
+
+    def _held(self, spec, groups) -> dict[str, str]:
+        return {m.host: m.address for m in plan_mesh(spec, groups).members}
+
+    def test_a_member_that_sorts_first_does_not_renumber_the_others(self):
+        before = self._held(SWARM, GROUPS)
+        grown = dict(GROUPS)
+        grown["svc-swarm-node"] = ["alpha-wrk-00", *GROUPS["svc-swarm-node"]]
+
+        mesh = plan_mesh(SWARM, grown, addresses=before)
+        after = {m.host: m.address for m in mesh.members}
+        for host, address in before.items():
+            with self.subTest(host=host):
+                self.assertEqual(after[host], address)
+        self.assertNotIn(after["alpha-wrk-00"], set(before.values()))
+
+    def test_rotation_replaces_identities_and_keeps_addresses(self):
+        before = self._held(SWARM, GROUPS)
+        mesh = plan_mesh(SWARM, GROUPS, rotate=True, addresses=before)
+        self.assertEqual({m.host: m.address for m in mesh.members}, before)
+
+    def test_a_stored_address_outside_the_subnet_is_replaced(self):
+        mesh = plan_mesh(SWARM, GROUPS, addresses={"swarm-wrk-01": "10.99.0.50"})
+        address = mesh.member("swarm-wrk-01").address
+        self.assertTrue(address.startswith("10.100.0."))
+
+    def test_a_spoke_never_adopts_the_hub_address(self):
+        """The mirror leaves every host holding the hub's entry.
+
+        A spoke that reused what it found there would bring up an interface
+        claiming the hub's address and blackhole the mesh it belongs to.
+        """
+        hub = plan_mesh(SWARM, GROUPS).hub.address
+        mesh = plan_mesh(SWARM, GROUPS, addresses={"swarm-wrk-01": hub})
+        self.assertNotEqual(mesh.member("swarm-wrk-01").address, hub)
+
+    def test_two_members_claiming_one_address_do_not_both_keep_it(self):
+        taken = plan_mesh(SWARM, GROUPS).member("swarm-wrk-01").address
+        mesh = plan_mesh(
+            SWARM,
+            GROUPS,
+            addresses={"swarm-wrk-01": taken, "swarm-wrk-02": taken},
+        )
+        addresses = [m.address for m in mesh.members]
+        self.assertEqual(len(addresses), len(set(addresses)))
+
+
 class TestPeering(unittest.TestCase):
     def test_the_hub_peers_with_every_spoke(self):
         mesh = plan_mesh(SWARM, GROUPS)

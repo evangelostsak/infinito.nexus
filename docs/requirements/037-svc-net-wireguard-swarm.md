@@ -82,6 +82,7 @@ Swarm mode only, and there only when the run's `vpn` axis asks for it. The role 
 - [x] The tool takes the host set as input and writes every affected inventory in one invocation, so no deploy can observe a mesh in which one host has been rotated and another has not.
 - [x] Each host's inventory carries one WireGuard private key identifying it on every mesh it belongs to, and the public key of every peer it is configured to reach; no host's inventory contains another host's private key.
 - [x] Every generated private key is vault-encrypted in the inventory, matching the treatment of every other platform credential.
+- [x] A member keeps the mesh address it already holds when the cluster grows or the keys rotate: `wg syncconf` carries keys and peers onto a live interface and never its address, so a renumbered member would answer on the old address while the inventory had already moved to the new one.
 - [x] Re-running the tool without a rotation request leaves an existing mesh byte-identical, so a deploy that changes nothing changes nothing.
 - [ ] The SWARM VPN is established between `swarm-mgr-01`, both workers and the controller, and the DATA VPN between `swarm-mgr-01`, `nfs-server` and `swarm-bkp-01`, with membership derived from the `default.env` topology rather than restated.
 - [ ] A worker reaches the NFS export over the mesh, routed by the Manager, and the same mount fails when the Manager's tunnel is down.

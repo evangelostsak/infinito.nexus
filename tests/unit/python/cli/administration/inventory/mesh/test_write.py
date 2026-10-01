@@ -14,6 +14,7 @@ from pathlib import Path
 from cli.administration.inventory.mesh.inventory import groups_of, specs_of
 from cli.administration.inventory.mesh.plan import plan_mesh
 from cli.administration.inventory.mesh.write import (
+    existing_addresses,
     existing_public_keys,
     private_key_name,
     prune_foreign_meshes,
@@ -97,6 +98,16 @@ class MeshOnDisk(unittest.TestCase):
             .get("meshes", {})
         )
 
+    def _entry(self, host: str, mesh_name: str) -> dict:
+        """The mesh block as the role will read it back off disk."""
+        document = load_yaml_any(str(self.host_vars / f"{host}.yml"))
+        return (
+            document.get("applications", {})
+            .get("svc-net-wireguard", {})
+            .get("meshes", {})
+            .get(mesh_name, {})
+        )
+
     def _write_all(self, *, rotate: bool = False) -> None:
         for spec in self.specs:
             mesh = plan_mesh(
@@ -178,15 +189,22 @@ class TestMeshShapeOnDisk(MeshOnDisk, unittest.TestCase):
         with no route to the NFS server, and the mount fails while every tunnel
         still reports a healthy handshake -- so the symptom points at storage
         rather than at routing.
+
+        Asserted against the serialized entry, not against a second plan: the
+        role reads the file, so a writer that stored the mesh subnet in place
+        of the routed range would satisfy a re-planned comparison.
         """
         self._write_all()
         for spec in self.specs:
             mesh = plan_mesh(spec, self.groups)
+            self.assertEqual(spec.routed_range, "10.100.0.0/16")
             for spoke in mesh.spokes:
                 with self.subTest(mesh=spec.name, spoke=spoke.host):
-                    peers = mesh.peers_of(spoke.host)
-                    self.assertEqual([p.host for p in peers], [mesh.hub.host])
-                    self.assertEqual(spec.routed_range, "10.100.0.0/16")
+                    peers = self._entry(spoke.host, spec.name)["peers"]
+                    self.assertEqual([p["host"] for p in peers], [mesh.hub.host])
+                    self.assertEqual(
+                        [p["allowed_ips"] for p in peers], [spec.routed_range]
+                    )
 
     def test_the_hub_pins_each_spoke_to_a_single_address(self):
         """The inverse of the spoke rule.
@@ -196,10 +214,42 @@ class TestMeshShapeOnDisk(MeshOnDisk, unittest.TestCase):
         """
         self._write_all()
         for spec in self.specs:
+            hub = plan_mesh(spec, self.groups).hub.host
+            for peer in self._entry(hub, spec.name)["peers"]:
+                with self.subTest(mesh=spec.name, peer=peer["host"]):
+                    self.assertFalse(peer["is_hub"])
+                    self.assertEqual(peer["allowed_ips"], peer["address"] + "/32")
+
+
+class TestStoredAddresses(MeshOnDisk, unittest.TestCase):
+    """What the planner is allowed to treat as an address already in use."""
+
+    def test_every_written_address_is_read_back(self):
+        self._write_all()
+        for spec in self.specs:
             mesh = plan_mesh(spec, self.groups)
-            for peer in mesh.peers_of(mesh.hub.host):
-                with self.subTest(mesh=spec.name, peer=peer.host):
-                    self.assertFalse(peer.is_hub)
+            with self.subTest(mesh=spec.name):
+                self.assertEqual(
+                    existing_addresses(self.host_vars, list(HOSTS), spec.name),
+                    {m.host: m.address for m in mesh.members},
+                )
+
+    def test_a_host_with_no_entry_is_absent_rather_than_empty(self):
+        self._write_all()
+        stored = existing_addresses(self.host_vars, list(HOSTS), "data")
+        self.assertNotIn("swarm-wrk-01", stored)
+
+    def test_a_mirrored_entry_is_not_read_as_the_hosts_own_address(self):
+        """The mirror hands every node the hub's entry.
+
+        Reusing what it finds there would put the hub's address on a worker,
+        which is the same failure the key reader already guards against.
+        """
+        self._write_all()
+        hub_text = self._text("swarm-mgr-01")
+        (self.host_vars / "swarm-wrk-01.yml").write_text(hub_text, encoding="utf-8")
+        stored = existing_addresses(self.host_vars, list(HOSTS), "swarm")
+        self.assertNotIn("swarm-wrk-01", stored)
 
 
 class TestIdempotence(MeshOnDisk, unittest.TestCase):

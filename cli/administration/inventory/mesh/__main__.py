@@ -19,6 +19,7 @@ from .inventory import groups_of, specs_of
 from .plan import plan_mesh
 from .write import (
     DEFAULT_APPLICATION_ID,
+    existing_addresses,
     existing_public_keys,
     prune_foreign_meshes,
     write_mesh,
@@ -157,6 +158,12 @@ def main(argv: list[str] | None = None) -> int:
             held,
             controller=(args.controller if spec.name == args.controller_mesh else None),
             endpoints=parse_endpoints(args.endpoint),
+            addresses=existing_addresses(
+                host_vars_dir,
+                all_hosts,
+                spec.name,
+                args.application_id,
+            ),
         )
         keyed_here.update({member.host: member.public_key for member in mesh.members})
         written = write_mesh(

@@ -68,6 +68,60 @@ def _address(subnet: str, offset: int) -> str:
     return str(address)
 
 
+def _offset_of(subnet: str, address: str) -> int | None:
+    """The spoke offset ``address`` occupies in ``subnet``, or None.
+
+    None covers everything that must not be reused: an unparseable value, an
+    address from a subnet the spec no longer declares, and the hub's own
+    offset, which belongs to whichever host holds the hub group today.
+    """
+    network = ipaddress.ip_network(subnet, strict=True)
+    try:
+        candidate = ipaddress.ip_address(address)
+    except ValueError:
+        return None
+    if candidate not in network:
+        return None
+    offset = int(candidate) - int(network.network_address)
+    return offset if offset > SPOKE_OFFSET else None
+
+
+def _spoke_offsets(
+    subnet: str, spokes: list[str], stored: dict[str, str]
+) -> dict[str, int]:
+    """Keep every spoke on the address it already holds.
+
+    Deriving the offset from a spoke's position renumbers every later member
+    the moment a host that sorts earlier joins. `wg syncconf` carries keys and
+    peers onto a live interface but never its address, so a renumbered member
+    keeps answering on the old address while the rest of the mesh and the
+    inventory have already moved to the new one.
+
+    Args:
+        subnet: the mesh subnet offsets are taken in.
+        spokes: every spoke of the mesh, in the order they were resolved.
+        stored: hostname to the address it already holds on this mesh.
+    """
+    taken = {HUB_OFFSET}
+    offsets: dict[str, int] = {}
+    for host in spokes:
+        offset = _offset_of(subnet, stored.get(host, ""))
+        if offset is None or offset in taken:
+            continue
+        offsets[host] = offset
+        taken.add(offset)
+
+    cursor = SPOKE_OFFSET + 1
+    for host in spokes:
+        if host in offsets:
+            continue
+        while cursor in taken:
+            cursor += 1
+        offsets[host] = cursor
+        taken.add(cursor)
+    return offsets
+
+
 def plan_mesh(
     spec: MeshSpec,
     groups: dict[str, list[str]],
@@ -76,6 +130,7 @@ def plan_mesh(
     rotate: bool = False,
     controller: str | None = None,
     endpoints: dict[str, str] | None = None,
+    addresses: dict[str, str] | None = None,
 ) -> Mesh:
     """Resolve ``spec`` into a mesh whose members are addressed and keyed.
 
@@ -94,10 +149,13 @@ def plan_mesh(
         endpoints: hostname to the underlay address its peers dial. A host
             left out keeps its hostname, which is what every peer already
             resolves and routes to wherever inventory names are real names.
+        addresses: hostname to the mesh address it already holds. Kept across
+            a rotation too: rotation replaces identities, not addresses.
     """
     held = {} if rotate else dict(existing_public_keys or {})
     underlay = dict(endpoints or {})
     hub, spokes = members_of(spec, groups, controller)
+    offsets = _spoke_offsets(spec.subnet, spokes, dict(addresses or {}))
 
     def member(host: str, offset: int, is_hub: bool) -> MeshMember:
         address = _address(spec.subnet, offset)
@@ -122,8 +180,5 @@ def plan_mesh(
         )
 
     members = [member(hub, HUB_OFFSET, True)]
-    members.extend(
-        member(host, SPOKE_OFFSET + index, False)
-        for index, host in enumerate(spokes, start=1)
-    )
+    members.extend(member(host, offsets[host], False) for host in spokes)
     return Mesh(spec=spec, members=tuple(members))

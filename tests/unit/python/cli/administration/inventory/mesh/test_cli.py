@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 
 from cli.administration.inventory.mesh.__main__ import main
+from utils.cache.yaml import load_yaml_any
 
 from .test_write import (
     BACKUP_INVENTORY,
@@ -18,6 +19,7 @@ from .test_write import (
 )
 
 CONTROLLER = "deploy-controller"
+SWARM_HOSTS = ("swarm-mgr-01", "swarm-wrk-01", "swarm-wrk-02")
 
 
 class TestMeshCli(unittest.TestCase):
@@ -125,6 +127,45 @@ class TestMeshCli(unittest.TestCase):
         self.assertEqual(2, len(own))
         self.assertEqual(1, len(set(own)))
         self.assertIn(own[0], spoke_peers)
+
+    def _address(self, host: str, mesh_name: str) -> str:
+        document = load_yaml_any(str(self.host_vars / f"{host}.yml"))
+        return document["applications"]["svc-net-wireguard"]["meshes"][mesh_name][
+            "address"
+        ]
+
+    def test_growing_the_cluster_leaves_every_member_on_its_address(self):
+        """A node added later must not renumber the nodes already up.
+
+        `wg syncconf` never moves a live interface's address, so a renumbered
+        member answers on the old one while the inventory has moved to the
+        new one -- and the next pass cannot reach it.
+        """
+        self.assertEqual(main(self._argv()), 0)
+        before = {host: self._address(host, "swarm") for host in SWARM_HOSTS}
+
+        (self.host_vars / "alpha-wrk-00.yml").write_text("---\n", encoding="utf-8")
+        self.cluster.write_text(
+            CLUSTER_INVENTORY.replace(
+                "        swarm-wrk-01: {}",
+                "        alpha-wrk-00: {}\n        swarm-wrk-01: {}",
+            ),
+            encoding="utf-8",
+        )
+        self.assertEqual(main(self._argv()), 0)
+
+        for host, address in before.items():
+            with self.subTest(host=host):
+                self.assertEqual(self._address(host, "swarm"), address)
+        self.assertNotIn(self._address("alpha-wrk-00", "swarm"), set(before.values()))
+
+    def test_a_rotation_leaves_every_member_on_its_address(self):
+        self.assertEqual(main(self._argv()), 0)
+        before = {host: self._address(host, "swarm") for host in SWARM_HOSTS}
+        self.assertEqual(main(self._argv("--rotate")), 0)
+        for host, address in before.items():
+            with self.subTest(host=host):
+                self.assertEqual(self._address(host, "swarm"), address)
 
     def test_a_rerun_is_a_no_op(self):
         self.assertEqual(main(self._argv()), 0)

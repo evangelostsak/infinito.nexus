@@ -122,6 +122,33 @@ def existing_public_keys(
     return found
 
 
+def existing_addresses(
+    host_vars_dir: Path,
+    hosts: list[str],
+    mesh_name: str,
+    application_id: str = DEFAULT_APPLICATION_ID,
+) -> dict[str, str]:
+    """The addresses already issued to ``hosts`` on ``mesh_name``.
+
+    Per mesh rather than per host, unlike the key: a member holds one address
+    on each plane it belongs to, so only its own entry on this mesh counts. An
+    entry naming another host is a leftover of the mirror and is ignored for
+    the same reason it is ignored when reading keys.
+    """
+    found: dict[str, str] = {}
+    for host in hosts:
+        path = host_vars_path(host_vars_dir, host)
+        if not path.exists():
+            continue
+        entry = _mesh_entry(load_document(path), mesh_name, application_id)
+        if not isinstance(entry, dict) or entry.get("host") != host:
+            continue
+        address = entry.get("address")
+        if isinstance(address, str) and address.strip():
+            found[host] = address.strip()
+    return found
+
+
 def prune_foreign_meshes(
     host_vars_dir: Path,
     hosts: list[str],
