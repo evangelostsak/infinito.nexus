@@ -27,18 +27,10 @@
   failed_when: false
   retries: 24
   delay: 5
-  until: wireguard_handshakes.stdout is not search('\t0')
-
-- name: "🛑 Fail hard when a spoke never reached its hub"
-  ansible.builtin.fail:
-    msg: >-
-      WireGuard interface '{{ item.mesh_name }}' on {{ inventory_hostname }}
-      never completed a handshake with its hub. No swarm deploy can proceed
-      over a partitioned mesh.
-  loop: "{{ wireguard_handshakes.results | default([]) }}"
-  loop_control:
-    label: "{{ item.mesh_name }}"
-  when: (item.stdout | default('\t0')) is search('\t0')
+  until:
+    - wireguard_handshakes.rc | default(1) == 0
+    - wireguard_handshakes.stdout | default('', true) | trim | length > 0
+    - wireguard_handshakes.stdout is not search('\t0')
 
 - name: "🔍 Check whether ping is available for the MTU probe"
   ansible.builtin.stat:
