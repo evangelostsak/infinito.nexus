@@ -376,6 +376,32 @@ class TestPinnedAxes(unittest.TestCase):
         )
         self.assertEqual(len(self._entries(row)), 1)
 
+    def test_a_held_mesh_axis_overrides_a_priority_rows_pin(self) -> None:
+        """A run that holds the axis must not delete the rows that fight it.
+
+        The pin narrows a cross product, so a conflicting one removes every
+        combination and the row leaves the matrix entirely -- while a regular
+        row with the same pin is simply moved onto the held side.
+        """
+        row = _row(
+            "web-app-b", 0, ("swarm",), priority=True, pin_mode="swarm", pin_vpn=False
+        )
+        entries = _assign(
+            [row],
+            sweep=0,
+            tor_mode="auto",
+            variants_per_app=_VARIANTS,
+            vpn_mode="enforced",
+        )
+        self.assertNotEqual(entries, [])
+        self.assertEqual({e["vpn"] for e in entries}, {"true"})
+
+    def test_a_priority_rows_pin_still_narrows_a_rotating_axis(self) -> None:
+        row = _row(
+            "web-app-b", 0, ("swarm",), priority=True, pin_mode="swarm", pin_vpn=False
+        )
+        self.assertEqual({e["vpn"] for e in self._entries(row)}, {"false"})
+
     def test_an_unoffered_mode_aborts_the_matrix(self) -> None:
         row = _row("web-app-b", 0, ("compose",), pin_mode="swarm")
         with self.assertRaises(SystemExit):

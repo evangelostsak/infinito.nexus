@@ -55,6 +55,26 @@ def vpn_states(mode: str, *, vpn_mode: str = "auto") -> list[bool]:
     return [False, True]
 
 
+def pinned_vpn_states(
+    mode: str, *, pin: bool | None = None, vpn_mode: str = "auto"
+) -> list[bool]:
+    """The mesh states a priority row takes, global axis ahead of the pin.
+
+    Same precedence :func:`rotated_vpn` gives a regular row: a run that holds
+    the axis overrides the pin instead of filtering the row out of the matrix,
+    so a held sweep keeps every row it would otherwise have run.
+
+    Args:
+        mode: the deploy mode of the row.
+        pin: the state the row asked for, or None for every state.
+        vpn_mode: the run's axis mode.
+    """
+    states = vpn_states(mode, vpn_mode=vpn_mode)
+    if vpn_mode in ("enforced", "disabled") or pin is None:
+        return states
+    return [state for state in states if state == pin]
+
+
 def wants_vpn(position: int, sweep: int) -> bool:
     """Whether a swarm row carries the mesh this sweep.
 

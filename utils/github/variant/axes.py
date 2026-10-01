@@ -63,8 +63,8 @@ from utils.github.variant.tor import (
 )
 from utils.github.variant.vpn import (
     MESH_GLYPH_MODES,
+    pinned_vpn_states,
     rotated_vpn,
-    vpn_states,
 )
 from utils.roles.display import VARIANT_SEPARATOR, display_names
 from utils.symbol_glossary import to_emoji
@@ -293,8 +293,7 @@ def assign(
                     offered, capable=capable, tor_mode=tor_mode
                 )
                 if pin_mode in (None, mode) and pin_tor in (None, state)
-                for meshed in vpn_states(mode, vpn_mode=vpn_mode)
-                if pin_vpn in (None, meshed)
+                for meshed in pinned_vpn_states(mode, pin=pin_vpn, vpn_mode=vpn_mode)
             ]
         else:
             mode = pin_mode or pick_mode(
