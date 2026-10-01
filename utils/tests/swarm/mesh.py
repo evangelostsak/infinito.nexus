@@ -77,6 +77,10 @@ def converge_mesh(*, inv_dir: str) -> int:
     The write before this one rotates the mesh, so each node still authorises
     the previous set until it re-renders. Reaching them over the container
     connection is what proves a rotation converges without an operator.
+
+    Both inventories, because the mesh spans both: the backup node is the data
+    plane's second spoke, and a rotation it never receives leaves the hub
+    expecting an identity that node no longer presents.
     """
     if not mesh_enabled():
         return 0
@@ -85,6 +89,8 @@ def converge_mesh(*, inv_dir: str) -> int:
             "ansible-playbook",
             "-i",
             f"{inv_dir}/devices.yml",
+            "-i",
+            f"{inv_dir}/backup.yml",
             "--vault-password-file",
             f"{inv_dir}/.password",
             _PLAYBOOK,
