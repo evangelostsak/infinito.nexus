@@ -71,26 +71,30 @@ def write_mesh(*, inv_dir: str, rotate: bool = False) -> int:
     )
 
 
-def converge_mesh(*, inv_dir: str) -> int:
+def converge_mesh(*, inv_dir: str, with_backup: bool = False) -> int:
     """Carry the rotated keys to every node before the transport moves.
 
     The write before this one rotates the mesh, so each node still authorises
     the previous set until it re-renders. Reaching them over the container
     connection is what proves a rotation converges without an operator.
 
-    Both inventories, because the mesh spans both: the backup node is the data
-    plane's second spoke, and a rotation it never receives leaves the hub
-    expecting an identity that node no longer presents.
+    Args:
+        inv_dir: inventory directory of the round.
+        with_backup: also converge the sibling backup inventory. The backup
+            node is the data plane's second spoke, and a rotation it never
+            receives leaves the hub expecting an identity it no longer
+            presents -- but only the round that deploys that node has one to
+            reach, so a later round would meet a container holding nothing.
     """
     if not mesh_enabled():
         return 0
+    inventories = [f"{inv_dir}/devices.yml"]
+    if with_backup:
+        inventories.append(f"{inv_dir}/backup.yml")
     return run_step(
         [
             "ansible-playbook",
-            "-i",
-            f"{inv_dir}/devices.yml",
-            "-i",
-            f"{inv_dir}/backup.yml",
+            *[argument for path in inventories for argument in ("-i", path)],
             "--vault-password-file",
             f"{inv_dir}/.password",
             _PLAYBOOK,

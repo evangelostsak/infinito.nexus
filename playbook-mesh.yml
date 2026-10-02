@@ -11,11 +11,5 @@
     - name: "🔓 Get apt ready before the first apt task"
       ansible.builtin.include_tasks: "./tasks/utils/apt/ready.yml"
       when: ansible_facts['os_family'] == 'Debian'
-
-    - name: "🔄 Refresh a missing or stale apt index"
-      ansible.builtin.apt:
-        update_cache: true
-        cache_valid_time: 3600
-      when: ansible_facts['os_family'] == 'Debian'
   roles:
     - svc-net-wireguard

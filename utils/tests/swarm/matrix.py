@@ -400,7 +400,7 @@ def main(argv: list[str] | None = None) -> int:
         if rc == 0:
             rc = write_mesh(inv_dir=inv_root, rotate=True)
         if rc == 0:
-            rc = converge_mesh(inv_dir=inv_root)
+            rc = converge_mesh(inv_dir=inv_root, with_backup=round_index == 0)
         if rc == 0:
             rc = mesh_controller(inv_dir=inv_root)
         if rc == 0:
