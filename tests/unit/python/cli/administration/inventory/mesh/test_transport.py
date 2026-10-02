@@ -15,7 +15,13 @@ from pathlib import Path
 
 from cli.administration.inventory.mesh.inventory import groups_of, specs_of
 from cli.administration.inventory.mesh.plan import members_of, plan_mesh
-from cli.administration.inventory.mesh.transport import mesh_address, switch_to_mesh
+from cli.administration.inventory.mesh.transport import (
+    MESH_CONTROL_PERSIST,
+    mesh_address,
+    mesh_ssh_args,
+    repo_ssh_args,
+    switch_to_mesh,
+)
 from cli.administration.inventory.mesh.write import write_mesh
 
 from . import PROJECT_ROOT
@@ -120,6 +126,17 @@ class TestSwitchingTheTransport(MeshOnDisk, unittest.TestCase):
         self.assertIn("ansible_connection: ssh", text)
         self.assertIn("ansible_user: administrator", text)
 
+    def test_a_switched_host_carries_the_meshs_own_ssh_args(self):
+        self._write_swarm()
+        self._switch()
+        text = (
+            self.host_vars / "swarm-wrk-01.yml"
+        ).read_text(  # nocheck: cache-read  tempdir fixture rewritten between reads in one test
+            encoding="utf-8"
+        )
+        self.assertIn("ansible_ssh_args:", text)
+        self.assertIn(f"ControlPersist={MESH_CONTROL_PERSIST}", text)
+
     def test_switching_before_the_mesh_exists_changes_nothing(self):
         """The first pass is what creates the mesh; there is nothing to move to."""
         self.assertEqual(self._switch(), {})
@@ -134,3 +151,43 @@ class TestSwitchingTheTransport(MeshOnDisk, unittest.TestCase):
         )
         (self.host_vars / "swarm-wrk-01.yml").write_text(mirrored, encoding="utf-8")
         self.assertIsNone(mesh_address(self.host_vars, "swarm-wrk-01", "swarm"))
+
+
+class TestTheMeshRetunesItsOwnTransport(unittest.TestCase):
+    """The mesh pass pays the SSH handshake once per task when the master has
+    already closed, so it raises the window for its own hosts rather than for
+    the whole repository."""
+
+    BASE = (
+        "-o ControlMaster=auto -o ControlPersist=20s "
+        "-o ControlPath=~/.ssh/ansible-%h-%p-%r -o ServerAliveInterval=15"
+    )
+
+    def test_the_window_is_the_meshs_own(self):
+        args = mesh_ssh_args(self.BASE)
+        self.assertIn(f"-o ControlPersist={MESH_CONTROL_PERSIST}", args)
+        self.assertNotIn("ControlPersist=20s", args)
+
+    def test_the_socket_is_left_to_ansible(self):
+        """A ControlPath naming a directory nothing creates leaves the master
+        unable to open its socket, and it reconnects per task in silence."""
+        self.assertNotIn("ControlPath", mesh_ssh_args(self.BASE))
+
+    def test_every_other_option_survives(self):
+        args = mesh_ssh_args(self.BASE)
+        self.assertIn("-o ControlMaster=auto", args)
+        self.assertIn("-o ServerAliveInterval=15", args)
+
+    def test_a_bare_flag_is_not_dropped(self):
+        self.assertIn("-C", mesh_ssh_args("-C -o ControlPersist=20s"))
+
+    def test_the_repository_value_is_the_one_retuned(self):
+        """Derived from ansible.cfg rather than restated, so a mesh host keeps
+        whatever the platform sets and differs only where the mesh needs it."""
+        base = repo_ssh_args()
+        self.assertIn("ControlMaster", base)
+        for option in base.split(" -o "):
+            name = option.split("=")[0].lstrip("-o ").strip()
+            if name and not name.startswith(("ControlPersist", "ControlPath")):
+                with self.subTest(option=name):
+                    self.assertIn(name, mesh_ssh_args(base))
