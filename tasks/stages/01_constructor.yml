@@ -115,7 +115,7 @@
   ansible.builtin.include_role:
     name: user-administrator
   when:
-    - WIREGUARD_ENABLED | bool
+    - "'svc-net-wireguard' | application_allowed(group_names, lookup('deployment').whitelist)"
     - "'svc-swarm-node' in group_names"
 
 - name: "🥾 Bootstrap svc-net-wireguard"
