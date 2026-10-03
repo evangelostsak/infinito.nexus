@@ -137,6 +137,20 @@ class TestSwitchingTheTransport(MeshOnDisk, unittest.TestCase):
         self.assertIn("ansible_ssh_args:", text)
         self.assertIn(f"ControlPersist={MESH_CONTROL_PERSIST}", text)
 
+    def test_a_switched_host_asks_for_no_tty(self):
+        """Ansible gives a pty to anything it cannot pipeline, and a pty ends
+        every line with a carriage return. The container connection this
+        replaces returned bare newlines, so a role reading its own stdout
+        would break purely because the deploy moved onto the mesh."""
+        self._write_swarm()
+        self._switch()
+        text = (
+            self.host_vars / "swarm-wrk-01.yml"
+        ).read_text(  # nocheck: cache-read  tempdir fixture rewritten between reads in one test
+            encoding="utf-8"
+        )
+        self.assertIn("ansible_ssh_use_tty: false", text)
+
     def test_switching_before_the_mesh_exists_changes_nothing(self):
         """The first pass is what creates the mesh; there is nothing to move to."""
         self.assertEqual(self._switch(), {})
