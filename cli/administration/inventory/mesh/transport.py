@@ -116,6 +116,13 @@ def switch_to_mesh(
 ) -> dict[str, str]:
     """Point every member of *mesh_name* at its mesh address over SSH.
 
+    The tty is switched off with the address. Ansible adds ``-tt`` to any
+    task it cannot pipeline -- ``script`` among them -- and the pty then ends
+    every line of output with a carriage return. The transport this replaces
+    reached the host through a container and returned bare newlines, so a
+    role that reads its own stdout would start failing merely because the
+    deploy moved onto the mesh.
+
     Returns:
         Host to the address it was switched to. A host with no address on this
         mesh is left alone -- it is not a member, and rewriting it would
@@ -133,6 +140,7 @@ def switch_to_mesh(
         document["ansible_user"] = user
         document["ansible_ssh_private_key_file"] = private_key_file
         document["ansible_ssh_args"] = mesh_ssh_args(repo_ssh_args())
+        document["ansible_ssh_use_tty"] = False
         dump_document(path, document)
         switched[host] = address
     return switched
