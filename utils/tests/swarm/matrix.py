@@ -26,7 +26,9 @@ import sys
 from utils import PROJECT_ROOT
 from utils.storage.constrained import host_storage_constrained
 from utils.tests.swarm.derive_includes import derive_includes, variant_scope
+from utils.tests.swarm.extend_inventory import mesh_enabled
 from utils.tests.swarm.mesh import (
+    bootstrap_mesh,
     converge_mesh,
     mesh_controller,
     switch_to_mesh_transport,
@@ -229,6 +231,22 @@ def _backup_restore_drill(*, app_id: str, inv_dir: str, extras_path: str) -> int
     )
 
 
+def _backup_phase(
+    *, app_id: str, inv_dir: str, deploy_extras: str, drill_extras: str
+) -> int:
+    """Bring the backup node up and drill backup, teardown and recovery.
+
+    Runs after whichever pass deployed the applications: there is nothing to
+    back up before it.
+    """
+    rc = _deploy_backup_host(app_id=app_id, inv_dir=inv_dir, extras_path=deploy_extras)
+    if rc == 0:
+        rc = _backup_restore_drill(
+            app_id=app_id, inv_dir=inv_dir, extras_path=drill_extras
+        )
+    return rc
+
+
 def _verify_recovered_marker(*, app_id: str) -> int:
     env = os.environ.copy()
     env["APP_ID"] = app_id
@@ -309,6 +327,7 @@ def main(argv: list[str] | None = None) -> int:
 
     total = len(plan)
     rc = 0
+    meshed = mesh_enabled()
     for plan_index, (
         round_index,
         inv_dir,
@@ -374,24 +393,25 @@ def main(argv: list[str] | None = None) -> int:
         if rc == 0:
             rc = _write_extras(extras_path=extras_path)
         if rc == 0:
-            rc = _deploy(
-                app_id=app_id,
-                inv_dir=inv_root,
-                extras_path=f"{inv_root}/swarm-nfs-extras.deploy.yml",
-                round_index=round_index,
-                total=total,
+            rc = (
+                bootstrap_mesh(inv_dir=inv_root)
+                if meshed
+                else _deploy(
+                    app_id=app_id,
+                    inv_dir=inv_root,
+                    extras_path=f"{inv_root}/swarm-nfs-extras.deploy.yml",
+                    round_index=round_index,
+                    total=total,
+                )
             )
-        if rc == 0:
+        if rc == 0 and not meshed:
             rc = _converge_and_verify(app_id=app_id)
-        if rc == 0 and round_index == 0:
-            rc = _deploy_backup_host(
+        if rc == 0 and not meshed and round_index == 0:
+            rc = _backup_phase(
                 app_id=app_id,
                 inv_dir=inv_root,
-                extras_path=f"{inv_root}/swarm-nfs-extras.deploy.yml",
-            )
-        if rc == 0 and round_index == 0:
-            rc = _backup_restore_drill(
-                app_id=app_id, inv_dir=inv_root, extras_path=extras_path
+                deploy_extras=f"{inv_root}/swarm-nfs-extras.deploy.yml",
+                drill_extras=extras_path,
             )
         if rc == 0:
             rc = _reset_credentials(
@@ -400,7 +420,7 @@ def main(argv: list[str] | None = None) -> int:
         if rc == 0:
             rc = write_mesh(inv_dir=inv_root, rotate=True)
         if rc == 0:
-            rc = converge_mesh(inv_dir=inv_root, with_backup=round_index == 0)
+            rc = converge_mesh(inv_dir=inv_root)
         if rc == 0:
             rc = mesh_controller(inv_dir=inv_root)
         if rc == 0:
@@ -416,6 +436,13 @@ def main(argv: list[str] | None = None) -> int:
             )
         if rc == 0:
             rc = _converge_and_verify(app_id=app_id)
+        if rc == 0 and meshed and round_index == 0:
+            rc = _backup_phase(
+                app_id=app_id,
+                inv_dir=inv_root,
+                deploy_extras=f"{inv_root}/swarm-nfs-extras.deploy.yml",
+                drill_extras=extras_path,
+            )
         if rc == 0 and round_index == 0:
             rc = _verify_recovered_marker(app_id=app_id)
         if rc != 0:
