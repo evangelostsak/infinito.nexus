@@ -71,30 +71,52 @@ def write_mesh(*, inv_dir: str, rotate: bool = False) -> int:
     )
 
 
-def converge_mesh(*, inv_dir: str, with_backup: bool = False) -> int:
+def bootstrap_mesh(*, inv_dir: str) -> int:
+    """Bring the mesh up before anything is deployed over it.
+
+    The pass that follows is the only one that deploys the applications, and
+    it runs over the tunnel, so this pass creates exactly what that transport
+    needs and nothing else: the account it logs in as and the interface it
+    reaches each node on. Deploying the roles here as well would deploy them
+    twice, once over each transport, which is what made the meshed arm cost
+    two full deploys.
+    """
+    if not mesh_enabled():
+        return 0
+    return run_step(
+        [
+            "ansible-playbook",
+            "-i",
+            f"{inv_dir}/devices.yml",
+            "--vault-password-file",
+            f"{inv_dir}/.password",
+            "-e",
+            "MESH_BOOTSTRAP=true",
+            _PLAYBOOK,
+        ],
+        env=os.environ.copy(),
+        label="bootstrap the mesh before the deploy",
+    )
+
+
+def converge_mesh(*, inv_dir: str) -> int:
     """Carry the rotated keys to every node before the transport moves.
 
     The write before this one rotates the mesh, so each node still authorises
     the previous set until it re-renders. Reaching them over the container
     connection is what proves a rotation converges without an operator.
 
-    Args:
-        inv_dir: inventory directory of the round.
-        with_backup: also converge the sibling backup inventory. The backup
-            node is the data plane's second spoke, and a rotation it never
-            receives leaves the hub expecting an identity it no longer
-            presents -- but only the round that deploys that node has one to
-            reach, so a later round would meet a container holding nothing.
+    The backup node is left out: it is deployed after the pass that needs the
+    tunnel, so it renders the rotated mesh on its first run and has nothing
+    to converge from.
     """
     if not mesh_enabled():
         return 0
-    inventories = [f"{inv_dir}/devices.yml"]
-    if with_backup:
-        inventories.append(f"{inv_dir}/backup.yml")
     return run_step(
         [
             "ansible-playbook",
-            *[argument for path in inventories for argument in ("-i", path)],
+            "-i",
+            f"{inv_dir}/devices.yml",
             "--vault-password-file",
             f"{inv_dir}/.password",
             _PLAYBOOK,
