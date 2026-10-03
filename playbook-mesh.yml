@@ -4,6 +4,7 @@
   become: true
   vars:
     WIREGUARD_ENABLED: true
+    MESH_BOOTSTRAP: false
   pre_tasks:
     - name: "🧊 Render the applications SPOT once and carry it into every task's worker"
       applications_carrier: {}
@@ -12,4 +13,7 @@
       ansible.builtin.include_tasks: "./tasks/utils/apt/ready.yml"
       when: ansible_facts['os_family'] == 'Debian'
   roles:
-    - svc-net-wireguard
+    - role: user-administrator
+      when: MESH_BOOTSTRAP | bool
+
+    - role: svc-net-wireguard
