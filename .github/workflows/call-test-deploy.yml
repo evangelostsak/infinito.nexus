@@ -117,6 +117,12 @@ on:
         type: choice
         default: auto
         options: [auto, enforced, exclusive, disabled]
+      vpn:
+        description: "🔒 WireGuard axis; see .github/workflows/README.md for what each value does"
+        required: false
+        type: choice
+        default: auto
+        options: [auto, enforced, disabled]
       disable:
         description: "🚫 Provider keys removed from the test inventory (comma-separated)"
         required: false
