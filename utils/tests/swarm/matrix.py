@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 
 from utils import PROJECT_ROOT
@@ -146,7 +147,15 @@ def _deploy(
     round_index: int,
     total: int,
     update_pass: bool = False,
+    dr_prepass: bool = False,
 ) -> int:
+    """Run one deploy of the round.
+
+    Args:
+        update_pass: run it as the async update pass.
+        dr_prepass: this pass is torn down by the drill, so it leaves the
+            end-to-end suites to the pass that follows the drill.
+    """
     env = os.environ.copy()
     env["APP_ID"] = app_id
     cmd = [
@@ -168,6 +177,8 @@ def _deploy(
         "-e",
         f"PRIMARY_APPS={json.dumps([app_id])}",
     ]
+    if dr_prepass:
+        cmd += ["-e", "SWARM_DR_PREPASS=true"]
     pass_label = (
         f"matrix-deploy: round {round_index + 1}/{total} "
         f"variants=[{round_index}] apps=['{app_id}']"
@@ -220,15 +231,43 @@ def _converge_and_verify(*, app_id: str) -> int:
     )
 
 
-def _backup_restore_drill(*, app_id: str, inv_dir: str, extras_path: str) -> int:
+def _drill_env(*, app_id: str, inv_dir: str, extras_path: str) -> dict[str, str]:
+    """The environment the drill reads, for a probe or for the real run."""
     env = os.environ.copy()
     env["APP_ID"] = app_id
     env["INFINITO_INVENTORY_DIR"] = inv_dir
     env["DRILL_EXTRAS"] = extras_path
     env["DISK_FLOOR_MB"] = str(DISK_FLOOR_MB)
-    return run_step(
+    return env
+
+
+def _drill_is_coming(*, app_id: str, inv_dir: str, extras_path: str) -> bool:
+    """Whether the drill will tear this round's stack down and recover it.
+
+    Asked of the drill rather than decided here, so which applications have
+    anything to restore keeps one owner. No verdict counts as a drill:
+    skipping the deploy a drill needs strands a torn-down stack, while an
+    extra deploy only costs time."""
+    env = _drill_env(app_id=app_id, inv_dir=inv_dir, extras_path=extras_path)
+    env["DRILL_PROBE"] = "true"
+    probe = subprocess.run(
         ["bash", str(_SWARM_SCRIPTS / "backup" / "base.sh")],
         env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if "DRILL=no" in probe.stdout:
+        return False
+    if "DRILL=yes" not in probe.stdout:
+        print(f"=== drill probe gave no verdict for {app_id}; assuming it drills ===")
+    return True
+
+
+def _backup_restore_drill(*, app_id: str, inv_dir: str, extras_path: str) -> int:
+    return run_step(
+        ["bash", str(_SWARM_SCRIPTS / "backup" / "base.sh")],
+        env=_drill_env(app_id=app_id, inv_dir=inv_dir, extras_path=extras_path),
         label="backup + restore DR drill",
     )
 
@@ -377,6 +416,7 @@ def main(argv: list[str] | None = None) -> int:
             variant_payloads=variant_payloads,
         )
         extras_path = f"{inv_root}/swarm-nfs-extras.yml"
+        deploy_extras = f"{inv_root}/swarm-nfs-extras.deploy.yml"
 
         rc = _provision(
             app_id=app_id,
@@ -394,25 +434,31 @@ def main(argv: list[str] | None = None) -> int:
             rc = write_mesh(inv_dir=inv_root)
         if rc == 0:
             rc = _write_extras(extras_path=extras_path)
-        if rc == 0:
-            rc = (
-                bootstrap_mesh(inv_dir=inv_root)
-                if meshed
-                else _deploy(
-                    app_id=app_id,
-                    inv_dir=inv_root,
-                    extras_path=f"{inv_root}/swarm-nfs-extras.deploy.yml",
-                    round_index=round_index,
-                    total=total,
-                )
+
+        deploy_args = {
+            "app_id": app_id,
+            "inv_dir": inv_root,
+            "extras_path": deploy_extras,
+            "round_index": round_index,
+            "total": total,
+        }
+        drills = (
+            rc == 0
+            and meshed
+            and round_index == 0
+            and _drill_is_coming(
+                app_id=app_id, inv_dir=inv_root, extras_path=extras_path
             )
+        )
+        if rc == 0:
+            rc = bootstrap_mesh(inv_dir=inv_root) if meshed else _deploy(**deploy_args)
         if rc == 0 and not meshed:
             rc = _converge_and_verify(app_id=app_id)
         if rc == 0 and not meshed and round_index == 0:
             rc = _backup_phase(
                 app_id=app_id,
                 inv_dir=inv_root,
-                deploy_extras=f"{inv_root}/swarm-nfs-extras.deploy.yml",
+                deploy_extras=deploy_extras,
                 drill_extras=extras_path,
             )
         if rc == 0:
@@ -427,24 +473,21 @@ def main(argv: list[str] | None = None) -> int:
             rc = mesh_controller(inv_dir=inv_root)
         if rc == 0:
             rc = switch_to_mesh_transport(inv_dir=inv_root)
+        if rc == 0 and drills:
+            rc = _deploy(**deploy_args, update_pass=True, dr_prepass=True)
+            if rc == 0:
+                rc = _converge_and_verify(app_id=app_id)
+            if rc == 0:
+                rc = _backup_phase(
+                    app_id=app_id,
+                    inv_dir=inv_root,
+                    deploy_extras=deploy_extras,
+                    drill_extras=extras_path,
+                )
         if rc == 0:
-            rc = _deploy(
-                app_id=app_id,
-                inv_dir=inv_root,
-                extras_path=f"{inv_root}/swarm-nfs-extras.deploy.yml",
-                round_index=round_index,
-                total=total,
-                update_pass=True,
-            )
+            rc = _deploy(**deploy_args, update_pass=True)
         if rc == 0:
             rc = _converge_and_verify(app_id=app_id)
-        if rc == 0 and meshed and round_index == 0:
-            rc = _backup_phase(
-                app_id=app_id,
-                inv_dir=inv_root,
-                deploy_extras=f"{inv_root}/swarm-nfs-extras.deploy.yml",
-                drill_extras=extras_path,
-            )
         if rc == 0 and round_index == 0:
             rc = _verify_recovered_marker(app_id=app_id)
         if rc != 0:
