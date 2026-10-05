@@ -1,5 +1,5 @@
 name: "🕹️ Manual"
-run-name: "🕹️ ${{ inputs.chunk_gate && '🛑 ' || '' }}${{ inputs.offset != '0' && inputs.offset != '' && format('⏩{0} ', inputs.offset) || '' }}${{ inputs.workspace != 'auto' && format('🧑‍💻{0} ', inputs.workspace == 'true' && '是' || '否') || '' }}${{ inputs.tor != 'auto' && format('{0} ', inputs.tor == 'disabled' && '🌐' || inputs.tor == 'enforced' && '🧅强制' || '🧅独占') || '' }}${{ inputs.vpn != 'auto' && format('{0} ', inputs.vpn == 'disabled' && '🔓' || '🔒强制') || '' }}${{ inputs.filesystem != '' && format('🗄️{0} ', inputs.filesystem) || '' }}${{ inputs.distros != '' && format('🐧{0} ', inputs.distros) || '' }}${{ inputs.lifecycles != '' && format('♻️{0} ', inputs.lifecycles) || '' }}${{ inputs.mode != 'auto' && format('🚀{0} ', inputs.mode) || '' }}${{ inputs.priority != '' && format('⭐{0} ', inputs.priority) || '' }}${{ inputs.whitelist != '' && format('🎯{0}', inputs.whitelist) || '🔀 diff (origin/main)' }}"
+run-name: "🕹️ ${{ inputs.chunk_gate && '🛑 ' || '' }}${{ inputs.offset != '0' && inputs.offset != '' && format('⏩{0} ', inputs.offset) || '' }}${{ inputs.workspace != 'auto' && format('🧑‍💻{0} ', inputs.workspace == 'true' && '是' || '否') || '' }}${{ inputs.tor != 'auto' && format('{0} ', inputs.tor == 'disabled' && '🌐' || inputs.tor == 'enforced' && '🧅强制' || '🧅独占') || '' }}${{ inputs.vpn != 'auto' && format('{0} ', inputs.vpn == 'disabled' && '🛣️' || '🚇强制') || '' }}${{ inputs.filesystem != '' && format('🗄️{0} ', inputs.filesystem) || '' }}${{ inputs.distros != '' && format('🐧{0} ', inputs.distros) || '' }}${{ inputs.lifecycles != '' && format('♻️{0} ', inputs.lifecycles) || '' }}${{ inputs.mode != 'auto' && format('🚀{0} ', inputs.mode) || '' }}${{ inputs.priority != '' && format('⭐{0} ', inputs.priority) || '' }}${{ inputs.whitelist != '' && format('🎯{0}', inputs.whitelist) || '🔀 diff (origin/main)' }}"
 
 concurrency:
   group: global-ci-${{ github.repository }}-${{ github.ref_name }}
@@ -54,7 +54,7 @@ on:
           - "exclusive"
           - "disabled"
       vpn:
-        description: "🔒 WireGuard axis for swarm; auto rotates, the others hold every row"
+        description: "🚇 WireGuard axis for swarm; auto rotates, the others hold every row"
         required: false
         default: "auto"
         type: choice
