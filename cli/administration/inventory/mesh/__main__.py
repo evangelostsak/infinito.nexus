@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""CLI: write every declared mesh into the host_vars of its members.
-
-Runs once over the whole host set, after the per-host provisioners have made
-each ``host_vars`` file exist. That ordering is the point: the mesh is the one
-credential whose values are correlated across hosts, so it needs a writer that
-sees all of them at once.
-"""
+"""CLI: write every declared mesh into the host_vars of its members."""
 
 from __future__ import annotations
 
