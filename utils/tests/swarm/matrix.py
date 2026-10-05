@@ -1,20 +1,4 @@
-"""Swarm variant-matrix round orchestrator.
-
-Mirrors the compose matrix deploy (``cli.administration.deploy.development.deploy``)
-for the swarm test cluster: for each variant round of the primary app it
-provisions a per-round inventory (baking that round's ``meta/variants.yml``
-overlay into ``host_vars`` so the deploy sees the round's config, e.g. the
-keycloak totp-off variant), extends it with the swarm topology, writes runtime
-extras, and deploys via ``cli.administration.deploy.swarm`` (the Playwright e2e
-runs in-deploy). Each round mirrors the compose ``--full-cycle``: an initial
-deploy then an async update pass, each followed by a convergence + reachability
-wait; on the first round the backup + restore DR drill runs between them. Prior
-rounds' stacks are purged between rounds.
-
-Runs on the cluster host (the test-deploy-swarm workflow's single orchestrator
-step) and reaches the nodes through the existing ``scripts/tests/deploy/swarm``
-helpers, which it drives per round via environment variables.
-"""
+"""Swarm variant-matrix round orchestrator."""
 
 from __future__ import annotations
 
@@ -97,21 +81,7 @@ def _write_extras(*, extras_path: str) -> int:
 def _reset_credentials(
     *, app_id: str, inv_dir: str, round_variants: dict[str, int]
 ) -> int:
-    """Regenerate the round's credentials so the update pass has to carry them.
-
-    `administrator` stays exempt: its password is `ansible_become_password`,
-    and rotating it would lock the deploy out of the nodes it manages.
-
-    The credential scope is `derive_includes`, the same source
-    `02_provision_inventory.sh` feeds provision's `--include`, so the gate
-    rotates the ids the round provisioned. A matrix host_vars file also holds
-    an application block per mirror artefact, and rotating those costs one
-    subprocess each for credentials provision never generated. Every declared
-    user password still rotates, so PASS 2 has to carry all of them.
-
-    The mesh block is kept out of the mirror: the cross-host writer mints an
-    address and a keypair per host, which the copy would overwrite.
-    """
+    """Regenerate the round's credentials so the update pass has to carry them."""
     return run_step(
         [
             "python3",
@@ -242,12 +212,7 @@ def _drill_env(*, app_id: str, inv_dir: str, extras_path: str) -> dict[str, str]
 
 
 def _drill_is_coming(*, app_id: str, inv_dir: str, extras_path: str) -> bool:
-    """Whether the drill will tear this round's stack down and recover it.
-
-    Asked of the drill rather than decided here, so which applications have
-    anything to restore keeps one owner. No verdict counts as a drill:
-    skipping the deploy a drill needs strands a torn-down stack, while an
-    extra deploy only costs time."""
+    """Whether the drill will tear this round's stack down and recover it."""
     env = _drill_env(app_id=app_id, inv_dir=inv_dir, extras_path=extras_path)
     env["DRILL_PROBE"] = "true"
     probe = subprocess.run(
@@ -275,11 +240,7 @@ def _backup_restore_drill(*, app_id: str, inv_dir: str, extras_path: str) -> int
 def _backup_phase(
     *, app_id: str, inv_dir: str, deploy_extras: str, drill_extras: str
 ) -> int:
-    """Bring the backup node up and drill backup, teardown and recovery.
-
-    Runs after whichever pass deployed the applications: there is nothing to
-    back up before it.
-    """
+    """Bring the backup node up and drill backup, teardown and recovery."""
     rc = _deploy_backup_host(app_id=app_id, inv_dir=inv_dir, extras_path=deploy_extras)
     if rc == 0:
         rc = _backup_restore_drill(
