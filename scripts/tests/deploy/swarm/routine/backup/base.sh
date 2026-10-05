@@ -50,12 +50,6 @@ DEV_TARGET="$(python3 -c "import sys, yaml; print(yaml.safe_load(open(sys.argv[1
 DEV_DEST="${DEV_MOUNT}${DEV_TARGET}"
 
 if [ "${DRILL_PROBE:-false}" = "true" ]; then
-	# Exception: the caller has to know whether a drill is coming before it
-	# deploys anything, because a round that drills deploys twice. Answering
-	# here keeps that one decision in the script that makes it. The verdict
-	# is printed rather than signalled by exit status, so a probe that dies
-	# on the way here cannot be read as "no drill" and leave the caller
-	# skipping the deploy the drill needs.
 	if [ -n "${PRIMARY_NFS_VOLUME}" ]; then
 		echo "DRILL=yes"
 	else
