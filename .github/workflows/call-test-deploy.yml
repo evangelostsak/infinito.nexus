@@ -118,7 +118,7 @@ on:
         default: auto
         options: [auto, enforced, exclusive, disabled]
       vpn:
-        description: "🔒 WireGuard axis; see .github/workflows/README.md for what each value does"
+        description: "🚇 WireGuard axis; see .github/workflows/README.md for what each value does"
         required: false
         type: choice
         default: auto
