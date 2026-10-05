@@ -305,9 +305,6 @@ def _centos_listings(name: str, repo: dict | None) -> list[str] | None:
 
 
 def _probe_centos(name: str, repo: dict | None) -> tuple[bool | None, str]:
-    # Exception: dl.fedoraproject.org redirects to whichever mirror is near the
-    # caller, and one that does not carry the directory answers 404, so a
-    # listing read from a GitHub runner reports EPEL packages as uncheckable.
     if (
         isinstance(repo, dict)
         and not repo.get("baseurl")
