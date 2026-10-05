@@ -1,15 +1,4 @@
-"""Move an inventory's Ansible transport onto the mesh it just created.
-
-The first pass of a deploy reaches the hosts however it can -- an underlay
-address, a container connection -- because no tunnel exists yet and the pass
-is what creates one. Every pass after it connects over the mesh, which is what
-makes the mesh load-bearing rather than merely present: if it is broken, the
-deploy cannot reach a single host, and no role can quietly fall back to the
-underlay it was supposed to stop using.
-
-The rewrite is a separate step rather than a fact set during the play, because
-a play cannot change the transport it is already running over.
-"""
+"""Move an inventory's Ansible transport onto the mesh it just created."""
 
 from __future__ import annotations
 
@@ -45,13 +34,6 @@ _REPLACED_OPTIONS = ("ControlPersist=", "ControlPath=")
 def mesh_ssh_args(base: str, *, persist: str = MESH_CONTROL_PERSIST) -> str:
     """The repo's ``ssh_args`` retuned for a host reached over the mesh.
 
-    Derived from the repo's own value rather than restated, so a mesh host
-    keeps every option the platform sets and differs only where the mesh needs
-    it to. ``ControlPath`` is dropped so Ansible supplies one under
-    ``control_path_dir``, which it creates; a path that names a directory
-    nothing creates leaves the master unable to open its socket, and it then
-    reconnects per task without reporting anything.
-
     Args:
         base: the ``ssh_args`` every other host uses.
         persist: how long to keep an idle master alive.
@@ -72,11 +54,7 @@ def mesh_ssh_args(base: str, *, persist: str = MESH_CONTROL_PERSIST) -> str:
 
 
 def repo_ssh_args(config_file: Path | None = None) -> str:
-    """The ``ssh_args`` the repository's ansible.cfg declares.
-
-    Read without interpolation, as Ansible itself reads it: the value carries
-    ``%h`` and friends, which ConfigParser would otherwise refuse.
-    """
+    """The ``ssh_args`` the repository's ansible.cfg declares."""
     parser = ConfigParser(interpolation=None)
     parser.read(config_file or PROJECT_ROOT / "ansible.cfg")
     return parser.get("ssh_connection", "ssh_args", fallback="")
@@ -115,13 +93,6 @@ def switch_to_mesh(
     application_id: str = DEFAULT_APPLICATION_ID,
 ) -> dict[str, str]:
     """Point every member of *mesh_name* at its mesh address over SSH.
-
-    The tty is switched off with the address. Ansible adds ``-tt`` to any
-    task it cannot pipeline -- ``script`` among them -- and the pty then ends
-    every line of output with a carriage return. The transport this replaces
-    reached the host through a container and returned bare newlines, so a
-    role that reads its own stdout would start failing merely because the
-    deploy moved onto the mesh.
 
     Returns:
         Host to the address it was switched to. A host with no address on this
