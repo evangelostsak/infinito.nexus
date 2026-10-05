@@ -1,14 +1,4 @@
-"""The WireGuard-mesh axis of a deploy row.
-
-Split out beside ``tor.py`` for the same reason: one axis, its modes, its
-rotation and its glyph pairing belong together rather than spread through the
-assigner.
-
-A swarm deploy runs either over the mesh or straight over the underlay, and
-both have to keep working -- the mesh joins physically separated clusters, so a
-single-site swarm has no use for it and must not depend on it. Rotating the
-axis proves both arms instead of proving one and assuming the other.
-"""
+"""The WireGuard-mesh axis of a deploy row."""
 
 from __future__ import annotations
 
@@ -60,10 +50,6 @@ def pinned_vpn_states(
 ) -> list[bool]:
     """The mesh states a priority row takes, global axis ahead of the pin.
 
-    Same precedence :func:`rotated_vpn` gives a regular row: a run that holds
-    the axis overrides the pin instead of filtering the row out of the matrix,
-    so a held sweep keeps every row it would otherwise have run.
-
     Args:
         mode: the deploy mode of the row.
         pin: the state the row asked for, or None for every state.
@@ -76,12 +62,7 @@ def pinned_vpn_states(
 
 
 def wants_vpn(position: int, sweep: int) -> bool:
-    """Whether a swarm row carries the mesh this sweep.
-
-    Quartered on ``sweep // 4`` so it flips in step with neither the mode
-    rotation nor the onion: a row walks every mode/tor/vpn combination over
-    eight sweeps instead of re-proving the same pairing.
-    """
+    """Whether a swarm row carries the mesh this sweep."""
     return (position + sweep // 4) % 2 == 0
 
 
@@ -93,11 +74,7 @@ def rotated_vpn(
     pin: bool | None = None,
     vpn_mode: str = "auto",
 ) -> bool:
-    """The single mesh state a regular row takes this sweep.
-
-    A pin replaces the rotation, and a run that holds the axis replaces both:
-    an operator who asked for a whole sweep on one side means it.
-    """
+    """The single mesh state a regular row takes this sweep."""
     if mode not in VPN_DEPLOY_MODES:
         return False
     if vpn_mode in ("enforced", "disabled"):
