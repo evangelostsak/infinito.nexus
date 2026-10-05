@@ -117,14 +117,11 @@ def _deploy(
     round_index: int,
     total: int,
     update_pass: bool = False,
-    dr_prepass: bool = False,
 ) -> int:
     """Run one deploy of the round.
 
     Args:
         update_pass: run it as the async update pass.
-        dr_prepass: this pass is torn down by the drill, so it leaves the
-            end-to-end suites to the pass that follows the drill.
     """
     env = os.environ.copy()
     env["APP_ID"] = app_id
@@ -147,8 +144,6 @@ def _deploy(
         "-e",
         f"PRIMARY_APPS={json.dumps([app_id])}",
     ]
-    if dr_prepass:
-        cmd += ["-e", "SWARM_DR_PREPASS=true"]
     pass_label = (
         f"matrix-deploy: round {round_index + 1}/{total} "
         f"variants=[{round_index}] apps=['{app_id}']"
@@ -212,7 +207,7 @@ def _drill_env(*, app_id: str, inv_dir: str, extras_path: str) -> dict[str, str]
 
 
 def _drill_is_coming(*, app_id: str, inv_dir: str, extras_path: str) -> bool:
-    """Whether the drill will tear this round's stack down and recover it."""
+    """Whether this round has an NFS-flagged volume for the drill to back up."""
     env = _drill_env(app_id=app_id, inv_dir=inv_dir, extras_path=extras_path)
     env["DRILL_PROBE"] = "true"
     probe = subprocess.run(
@@ -229,22 +224,37 @@ def _drill_is_coming(*, app_id: str, inv_dir: str, extras_path: str) -> bool:
     return True
 
 
-def _backup_restore_drill(*, app_id: str, inv_dir: str, extras_path: str) -> int:
+def _backup_restore_drill(
+    *, app_id: str, inv_dir: str, extras_path: str, stage: str
+) -> int:
+    env = _drill_env(app_id=app_id, inv_dir=inv_dir, extras_path=extras_path)
+    env["DRILL_STAGE"] = stage
+    label = "backup + restore DR drill" if stage == "full" else "backup chain drill"
     return run_step(
         ["bash", str(_SWARM_SCRIPTS / "backup" / "base.sh")],
-        env=_drill_env(app_id=app_id, inv_dir=inv_dir, extras_path=extras_path),
-        label="backup + restore DR drill",
+        env=env,
+        label=label,
     )
 
 
 def _backup_phase(
-    *, app_id: str, inv_dir: str, deploy_extras: str, drill_extras: str
+    *,
+    app_id: str,
+    inv_dir: str,
+    deploy_extras: str,
+    drill_extras: str,
+    stage: str = "full",
 ) -> int:
-    """Bring the backup node up and drill backup, teardown and recovery."""
+    """Bring the backup node up and drill the backup chain.
+
+    Args:
+        stage: ``full`` also tears the stack down and recovers it; ``backup``
+            stops once the chain has reached the encrypted device.
+    """
     rc = _deploy_backup_host(app_id=app_id, inv_dir=inv_dir, extras_path=deploy_extras)
     if rc == 0:
         rc = _backup_restore_drill(
-            app_id=app_id, inv_dir=inv_dir, extras_path=drill_extras
+            app_id=app_id, inv_dir=inv_dir, extras_path=drill_extras, stage=stage
         )
     return rc
 
@@ -434,21 +444,18 @@ def main(argv: list[str] | None = None) -> int:
             rc = mesh_controller(inv_dir=inv_root)
         if rc == 0:
             rc = switch_to_mesh_transport(inv_dir=inv_root)
-        if rc == 0 and drills:
-            rc = _deploy(**deploy_args, update_pass=True, dr_prepass=True)
-            if rc == 0:
-                rc = _converge_and_verify(app_id=app_id)
-            if rc == 0:
-                rc = _backup_phase(
-                    app_id=app_id,
-                    inv_dir=inv_root,
-                    deploy_extras=deploy_extras,
-                    drill_extras=extras_path,
-                )
         if rc == 0:
             rc = _deploy(**deploy_args, update_pass=True)
         if rc == 0:
             rc = _converge_and_verify(app_id=app_id)
+        if rc == 0 and drills:
+            rc = _backup_phase(
+                app_id=app_id,
+                inv_dir=inv_root,
+                deploy_extras=deploy_extras,
+                drill_extras=extras_path,
+                stage="backup",
+            )
         if rc == 0 and round_index == 0:
             rc = _verify_recovered_marker(app_id=app_id)
         if rc != 0:
