@@ -1,10 +1,5 @@
 #!/bin/bash
 
-# Exception: bash sources this file for a non-interactive shell too when sshd
-# starts it, so without this guard the banner below lands on the stdout of
-# every command Ansible runs over SSH. A task that parses its own output then
-# reads the banner instead -- starting with `clear` failing as "'unknown':
-# unknown terminal type." when there is no terminal to clear.
 case $- in
 *i*) ;;
 *) return ;;
