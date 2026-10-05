@@ -223,12 +223,6 @@ if ! docker exec "${BACKUP_NODE}" find "${DEV_DEST}" -name "${DR_MARKER}" 2>/dev
 fi
 echo "    marker present on encrypted USB"
 
-if [ "${DRILL_STAGE:-full}" = "backup" ]; then
-	drill_device_teardown
-	echo "==> DRILL_STAGE=backup: chain proven to the encrypted device; leaving teardown and recovery to the full drill"
-	exit 0
-fi
-
 echo "==> [6/9] tear the stack down completely (full disaster) before recovery"
 if has_swarm_service; then
 	docker exec "${MGR}" bash "${BKP_IN_NODE}/04_stack_rm_wait.sh" "${STACK_NAME}"
