@@ -37,6 +37,4 @@
 - name: ▶️ Run E2E Playwright tests
   include_role:
     name: "test-e2e-playwright"
-  when:
-    - RUNTIME in ['dev', 'act', 'github']
-    - not (SWARM_DR_PREPASS | default(false) | bool)
+  when: RUNTIME in ['dev', 'act', 'github']
