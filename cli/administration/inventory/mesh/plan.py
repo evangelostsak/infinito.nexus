@@ -1,10 +1,4 @@
-"""Resolve a spec against an inventory into a complete mesh.
-
-Planning is a pure function of the inventory, the spec and whatever public keys
-already exist. It touches no file, so the whole correctness argument -- every
-member addressed, every key paired, rotation honoured -- is unit-testable
-without a deploy.
-"""
+"""Resolve a spec against an inventory into a complete mesh."""
 
 from __future__ import annotations
 
@@ -24,17 +18,7 @@ SPOKE_OFFSET = 10
 def members_of(
     spec: MeshSpec, groups: dict[str, list[str]], controller: str | None = None
 ) -> tuple[str, list[str]]:
-    """The hub and the spokes ``spec`` selects out of ``groups``.
-
-    ``controller`` joins as an ordinary spoke. It is named rather than resolved
-    from a group because the Ansible controller is not a swarm member and has
-    no role group of its own -- inventing one would put a non-role name into
-    group_names, where every service and placement lookup would then have to
-    special-case it.
-
-    Raises when the hub group does not resolve to exactly one host: a mesh with
-    no hub has no routes, and a mesh with two hubs silently splits in half.
-    """
+    """The hub and the spokes ``spec`` selects out of ``groups``."""
     hubs = sorted(dict.fromkeys(groups.get(spec.hub_group, [])))
     if len(hubs) != 1:
         raise ValueError(
@@ -69,12 +53,7 @@ def _address(subnet: str, offset: int) -> str:
 
 
 def _offset_of(subnet: str, address: str) -> int | None:
-    """The spoke offset ``address`` occupies in ``subnet``, or None.
-
-    None covers everything that must not be reused: an unparseable value, an
-    address from a subnet the spec no longer declares, and the hub's own
-    offset, which belongs to whichever host holds the hub group today.
-    """
+    """The spoke offset ``address`` occupies in ``subnet``, or None."""
     network = ipaddress.ip_network(subnet, strict=True)
     try:
         candidate = ipaddress.ip_address(address)
@@ -90,12 +69,6 @@ def _spoke_offsets(
     subnet: str, spokes: list[str], stored: dict[str, str]
 ) -> dict[str, int]:
     """Keep every spoke on the address it already holds.
-
-    Deriving the offset from a spoke's position renumbers every later member
-    the moment a host that sorts earlier joins. `wg syncconf` carries keys and
-    peers onto a live interface but never its address, so a renumbered member
-    keeps answering on the old address while the rest of the mesh and the
-    inventory have already moved to the new one.
 
     Args:
         subnet: the mesh subnet offsets are taken in.
@@ -133,11 +106,6 @@ def plan_mesh(
     addresses: dict[str, str] | None = None,
 ) -> Mesh:
     """Resolve ``spec`` into a mesh whose members are addressed and keyed.
-
-    A member that already holds a key keeps it and carries no private half, so
-    the writer leaves its stored credential untouched. Vault encryption is
-    salted, so re-encrypting an unchanged secret would rewrite the file on
-    every run and no deploy could ever be a no-op.
 
     Args:
         spec: the mesh to resolve.
