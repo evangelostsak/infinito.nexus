@@ -1,10 +1,4 @@
-"""Project a resolved mesh onto the host_vars of every member.
-
-Each member receives its own private key and the public halves of the peers it
-may reach. A private key is written to exactly one file -- the one belonging to
-the host that owns it -- so a leaked inventory compromises one member rather
-than the mesh.
-"""
+"""Project a resolved mesh onto the host_vars of every member."""
 
 from __future__ import annotations
 
@@ -36,12 +30,7 @@ PRIVATE_KEY_NAME = "mesh_private_key"
 
 
 def private_key_name(mesh_name: str | None = None) -> str:
-    """The credential key a member's own secret half is stored under.
-
-    One key per host, not per mesh: a host presents the same identity on every
-    plane it belongs to, so the hub does not carry two identities and the
-    writer has one credential to keep in step.
-    """
+    """The credential key a member's own secret half is stored under."""
     return PRIVATE_KEY_NAME
 
 
@@ -64,24 +53,7 @@ def existing_public_keys(
     mesh_name: str,
     application_id: str = DEFAULT_APPLICATION_ID,
 ) -> dict[str, str]:
-    """The public keys already issued to ``hosts`` for ``mesh_name``.
-
-    Read from the plaintext mesh entry rather than by decrypting the private
-    half, so planning needs no vault password and a re-run never has to
-    re-encrypt a secret it would then have to write back.
-
-    A host whose stored credential has gone missing is reported as unkeyed, so
-    the pair is reminted together instead of leaving a public key that no
-    private key answers for.
-
-    One key per host: the identity recorded on any plane this host owns is the
-    identity it presents on every other, so a member already keyed by an
-    earlier mesh keeps that key rather than minting a second one. An entry
-    naming a different host is not this host's key at all -- the swarm reset
-    mirrors one node's host_vars over every other, which is right for
-    credentials that are identical per host and hands everyone else the hub's
-    identity here.
-    """
+    """The public keys already issued to ``hosts`` for ``mesh_name``."""
     found: dict[str, str] = {}
     for host in hosts:
         path = host_vars_path(host_vars_dir, host)
@@ -128,13 +100,7 @@ def existing_addresses(
     mesh_name: str,
     application_id: str = DEFAULT_APPLICATION_ID,
 ) -> dict[str, str]:
-    """The addresses already issued to ``hosts`` on ``mesh_name``.
-
-    Per mesh rather than per host, unlike the key: a member holds one address
-    on each plane it belongs to, so only its own entry on this mesh counts. An
-    entry naming another host is a leftover of the mirror and is ignored for
-    the same reason it is ignored when reading keys.
-    """
+    """The addresses already issued to ``hosts`` on ``mesh_name``."""
     found: dict[str, str] = {}
     for host in hosts:
         path = host_vars_path(host_vars_dir, host)
@@ -154,14 +120,7 @@ def prune_foreign_meshes(
     hosts: list[str],
     application_id: str = DEFAULT_APPLICATION_ID,
 ) -> dict[str, list[str]]:
-    """Drop mesh entries a host does not own, returning what was removed.
-
-    Writing a member's own entry is not enough to undo a mirror: a host that
-    received another's host_vars keeps that host's entry for every mesh it is
-    not a member of, and brings up an interface impersonating it. The NFS
-    server ends up claiming the hub's swarm address and swallowing the return
-    path for every worker.
-    """
+    """Drop mesh entries a host does not own, returning what was removed."""
     removed: dict[str, list[str]] = {}
     for host in hosts:
         path = host_vars_path(host_vars_dir, host)
