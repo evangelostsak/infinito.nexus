@@ -1,11 +1,4 @@
-"""The mesh steps of one swarm-matrix round.
-
-Four things happen around the deploy passes when the run carries the mesh: the
-cross-host writer mints it, the nodes converge on what it minted, the
-controller is brought onto it, and the inventory is moved onto it so the pass
-that follows connects over the tunnel. All four are no-ops when the run's vpn
-axis is off.
-"""
+"""The mesh steps of one swarm-matrix round."""
 
 from __future__ import annotations
 
@@ -45,10 +38,6 @@ def _lab_endpoints() -> list[str]:
 def write_mesh(*, inv_dir: str, rotate: bool = False) -> int:
     """Write the WireGuard meshes over both inventories of the round.
 
-    Ordered after extend_inventory, which creates the groups the meshes
-    resolve from and the sibling backup.yml the data mesh spans. A no-op when
-    the run's vpn axis is off, because the groups are then absent entirely.
-
     Args:
         inv_dir: inventory directory of the round.
         rotate: mint a fresh keypair for every member.
@@ -72,15 +61,7 @@ def write_mesh(*, inv_dir: str, rotate: bool = False) -> int:
 
 
 def bootstrap_mesh(*, inv_dir: str) -> int:
-    """Bring the mesh up before anything is deployed over it.
-
-    The pass that follows is the only one that deploys the applications, and
-    it runs over the tunnel, so this pass creates exactly what that transport
-    needs and nothing else: the account it logs in as and the interface it
-    reaches each node on. Deploying the roles here as well would deploy them
-    twice, once over each transport, which is what made the meshed arm cost
-    two full deploys.
-    """
+    """Bring the mesh up before anything is deployed over it."""
     if not mesh_enabled():
         return 0
     return run_step(
@@ -100,16 +81,7 @@ def bootstrap_mesh(*, inv_dir: str) -> int:
 
 
 def converge_mesh(*, inv_dir: str) -> int:
-    """Carry the rotated keys to every node before the transport moves.
-
-    The write before this one rotates the mesh, so each node still authorises
-    the previous set until it re-renders. Reaching them over the container
-    connection is what proves a rotation converges without an operator.
-
-    The backup node is left out: it is deployed after the pass that needs the
-    tunnel, so it renders the rotated mesh on its first run and has nothing
-    to converge from.
-    """
+    """Carry the rotated keys to every node before the transport moves."""
     if not mesh_enabled():
         return 0
     return run_step(
@@ -127,12 +99,7 @@ def converge_mesh(*, inv_dir: str) -> int:
 
 
 def mesh_controller(*, inv_dir: str) -> int:
-    """Bring the controller's own interface up before the transport moves.
-
-    Its own play rather than a host in the deploy inventory: playbook.yml
-    targets every host with become, so a controller listed there would take
-    the whole host bootstrap instead of one interface.
-    """
+    """Bring the controller's own interface up before the transport moves."""
     if not mesh_enabled():
         return 0
     inventory = Path(inv_dir) / "controller.yml"
@@ -163,10 +130,7 @@ def mesh_controller(*, inv_dir: str) -> int:
 
 
 def switch_to_mesh_transport(*, inv_dir: str) -> int:
-    """Point the inventory at the mesh before the pass that must use it.
-
-    The controller keeps its own transport: it is the machine running the play.
-    """
+    """Point the inventory at the mesh before the pass that must use it."""
     if not mesh_enabled():
         return 0
     from cli.administration.inventory.mesh.transport import switch_to_mesh
