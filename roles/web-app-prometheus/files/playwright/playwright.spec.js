@@ -284,7 +284,8 @@ test("prometheus scrape: every consumer role reports up=1 and passes its probe",
   await expect
     .poll(
       async () => {
-        const probes = (await (await page.request.get(probeUrl, { ignoreHTTPSErrors: true })).json())?.data?.result || [];
+        const response = await page.request.get(probeUrl, { ignoreHTTPSErrors: true });
+        const probes = response.ok() ? (await response.json())?.data?.result || [] : [];
         return prometheusTargetRoles
           .filter((target) => {
             const own = probes.filter((entry) => entry?.metric?.app === target.id);
