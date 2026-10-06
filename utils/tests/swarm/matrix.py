@@ -117,14 +117,11 @@ def _deploy(
     round_index: int,
     total: int,
     update_pass: bool = False,
-    dr_prepass: bool = False,
 ) -> int:
     """Run one deploy of the round.
 
     Args:
         update_pass: run it as the async update pass.
-        dr_prepass: this pass is torn down by the drill, so it leaves the
-            end-to-end suites to the pass that follows the drill.
     """
     env = os.environ.copy()
     env["APP_ID"] = app_id
@@ -147,8 +144,6 @@ def _deploy(
         "-e",
         f"PRIMARY_APPS={json.dumps([app_id])}",
     ]
-    if dr_prepass:
-        cmd += ["-e", "SWARM_DR_PREPASS=true"]
     pass_label = (
         f"matrix-deploy: round {round_index + 1}/{total} "
         f"variants=[{round_index}] apps=['{app_id}']"
@@ -257,6 +252,35 @@ def _verify_recovered_marker(*, app_id: str) -> int:
         env=env,
         label="verify recovered marker (post update pass)",
     )
+
+
+def _mesh_prologue(*, app_id: str, inv_dir: str, round_variants: dict[str, int]) -> int:
+    """Put every node and the controller on the mesh, then move the transport.
+
+    The credential reset runs here rather than between the passes, where the
+    direct arm has it: its mirror copies the manager's host_vars over every
+    other host, which after the switch would hand every worker the manager's
+    mesh address.
+
+    Args:
+        app_id: primary application of the round.
+        inv_dir: inventory directory of the round.
+        round_variants: the round's ``{app_id: variant_index}`` map.
+    """
+    rc = bootstrap_mesh(inv_dir=inv_dir)
+    if rc == 0:
+        rc = _reset_credentials(
+            app_id=app_id, inv_dir=inv_dir, round_variants=round_variants
+        )
+    if rc == 0:
+        rc = write_mesh(inv_dir=inv_dir, rotate=True)
+    if rc == 0:
+        rc = converge_mesh(inv_dir=inv_dir)
+    if rc == 0:
+        rc = mesh_controller(inv_dir=inv_dir)
+    if rc == 0:
+        rc = switch_to_mesh_transport(inv_dir=inv_dir)
+    return rc
 
 
 def _purge(*, purge_set: tuple[str, ...]) -> int:
@@ -405,46 +429,30 @@ def main(argv: list[str] | None = None) -> int:
         }
         drills = (
             rc == 0
-            and meshed
             and round_index == 0
             and _drill_is_coming(
                 app_id=app_id, inv_dir=inv_root, extras_path=extras_path
             )
         )
+        if rc == 0 and meshed:
+            rc = _mesh_prologue(
+                app_id=app_id, inv_dir=inv_root, round_variants=round_variants
+            )
         if rc == 0:
-            rc = bootstrap_mesh(inv_dir=inv_root) if meshed else _deploy(**deploy_args)
-        if rc == 0 and not meshed:
+            rc = _deploy(**deploy_args)
+        if rc == 0:
             rc = _converge_and_verify(app_id=app_id)
-        if rc == 0 and not meshed and round_index == 0:
+        if rc == 0 and drills:
             rc = _backup_phase(
                 app_id=app_id,
                 inv_dir=inv_root,
                 deploy_extras=deploy_extras,
                 drill_extras=extras_path,
             )
-        if rc == 0:
+        if rc == 0 and not meshed:
             rc = _reset_credentials(
                 app_id=app_id, inv_dir=inv_root, round_variants=round_variants
             )
-        if rc == 0:
-            rc = write_mesh(inv_dir=inv_root, rotate=True)
-        if rc == 0:
-            rc = converge_mesh(inv_dir=inv_root)
-        if rc == 0:
-            rc = mesh_controller(inv_dir=inv_root)
-        if rc == 0:
-            rc = switch_to_mesh_transport(inv_dir=inv_root)
-        if rc == 0 and drills:
-            rc = _deploy(**deploy_args, update_pass=True, dr_prepass=True)
-            if rc == 0:
-                rc = _converge_and_verify(app_id=app_id)
-            if rc == 0:
-                rc = _backup_phase(
-                    app_id=app_id,
-                    inv_dir=inv_root,
-                    deploy_extras=deploy_extras,
-                    drill_extras=extras_path,
-                )
         if rc == 0:
             rc = _deploy(**deploy_args, update_pass=True)
         if rc == 0:
