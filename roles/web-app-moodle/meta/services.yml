@@ -45,7 +45,13 @@ moodle:
   bond: 1
   enabled: true # nocheck: dynamic-flag
   shared: true
-  release: 4.5.11
+  app_version: 4.5.11
+  update:
+    key: app_version
+    type: git_tags
+    repository: https://github.com/moodle/moodle.git
+    match: "v"
+    strip: true
   image: php
   # nocheck: docker-version
   version: "8.3-fpm"
@@ -59,7 +65,6 @@ moodle:
   site_titel: Academy on {{ DOMAIN_PRIMARY }}
   performance:
     php:
-      memory_limit: 512M
       upload_max_filesize: 256M
       post_max_size: 256M
   ports:
