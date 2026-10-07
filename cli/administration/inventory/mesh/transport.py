@@ -91,8 +91,14 @@ def switch_to_mesh(
     user: str,
     private_key_file: str,
     application_id: str = DEFAULT_APPLICATION_ID,
+    keep_address: bool = False,
 ) -> dict[str, str]:
     """Point every member of *mesh_name* at its mesh address over SSH.
+
+    Args:
+        keep_address: move the connection to SSH but leave ``ansible_host`` on
+            the address it already held, so a run can separate the cost of
+            leaving the local connection from the cost of the tunnel.
 
     Returns:
         Host to the address it was switched to. A host with no address on this
@@ -106,7 +112,10 @@ def switch_to_mesh(
             continue
         path = host_vars_path(host_vars_dir, host)
         document = load_document(path)
-        document["ansible_host"] = address
+        if keep_address:
+            address = str(document.get("ansible_host") or address)
+        else:
+            document["ansible_host"] = address
         document["ansible_connection"] = SSH_CONNECTION
         document["ansible_user"] = user
         document["ansible_ssh_private_key_file"] = private_key_file
