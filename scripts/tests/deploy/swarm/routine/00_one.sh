@@ -177,6 +177,7 @@ if [ "$(id -u)" -ne 0 ]; then
 		"variant=${variant:-}"
 		"disable=${disable:-}"
 		"INFINITO_SWARM_VPN=${INFINITO_SWARM_VPN:-}"
+		"INFINITO_SWARM_SSH_UNDERLAY=${INFINITO_SWARM_SSH_UNDERLAY:-}"
 		"${matrix_cmd[@]}"
 	)
 fi
