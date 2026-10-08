@@ -179,7 +179,7 @@ class TestOutdated(unittest.TestCase):
 class TestTemplate(unittest.TestCase):
     def _outdated(self, services: str, upstream: str) -> list[str]:
         root = _repo(services)
-        with mock.patch.object(module, "_get", return_value=upstream.encode()):
+        with mock.patch.object(module, "documents", return_value=upstream):
             updates = module.outdated(module.collect_entries(root), root)
         return [update.latest for update in updates]
 

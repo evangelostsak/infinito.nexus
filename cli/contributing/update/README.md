@@ -56,6 +56,10 @@ freeswitch:
 
 A templated pin moves whenever the assembled value changes, its suffix included.
 
+`url` takes a list when the values live in several documents. Their bodies are
+searched as one text, in the listed order. Every document is fetched once per
+run, so all pins that read it resolve against the same snapshot.
+
 The pinned value is a semver such as `v1.0.5`, `26.04.4.2.1` or `2.4.0p32`. A
 moving tag behind an `update:` block, or as the `version` of a monitored addon,
 fails `tests/lint/ansible/services/test_version_keys.py`.
