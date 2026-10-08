@@ -24,14 +24,22 @@ _LAB_ADDRESSES = {
 }
 
 
-def _lab_endpoints() -> list[str]:
-    """`--endpoint` argument per lab node, from the topology default.env names."""
-    arguments: list[str] = []
+def _lab_address_map() -> dict[str, str]:
+    """Underlay address per lab node name, from the topology default.env names."""
+    mapping: dict[str, str] = {}
     for name_var, address_var in _LAB_ADDRESSES.items():
         name = os.environ.get(name_var, "").strip()
         address = os.environ.get(address_var, "").strip()
         if name and address:
-            arguments += ["--endpoint", f"{name}={address}"]
+            mapping[name] = address
+    return mapping
+
+
+def _lab_endpoints() -> list[str]:
+    """`--endpoint` argument per lab node, from the topology default.env names."""
+    arguments: list[str] = []
+    for name, address in _lab_address_map().items():
+        arguments += ["--endpoint", f"{name}={address}"]
     return arguments
 
 
@@ -157,7 +165,7 @@ def switch_to_mesh_transport(*, inv_dir: str) -> int:
         _MESH_NAME,
         user="administrator",
         private_key_file=os.environ.get("KEY_PATH") or _DEFAULT_ADMIN_KEY,
-        keep_address=underlay,
+        addresses=_lab_address_map() if underlay else None,
     )
     if underlay:
         print("[INFO] SSH on the underlay: the tunnel carries no deploy traffic", flush=True)
