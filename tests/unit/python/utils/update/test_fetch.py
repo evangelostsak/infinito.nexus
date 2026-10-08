@@ -35,9 +35,11 @@ class TestDocuments(unittest.TestCase):
         self.assertEqual(get.call_count, 2)
 
     def test_a_failed_fetch_is_tried_again(self) -> None:
-        with mock.patch.object(module, "get", side_effect=OSError("down")):
-            with self.assertRaises(OSError):
-                module.documents("https://example.test/tags")
+        with (
+            mock.patch.object(module, "get", side_effect=OSError("down")),
+            self.assertRaises(OSError),
+        ):
+            module.documents("https://example.test/tags")
         with mock.patch.object(module, "get", side_effect=BODIES.__getitem__):
             self.assertEqual(
                 module.documents("https://example.test/tags"), "core v1.0.0"

@@ -250,9 +250,10 @@ class TestSourcedRef(unittest.TestCase):
 
             apply_updates([RepositoryRefUpdate(entry=entries[0], latest="v1.1.0")])
 
-            written = config.read_text().splitlines()  # nocheck: cache-read  just rewritten here
-            self.assertEqual(written[2], "  ref: v1.0.0")
-            self.assertEqual(written[10], "  ref: v1.1.0")
+            written = config.read_text()  # nocheck: cache-read  just rewritten here
+            lines = written.splitlines()
+            self.assertEqual(lines[2], "  ref: v1.0.0")
+            self.assertEqual(lines[10], "  ref: v1.1.0")
 
 
 class TestCollectEntriesCoversAddons(unittest.TestCase):
