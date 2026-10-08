@@ -76,30 +76,6 @@ class TestWalkRepoRefPairs(unittest.TestCase):
         self.assertEqual(len(pairs), 1)
         self.assertEqual(pairs[0][0], ("both",))
 
-    def test_a_ref_with_its_own_source_is_left_to_that_source(self) -> None:
-        source = {"type": "http_regex", "url": "https://example.invalid/tags"}
-        data = {
-            "sourced": {
-                "repository": "https://example.invalid/a.git",
-                "ref": "v1.0.0",
-                "update": {**source, "key": "ref"},
-            },
-            "listed": {
-                "repository": "https://example.invalid/b.git",
-                "ref": "v2.0.0",
-                "update": [{**source, "key": "ref"}],
-            },
-            "other-key": {
-                "repository": "https://example.invalid/c.git",
-                "ref": "v3.0.0",
-                "update": {**source, "key": "app_version"},
-            },
-        }
-
-        pairs = list(walk_repo_ref_pairs(data, ()))
-
-        self.assertEqual([pair[0] for pair in pairs], [("other-key",)])
-
     def test_walks_lists(self) -> None:
         data = {
             "repos": [
@@ -240,6 +216,43 @@ class TestApplyUpdates(unittest.TestCase):
             self.assertEqual(set(changed), {config_a, config_b})
             self.assertEqual(read_text(str(config_a)), "  ref: v1.1.0\n")
             self.assertEqual(read_text(str(config_b)), "  ref: v2.1.0\n")
+
+
+SOURCED_FIRST = (
+    "sourced:\n"
+    "  repository: https://example.test/a.git\n"
+    "  ref: v1.0.0\n"
+    "  update:\n"
+    "    key: ref\n"
+    "    type: http_regex\n"
+    "    url: https://example.test/tags\n"
+    "    pattern: 'a (v[0-9.]+)'\n"
+    "plain:\n"
+    "  repository: https://example.test/b.git\n"
+    "  ref: v1.0.0\n"
+)
+
+
+class TestSourcedRef(unittest.TestCase):
+    def test_a_sourced_ref_is_skipped_and_keeps_its_own_line(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            config = root / "roles" / "web-app-example" / ROLE_FILE_META_SERVICES
+            config.parent.mkdir(parents=True)
+            config.write_text(SOURCED_FIRST, encoding="utf-8")
+
+            entries = collect_entries(root)
+
+            self.assertEqual(
+                [(entry.entity_path, entry.line) for entry in entries],
+                [(("plain",), 11)],
+            )
+
+            apply_updates([RepositoryRefUpdate(entry=entries[0], latest="v1.1.0")])
+
+            written = config.read_text().splitlines()  # nocheck: cache-read  just rewritten here
+            self.assertEqual(written[2], "  ref: v1.0.0")
+            self.assertEqual(written[10], "  ref: v1.1.0")
 
 
 class TestCollectEntriesCoversAddons(unittest.TestCase):
