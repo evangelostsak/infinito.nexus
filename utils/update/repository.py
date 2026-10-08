@@ -17,6 +17,9 @@ reused for every entry pointing at the same repo.
 
 Suppress a check by placing ``# nocheck: repository-version`` on the
 line directly above the `ref:` key.
+
+A `ref:` that names its own upstream in an ``update:`` block belongs to
+:mod:`utils.update.source` and is not collected here.
 """
 
 from __future__ import annotations
@@ -32,6 +35,7 @@ from utils.cache.files import read_text
 from utils.cache.yaml import load_yaml_any
 from utils.roles.mapping import ROLE_DIR_META_ADDONS, ROLE_FILE_META_SERVICES
 from utils.update.base import (
+    declares_source,
     is_maintained,
     is_semver,
     latest_semver,
@@ -78,7 +82,13 @@ def walk_repo_ref_pairs(
     if isinstance(node, dict):
         repo = node.get("repository")
         ref = node.get("ref")
-        if isinstance(repo, str) and repo and isinstance(ref, str) and ref:
+        if (
+            isinstance(repo, str)
+            and repo
+            and isinstance(ref, str)
+            and ref
+            and not declares_source(node, "ref")
+        ):
             yield (path, repo.strip(), ref.strip())
         for key, value in node.items():
             if key in ("repository", "ref"):

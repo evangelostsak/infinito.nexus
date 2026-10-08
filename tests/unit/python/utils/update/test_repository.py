@@ -76,6 +76,30 @@ class TestWalkRepoRefPairs(unittest.TestCase):
         self.assertEqual(len(pairs), 1)
         self.assertEqual(pairs[0][0], ("both",))
 
+    def test_a_ref_with_its_own_source_is_left_to_that_source(self) -> None:
+        source = {"type": "http_regex", "url": "https://example.invalid/tags"}
+        data = {
+            "sourced": {
+                "repository": "https://example.invalid/a.git",
+                "ref": "v1.0.0",
+                "update": {**source, "key": "ref"},
+            },
+            "listed": {
+                "repository": "https://example.invalid/b.git",
+                "ref": "v2.0.0",
+                "update": [{**source, "key": "ref"}],
+            },
+            "other-key": {
+                "repository": "https://example.invalid/c.git",
+                "ref": "v3.0.0",
+                "update": {**source, "key": "app_version"},
+            },
+        }
+
+        pairs = list(walk_repo_ref_pairs(data, ()))
+
+        self.assertEqual([pair[0] for pair in pairs], [("other-key",)])
+
     def test_walks_lists(self) -> None:
         data = {
             "repos": [

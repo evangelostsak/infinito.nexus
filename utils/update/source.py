@@ -15,8 +15,9 @@ upstream lives::
 ``key`` names the pinned key and defaults to ``version``; an entity with
 several pins declares a list of such blocks. The types are
 ``git_tags`` (repository), ``registry_tags`` (image), ``npm`` (package),
-``http_regex`` (url, pattern) and ``script`` (path, run with the current
-version and printing the latest one).
+``http_regex`` (url, pattern, optionally a template over the pattern's named
+groups) and ``script`` (path, run with the current version and printing the
+latest one).
 
 An addon in ``meta/addons/<id>.yml`` declares the same fields in its
 ``update:`` block, beside ``monitored``, ``catalog`` and ``upstream_id``. A
@@ -42,12 +43,10 @@ from utils.cache.yaml import load_yaml
 from utils.roles.mapping import ROLE_FILE_META_SERVICES
 from utils.update.addons import GITHUB_RELEASES_CATALOG, iter_addon_files
 from utils.update.base import (
+    captured_versions,
     is_maintained,
     is_semver,
-    latest_semver,
-    version_depth,
-    version_flavor,
-    version_key,
+    newer_version,
 )
 from utils.update.docker import (
     dockerhub_repo,
@@ -180,13 +179,13 @@ def npm_versions(package: str) -> list[str]:
     return list((payload.get("versions") or {}).keys())
 
 
-def http_regex_versions(url: str, pattern: str) -> list[str]:
-    """Return every capture of *pattern* in the body of *url*."""
+def http_regex_versions(url: str, pattern: str, template: str = "") -> list[str]:
+    """Return every version *pattern* names in the body of *url*."""
     try:
         body = _get(url).decode("utf-8", "replace")
     except OSError:
         return []
-    return [match.group(1) for match in re.finditer(pattern, body)]
+    return captured_versions(body, pattern, template)
 
 
 def script_versions(repo_root: Path, role: str, path: str, current: str) -> list[str]:
@@ -228,7 +227,11 @@ def candidates(entry: VersionSourceEntry, repo_root: Path) -> list[str]:
     elif kind == "npm":
         found = npm_versions(str(source["package"]))
     elif kind == "http_regex":
-        found = http_regex_versions(str(source["url"]), str(source["pattern"]))
+        found = http_regex_versions(
+            str(source["url"]),
+            str(source["pattern"]),
+            str(source.get("template", "")),
+        )
     elif kind == "script":
         found = script_versions(
             repo_root, entry.role, str(source["path"]), entry.current
@@ -460,12 +463,12 @@ def outdated(
     """Return one update per entry whose source offers a newer version."""
     updates: list[VersionSourceUpdate] = []
     for entry in entries:
-        newest = latest_semver(
+        newest = newer_version(
+            entry.current,
             candidates(entry, repo_root),
-            version_depth(entry.current),
-            version_flavor(entry.current),
+            assembled=bool(entry.source.get("template")),
         )
-        if newest and version_key(entry.current) < version_key(newest):
+        if newest:
             updates.append(VersionSourceUpdate(entry=entry, latest=newest))
     return updates
 
