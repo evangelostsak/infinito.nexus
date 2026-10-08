@@ -155,6 +155,42 @@ class TestSwitchingTheTransport(MeshOnDisk, unittest.TestCase):
         """The first pass is what creates the mesh; there is nothing to move to."""
         self.assertEqual(self._switch(), {})
 
+    def test_given_addresses_are_dialled_instead_of_the_mesh_ones(self):
+        mesh = self._write_swarm()
+        given = {member.host: f"192.168.244.{index + 10}" for index, member in
+                 enumerate(mesh.members)}
+        switched = switch_to_mesh(
+            self.host_vars,
+            list(HOSTS),
+            "swarm",
+            user="administrator",
+            private_key_file="/tmp/key",
+            addresses=given,
+        )
+        for host, address in switched.items():
+            with self.subTest(host=host):
+                self.assertEqual(address, given[host])
+        text = (
+            self.host_vars / "swarm-wrk-01.yml"
+        ).read_text(  # nocheck: cache-read  tempdir fixture rewritten between reads in one test
+            encoding="utf-8"
+        )
+        self.assertIn(f"ansible_host: {given['swarm-wrk-01']}", text)
+        self.assertIn("ansible_connection: ssh", text)
+
+    def test_a_member_missing_from_the_given_addresses_raises(self):
+        """Falling back would hand back the meshed arm under the other's name."""
+        self._write_swarm()
+        with self.assertRaises(KeyError):
+            switch_to_mesh(
+                self.host_vars,
+                list(HOSTS),
+                "swarm",
+                user="administrator",
+                private_key_file="/tmp/key",
+                addresses={},
+            )
+
     def test_the_address_is_only_read_from_the_host_that_owns_it(self):
         """The swarm reset mirrors one node's host_vars over every other."""
         self._write_swarm()
