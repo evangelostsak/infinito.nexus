@@ -54,7 +54,7 @@ freeswitch:
     template: "{freeswitch}-{bbb}"
 ```
 
-A templated pin moves whenever the assembled value changes, its suffix included.
+A templated pin moves when the assembled value changes, its suffix included, and never to an older version.
 
 `url` takes a list when the values live in several documents. Their bodies are
 searched as one text, in the listed order. Every document is fetched once per
