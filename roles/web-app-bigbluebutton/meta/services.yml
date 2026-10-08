@@ -129,9 +129,11 @@ nginx:
   version: "v3.0.23-v5.4.4-1.29"
   update:
     type: http_regex
-    url: https://raw.githubusercontent.com/bigbluebutton/docker/develop/repos/tags
-    pattern: 'repos/bbb-playback (?P<playback>v[0-9.]+)\n(?:.*\n)*?repos/bigbluebutton (?P<bbb>v[0-9.]+)'
-    template: "{bbb}-{playback}-1.29"
+    url:
+      - https://raw.githubusercontent.com/bigbluebutton/docker/develop/repos/tags
+      - https://raw.githubusercontent.com/bigbluebutton/docker/develop/docker-compose.tmpl.yml
+    pattern: 'repos/bbb-playback (?P<playback>v[0-9.]+)\n(?:.*\n)*?repos/bigbluebutton (?P<bbb>v[0-9.]+)\n(?:.*\n)*?.*bbb-docker-nginx:.*-(?P<base>[0-9.]+)\n'
+    template: "{bbb}-{playback}-{base}"
   enabled: false
 # nocheck: playwright-service-flag: prebuilt upstream-compose image, mirror pre-pull only
 # nocheck: dynamic-flag: fixed upstream-compose sub-service, not group-gated
@@ -140,9 +142,11 @@ etherpad:
   version: "2.4.2-s8328b77-p88f3f6b"
   update:
     type: http_regex
-    url: https://raw.githubusercontent.com/bigbluebutton/docker/develop/repos/tags
-    pattern: 'repos/bbb-etherpad-plugin (?P<plugin>[0-9a-f]+)\nrepos/bbb-etherpad-skin (?P<skin>[0-9a-f]+)'
-    template: "2.4.2-s{skin}-p{plugin}"
+    url:
+      - https://raw.githubusercontent.com/bigbluebutton/docker/develop/repos/tags
+      - https://raw.githubusercontent.com/bigbluebutton/docker/develop/docker-compose.tmpl.yml
+    pattern: 'repos/bbb-etherpad-plugin (?P<plugin>[0-9a-f]+)\nrepos/bbb-etherpad-skin (?P<skin>[0-9a-f]+)\n(?:.*\n)*?.*bbb-docker-etherpad:(?P<base>[0-9.]+)-s'
+    template: "{base}-s{skin}-p{plugin}"
   enabled: false
 # nocheck: playwright-service-flag: prebuilt upstream-compose image, mirror pre-pull only
 # nocheck: dynamic-flag: fixed upstream-compose sub-service, not group-gated
