@@ -255,7 +255,13 @@ def _verify_recovered_marker(*, app_id: str) -> int:
     )
 
 
-def _mesh_prologue(*, app_id: str, inv_dir: str, round_variants: dict[str, int]) -> int:
+def _mesh_prologue(
+    *,
+    app_id: str,
+    inv_dir: str,
+    extras_path: str,
+    round_variants: dict[str, int],
+) -> int:
     """Put every node and the controller on the mesh, then move the transport.
 
     The credential reset runs here rather than between the passes, where the
@@ -266,6 +272,7 @@ def _mesh_prologue(*, app_id: str, inv_dir: str, round_variants: dict[str, int])
     Args:
         app_id: primary application of the round.
         inv_dir: inventory directory of the round.
+        extras_path: round extras, for the optional transport benchmark.
         round_variants: the round's ``{app_id: variant_index}`` map.
     """
     rc = bootstrap_mesh(inv_dir=inv_dir)
@@ -280,11 +287,15 @@ def _mesh_prologue(*, app_id: str, inv_dir: str, round_variants: dict[str, int])
     if rc == 0:
         rc = mesh_controller(inv_dir=inv_dir)
     if rc == 0:
-        rc = transport_bench(inv_dir=inv_dir, label="docker")
+        rc = transport_bench(
+            inv_dir=inv_dir, extras_path=extras_path, label="docker"
+        )
     if rc == 0:
         rc = switch_to_mesh_transport(inv_dir=inv_dir)
     if rc == 0:
-        rc = transport_bench(inv_dir=inv_dir, label="ssh over the mesh")
+        rc = transport_bench(
+            inv_dir=inv_dir, extras_path=extras_path, label="ssh over the mesh"
+        )
     return rc
 
 
@@ -441,7 +452,10 @@ def main(argv: list[str] | None = None) -> int:
         )
         if rc == 0 and meshed:
             rc = _mesh_prologue(
-                app_id=app_id, inv_dir=inv_root, round_variants=round_variants
+                app_id=app_id,
+                inv_dir=inv_root,
+                extras_path=deploy_extras,
+                round_variants=round_variants,
             )
         if rc == 0:
             rc = _deploy(**deploy_args)

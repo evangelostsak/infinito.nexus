@@ -14,6 +14,7 @@ _MESH_NAME = "swarm"
 _CONTROLLER = "localhost"
 _PLAYBOOK = "playbook-mesh.yml"
 _BENCH_PLAYBOOK = "transport-bench.yml"
+_SWARM_EXTRAS_VARS = "inventories/development/swarm.yml"
 _DEFAULT_ADMIN_KEY = "/tmp/swarm-nfs-admin.key"  # noqa: S108 - ephemeral swarm-test path, overridable via KEY_PATH
 
 _LAB_ADDRESSES = {
@@ -130,32 +131,40 @@ def mesh_controller(*, inv_dir: str) -> int:
     )
 
 
-def transport_bench(*, inv_dir: str, label: str) -> int:
+def transport_bench(*, inv_dir: str, extras_path: str, label: str) -> int:
     """Time a fixed number of module calls over whatever transport is in force.
 
     Run once before the transport switch and once after, the four task
     durations decompose the meshed arm's per-task cost into the connection
-    plugin and the privilege escalation. Off unless asked for: it is a
-    diagnostic, not part of what a round proves.
+    plugin and the privilege escalation. Off unless asked for, and its exit
+    code never reaches the round: a diagnostic must not decide whether a
+    deploy passes.
 
     Args:
         inv_dir: inventory directory of the round.
+        extras_path: round extras, which carry the become password the
+            escalated half of the benchmark needs.
         label: which transport the numbers belong to, for the banner.
     """
     if (os.environ.get("INFINITO_SWARM_TRANSPORT_BENCH") or "").strip().lower() != "true":
         return 0
-    return run_step(
+    run_step(
         [
             "ansible-playbook",
             "-i",
             f"{inv_dir}/devices.yml",
             "--vault-password-file",
             f"{inv_dir}/.password",
+            "-e",
+            f"@{_SWARM_EXTRAS_VARS}",
+            "-e",
+            f"@{extras_path}",
             _BENCH_PLAYBOOK,
         ],
         env=os.environ.copy(),
         label=f"transport benchmark ({label})",
     )
+    return 0
 
 
 def switch_to_mesh_transport(*, inv_dir: str) -> int:
