@@ -15,6 +15,7 @@ from utils.tests.swarm.extend_inventory import mesh_enabled
 from utils.tests.swarm.mesh import (
     bootstrap_mesh,
     converge_mesh,
+    lab_sudo_without_prompt,
     mesh_controller,
     switch_to_mesh_transport,
     transport_bench,
@@ -276,6 +277,8 @@ def _mesh_prologue(
         round_variants: the round's ``{app_id: variant_index}`` map.
     """
     rc = bootstrap_mesh(inv_dir=inv_dir)
+    if rc == 0:
+        rc = lab_sudo_without_prompt(inv_dir=inv_dir)
     if rc == 0:
         rc = _reset_credentials(
             app_id=app_id, inv_dir=inv_dir, round_variants=round_variants

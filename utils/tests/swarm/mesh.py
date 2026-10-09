@@ -14,6 +14,7 @@ _MESH_NAME = "swarm"
 _CONTROLLER = "localhost"
 _PLAYBOOK = "playbook-mesh.yml"
 _BENCH_PLAYBOOK = "transport-bench.yml"
+_SUDO_PLAYBOOK = "lab-sudo.yml"
 _SWARM_EXTRAS_VARS = "inventories/development/swarm.yml"
 _DEFAULT_ADMIN_KEY = "/tmp/swarm-nfs-admin.key"  # noqa: S108 - ephemeral swarm-test path, overridable via KEY_PATH
 
@@ -128,6 +129,37 @@ def mesh_controller(*, inv_dir: str) -> int:
         ],
         env=os.environ.copy(),
         label="put the deploy controller on the mesh",
+    )
+
+
+def lab_sudo_without_prompt(*, inv_dir: str) -> int:
+    """Take the sudo prompt off the lab's administrator before the switch.
+
+    Measured over the mesh, an escalated module call costs 1046ms more than an
+    unescalated one, while over the container connection -- which runs as root
+    and so never prompts -- escalation is free. The prompt, not the transport,
+    is what the meshed arm was paying: SSH through the tunnel is itself faster
+    per call than docker exec.
+
+    Runs while the inventory still reaches the nodes as root, so it is in place
+    before anything logs in as the administrator.
+
+    Args:
+        inv_dir: inventory directory of the round.
+    """
+    if not mesh_enabled():
+        return 0
+    return run_step(
+        [
+            "ansible-playbook",
+            "-i",
+            f"{inv_dir}/devices.yml",
+            "--vault-password-file",
+            f"{inv_dir}/.password",
+            _SUDO_PLAYBOOK,
+        ],
+        env=os.environ.copy(),
+        label="take the sudo prompt off the lab administrator",
     )
 
 
