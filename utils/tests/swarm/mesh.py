@@ -13,7 +13,7 @@ from utils.tests.swarm.run import run_step
 _MESH_NAME = "swarm"
 _CONTROLLER = "localhost"
 _PLAYBOOK = "playbook-mesh.yml"
-_BENCH_PLAYBOOK = "playbook-transport-bench.yml"
+_BENCH_PLAYBOOK = "transport-bench.yml"
 _DEFAULT_ADMIN_KEY = "/tmp/swarm-nfs-admin.key"  # noqa: S108 - ephemeral swarm-test path, overridable via KEY_PATH
 
 _LAB_ADDRESSES = {
