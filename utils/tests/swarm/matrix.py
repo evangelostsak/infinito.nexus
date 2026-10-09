@@ -17,6 +17,7 @@ from utils.tests.swarm.mesh import (
     converge_mesh,
     mesh_controller,
     switch_to_mesh_transport,
+    transport_bench,
     write_mesh,
 )
 from utils.tests.swarm.run import DISK_FLOOR_MB, run_step
@@ -279,7 +280,11 @@ def _mesh_prologue(*, app_id: str, inv_dir: str, round_variants: dict[str, int])
     if rc == 0:
         rc = mesh_controller(inv_dir=inv_dir)
     if rc == 0:
+        rc = transport_bench(inv_dir=inv_dir, label="docker")
+    if rc == 0:
         rc = switch_to_mesh_transport(inv_dir=inv_dir)
+    if rc == 0:
+        rc = transport_bench(inv_dir=inv_dir, label="ssh over the mesh")
     return rc
 
 

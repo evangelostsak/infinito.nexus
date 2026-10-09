@@ -13,6 +13,7 @@ from utils.tests.swarm.run import run_step
 _MESH_NAME = "swarm"
 _CONTROLLER = "localhost"
 _PLAYBOOK = "playbook-mesh.yml"
+_BENCH_PLAYBOOK = "playbook-transport-bench.yml"
 _DEFAULT_ADMIN_KEY = "/tmp/swarm-nfs-admin.key"  # noqa: S108 - ephemeral swarm-test path, overridable via KEY_PATH
 
 _LAB_ADDRESSES = {
@@ -126,6 +127,34 @@ def mesh_controller(*, inv_dir: str) -> int:
         ],
         env=os.environ.copy(),
         label="put the deploy controller on the mesh",
+    )
+
+
+def transport_bench(*, inv_dir: str, label: str) -> int:
+    """Time a fixed number of module calls over whatever transport is in force.
+
+    Run once before the transport switch and once after, the four task
+    durations decompose the meshed arm's per-task cost into the connection
+    plugin and the privilege escalation. Off unless asked for: it is a
+    diagnostic, not part of what a round proves.
+
+    Args:
+        inv_dir: inventory directory of the round.
+        label: which transport the numbers belong to, for the banner.
+    """
+    if (os.environ.get("INFINITO_SWARM_TRANSPORT_BENCH") or "").strip().lower() != "true":
+        return 0
+    return run_step(
+        [
+            "ansible-playbook",
+            "-i",
+            f"{inv_dir}/devices.yml",
+            "--vault-password-file",
+            f"{inv_dir}/.password",
+            _BENCH_PLAYBOOK,
+        ],
+        env=os.environ.copy(),
+        label=f"transport benchmark ({label})",
     )
 
 
