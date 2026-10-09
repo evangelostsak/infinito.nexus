@@ -91,16 +91,8 @@ def switch_to_mesh(
     user: str,
     private_key_file: str,
     application_id: str = DEFAULT_APPLICATION_ID,
-    addresses: dict[str, str] | None = None,
 ) -> dict[str, str]:
     """Point every member of *mesh_name* at its mesh address over SSH.
-
-    Args:
-        addresses: dial these addresses instead of the mesh ones, so a run can
-            separate the cost of leaving the local connection from the cost of
-            the tunnel. A member missing from the mapping raises rather than
-            falling back to its mesh address, which would silently produce the
-            meshed arm under the other arm's name.
 
     Returns:
         Host to the address it was switched to. A host with no address on this
@@ -112,10 +104,6 @@ def switch_to_mesh(
         address = mesh_address(host_vars_dir, host, mesh_name, application_id)
         if address is None:
             continue
-        if addresses is not None:
-            if host not in addresses:
-                raise KeyError(f"no address given for mesh member {host!r}")
-            address = addresses[host]
         path = host_vars_path(host_vars_dir, host)
         document = load_document(path)
         document["ansible_host"] = address

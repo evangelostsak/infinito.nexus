@@ -24,22 +24,14 @@ _LAB_ADDRESSES = {
 }
 
 
-def _lab_address_map() -> dict[str, str]:
-    """Underlay address per lab node name, from the topology default.env names."""
-    mapping: dict[str, str] = {}
+def _lab_endpoints() -> list[str]:
+    """`--endpoint` argument per lab node, from the topology default.env names."""
+    arguments: list[str] = []
     for name_var, address_var in _LAB_ADDRESSES.items():
         name = os.environ.get(name_var, "").strip()
         address = os.environ.get(address_var, "").strip()
         if name and address:
-            mapping[name] = address
-    return mapping
-
-
-def _lab_endpoints() -> list[str]:
-    """`--endpoint` argument per lab node, from the topology default.env names."""
-    arguments: list[str] = []
-    for name, address in _lab_address_map().items():
-        arguments += ["--endpoint", f"{name}={address}"]
+            arguments += ["--endpoint", f"{name}={address}"]
     return arguments
 
 
@@ -137,17 +129,6 @@ def mesh_controller(*, inv_dir: str) -> int:
     )
 
 
-def ssh_underlay() -> bool:
-    """Whether this run moves to SSH but stays on the underlay addresses.
-
-    The third arm of the transport comparison: the mesh is up and gated, the
-    connection is SSH, and the tunnel carries nothing. Against the other two
-    arms it separates the cost of leaving ``ansible_connection: docker`` from
-    the cost of the tunnel itself.
-    """
-    return (os.environ.get("INFINITO_SWARM_SSH_UNDERLAY") or "").strip().lower() == "true"
-
-
 def switch_to_mesh_transport(*, inv_dir: str) -> int:
     """Point the inventory at the mesh before the pass that must use it."""
     if not mesh_enabled():
@@ -158,17 +139,13 @@ def switch_to_mesh_transport(*, inv_dir: str) -> int:
     hosts = sorted(
         path.stem for path in host_vars.glob("*.yml") if path.stem != _CONTROLLER
     )
-    underlay = ssh_underlay()
     switched = switch_to_mesh(
         host_vars,
         hosts,
         _MESH_NAME,
         user="administrator",
         private_key_file=os.environ.get("KEY_PATH") or _DEFAULT_ADMIN_KEY,
-        addresses=_lab_address_map() if underlay else None,
     )
-    if underlay:
-        print("[INFO] SSH on the underlay: the tunnel carries no deploy traffic", flush=True)
     for host, address in sorted(switched.items()):
         print(f"[INFO] {host}: ansible now connects over {address}", flush=True)
     if not switched:
