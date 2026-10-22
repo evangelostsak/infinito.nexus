@@ -1,0 +1,38 @@
+---
+- include_tasks: utils/once/flag.yml
+
+- name: "🔗 Pin OpenPost apps on the sibling Mastodon and Pixelfed instances"
+  include_tasks: 01_fediverse_apps.yml
+
+- name: "🧪 Prepare the provider simulator"
+  include_tasks:
+    file: 02_simulator.yml
+    apply:
+      delegate_to: "{{ STACK_HOST }}"
+      run_once: true
+  when: OPENPOST_SIMULATOR_ENABLED | bool
+
+- name: "🧩 load docker, db and proxy for {{ application_id }}"
+  include_role:
+    name: sys-stk-full
+  vars:
+    compose_handlers_flush: false
+    webserver_extra_configuration: >-
+      {{ lookup('file', lookup('path_absolute', 'roles/web-app-openpost/files/nginx/deny-password-registration.conf'))
+         if OPENPOST_OIDC_ENABLED | bool else '' }}
+
+- name: "📄 Render the egress relay config (local + swarm peers)"
+  ansible.builtin.include_tasks:
+    file: "{{ lookup('path_absolute', 'roles/sys-svc-compose/tasks/utils/render_replicated_templates.yml') }}"
+  vars:
+    role_templates:
+      - src: "relay.conf.j2"
+        dest: "{{ OPENPOST_RELAY_CONF_HOST }}"
+        mode: "0644"
+
+- name: "🚿 flush handlers for '{{ application_id }}'"
+  meta: flush_handlers
+
+- name: "🔑 Bootstrap the break-glass instance admin"
+  include_tasks: 03_breakglass.yml
+  when: IS_STACK_HOST | bool
