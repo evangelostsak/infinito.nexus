@@ -85,7 +85,7 @@ Sources:
 
 - [`web-app-nextcloud`](../../roles/web-app-nextcloud/), [`web-app-mastodon`](../../roles/web-app-mastodon/), [`web-app-fider`](../../roles/web-app-fider/), [`web-app-penpot`](../../roles/web-app-penpot/) and [`web-app-discourse`](../../roles/web-app-discourse/) relax their own SSRF guards through native switches; OpenPost has none for built-in providers, which is why the relay exists.
 - [container_extra_hosts.py](../../plugins/lookup/container_extra_hosts.py) already resolves the address that reaches the shared proxy per deploy mode for the SSO back-channel pin; the relay forwards to the same address.
-- [`svc-net-wireguard`](../../roles/svc-net-wireguard/) carries swarm overlay traffic inside its `swarm` mesh, so an overlay egress network is tunnelled without extra configuration.
+- [`svc-net-wireguard`](../../roles/svc-net-wireguard/) carries swarm overlay traffic inside its `swarm` mesh, so the role's overlay network is tunnelled without extra configuration.
 - [`web-app-semaphore`](../../roles/web-app-semaphore/) consumes Keycloak through `sso.flavor: oidc`.
 - [`web-app-mastodon`](../../roles/web-app-mastodon/), [`web-app-pixelfed`](../../roles/web-app-pixelfed/) and [`web-app-peertube`](../../roles/web-app-peertube/) provide the local Fediverse accounts used as publishing targets in tests.
 - [`web-app-seaweedfs`](../../roles/web-app-seaweedfs/) provides S3 object storage through the `seaweedfs` service with `public: true`, as in `web-app-mastodon`.
@@ -100,13 +100,13 @@ These decisions were confirmed by the operator before implementation starts and 
 | 1 | OpenPost is the publishing desk. | Only candidate covering every required source and target network. |
 | 2 | Role id `web-app-openpost`, canonical domain `publish.{{ DOMAIN_PRIMARY }}`. | `social.{{ DOMAIN_PRIMARY }}` belongs to `web-app-friendica`. |
 | 3 | The role runs the official `ghcr.io/getopenpost/openpost` image unmodified, pinned to a release tag and configured through environment variables only. | The application is integrated like every other role; the project does not maintain OpenPost. |
-| 4 | OpenPost reaches the deployment's own sibling vhosts only through an always-on, role-local egress relay on a network in `NETWORK_EGRESS_RELAY_CIDR`, with exact aliases and an SNI allowlist, forwarding to the shared proxy. | One proven path for development, CI and production, including split-horizon DNS and WireGuard meshes, with the guard intact for every other destination. |
+| 4 | OpenPost reaches the deployment's own sibling vhosts only through an always-on, role-local egress relay on the role network `192.88.99.0/24` (declared in `meta/networks.yml`, listed in `NETWORK_ROLE_SUBNET_EXCEPTION_ROLES`), with exact aliases and an SNI allowlist, forwarding to the shared proxy. | One proven path for development, CI and production, including split-horizon DNS and WireGuard meshes, with the guard intact for every other destination; the existing role-subnet exception mechanism already carries out-of-pool blocks, so no new SPOT is needed. |
 | 5 | Keycloak SSO through native OIDC (`sso.flavor: oidc`); publishing permissions are enforced through OpenPost workspace roles. | OpenPost ships an OIDC adapter and does not consume group claims. |
 | 6 | Shared `svc-db-postgres`; media on `web-app-seaweedfs` S3 when deployed, a role volume otherwise. | Postgres is the only multi-process database; S3 gives public media URLs for Meta. |
 | 7 | One `all` process with one replica in compose and swarm. | State lives in Postgres and S3, so rescheduling is safe; split `web`/`worker` scaling is out of scope. |
 | 8 | Provider app credentials live in the central `API` SPOT. | One place for proprietary credentials. |
 | 9 | Diagnostics, update check, PostHog telemetry, feedback and public profiles are disabled. | No unnecessary transmission of internal data. |
-| 10 | CI tests Fediverse publishing end to end against local instances through the relay, and the commercial adapters against a role-local provider simulator on the same egress network; real platforms are checked manually in staging. | Real OAuth logins, public redirect hosts and per-post billing make real platforms unusable in CI. |
+| 10 | CI tests Fediverse publishing end to end against local instances through the relay, and the commercial adapters against a role-local provider simulator on the same role network; real platforms are checked manually in staging. | Real OAuth logins, public redirect hosts and per-post billing make real platforms unusable in CI. |
 | 11 | Automated crossposting is a separate sidecar specified in [041](041-openpost-crossposter.md). | Separable deliverable and pull request. |
 
 ## Target Schema
@@ -119,10 +119,12 @@ roles/web-app-openpost/
 ├── README.md
 ├── files/
 │   ├── playwright/
+│   │   ├── _shared.js
 │   │   ├── playwright.spec.js
 │   │   └── test-*.js
 │   ├── simulator/
 │   └── test/
+│       ├── probe.py
 │       └── test.sh
 ├── meta/
 │   ├── csp.yml
@@ -130,11 +132,17 @@ roles/web-app-openpost/
 │   ├── info.yml
 │   ├── main.yml
 │   ├── networks.yml
+│   ├── rbac.yml
 │   ├── secrets.yml
 │   ├── services.yml
+│   ├── tests.yml
+│   ├── users.yml
 │   ├── variants.yml
 │   └── volumes.yml
 ├── tasks/
+│   ├── 00_core.yml
+│   ├── 01_fediverse_apps.yml
+│   ├── 02_breakglass.yml
 │   └── main.yml
 ├── templates/
 │   ├── compose.yml.j2
@@ -160,15 +168,15 @@ openpost:
     internal:
       http: 8080
     local:
-      http: <suggested by cli contributing network ports suggest>
+      http: 8098
   lifecycle: alpha
 relay:
   image: nginx
-  version: "<pinned alpine release>"
+  version: 1.31.7-alpine
 simulator:
   enabled: false
   image: wiremock/wiremock
-  version: "<pinned release>"
+  version: "3.13.2"
 ```
 
 ## Acceptance Criteria
@@ -184,17 +192,17 @@ simulator:
 
 - [ ] The role runs `ghcr.io/getopenpost/openpost` pinned to a release tag in `meta/services.yml` and ships no role-local Dockerfile or source modification.
 - [ ] The external update tooling proposes new upstream release tags through `update.type: registry_tags`.
-- [ ] Every OpenPost setting is rendered through `templates/env.j2` or `_FILE` secrets, and `OPENPOST_APP_URL` and `OPENPOST_PUBLIC_URL` carry `https://publish.{{ DOMAIN_PRIMARY }}`.
+- [ ] Every OpenPost setting is rendered through `templates/env.j2`, and `OPENPOST_APP_URL` and `OPENPOST_PUBLIC_URL` carry `https://publish.{{ DOMAIN_PRIMARY }}`.
 
 ### Egress relay (story AC2, AC4, AC7)
 
-- [ ] `group_vars/all/08_networks.yml` declares `NETWORK_EGRESS_RELAY_CIDR`, a subnet outside every range OpenPost's guard blocks and outside every Docker, mesh, Tor and role subnet pool, and the role's egress network uses it as a bridge in compose and as an overlay in swarm.
-- [ ] A `relay` entity running a pinned `nginx` image carries network aliases only for the canonical domains of the deployed sibling roles OpenPost publishes to (`web-app-mastodon`, `web-app-pixelfed`, `web-app-peertube`), each gated by that role's dynamic service flag.
-- [ ] The relay forwards TLS unmodified by SNI to the address that reaches the shared proxy in the effective deploy mode, resolved like the `container_extra_hosts` back-channel pin, and never resolves its own aliases.
+- [ ] `roles/web-app-openpost/meta/networks.yml` declares the role subnet `192.88.99.0/24`, a block outside every range OpenPost's guard rejects and outside every Docker, mesh, Tor and role subnet pool, and `NETWORK_ROLE_SUBNET_EXCEPTION_ROLES` in `group_vars/all/08_networks.yml` names the role; the network is a bridge in compose and an overlay in swarm.
+- [ ] A `relay` entity running a pinned `nginx` image carries network aliases, passed through the `aliases` argument of the shared `container_networks` lookup, only for the canonical domains of the deployed sibling roles OpenPost publishes to (`web-app-mastodon`, `web-app-pixelfed`, `web-app-peertube`), each gated by that role's dynamic service flag.
+- [ ] The relay forwards TLS unmodified by SNI to `host.docker.internal`, which `container_extra_hosts` resolves to the address that reaches the shared proxy in the effective deploy mode, and never resolves its own aliases.
 - [ ] The relay refuses every SNI that is not in its map.
 - [ ] When `TLS_MODE` is self-signed, OpenPost trusts the platform CA so that relayed vhosts verify; with public certificates no extra trust is configured.
-- [ ] The CLI test proves that OpenPost reaches an aliased sibling vhost, that it still rejects a non-aliased private host and a private IP literal, and that the relay refuses an aliased name missing from its map.
-- [ ] Publishing to a local Mastodon account succeeds in swarm through the overlay egress network, verified by `make roundtrip apps="web-app-openpost"`.
+- [ ] The CLI test proves that OpenPost reaches an aliased sibling vhost, that it still rejects a private container name and a private IP literal, and that the relay refuses a TLS connection whose SNI is not in its map.
+- [ ] Publishing to a local Mastodon account succeeds in swarm through the role's overlay network, verified by `make roundtrip apps="web-app-openpost"`.
 - [ ] `Administration.md` explains the guard, the relay, and how a deployment with sibling vhosts on another host or behind split-horizon DNS is covered.
 
 ### Deployment and operations (story AC2)
@@ -211,19 +219,21 @@ simulator:
 
 ### Secrets and provider credentials (story AC2, AC7)
 
-- [ ] The JWT secret, encryption key, media signing key and OIDC client secret are generated through `meta/secrets.yml` and reach OpenPost through `_FILE` variants.
+- [ ] The JWT secret, encryption key and media signing key are generated through `meta/secrets.yml`, the OIDC client secret comes from `OIDC.CLIENT.SECRET`, and all of them reach OpenPost through the role's env file like every other role's secrets.
+- [ ] The break-glass instance admin `web-app-openpost-breakglass` is declared in `meta/users.yml` with a generated password, is bootstrapped as the first account on a fresh instance, and its e-mail differs from every Keycloak user so just-in-time provisioning never collides with it.
 - [ ] `group_vars/all/18_api.yml` gains the entries `x`, `meta`, `threads`, `linkedin`, `youtube` and `tiktok`, and the role renders them into `X_CLIENT_*`, `THREADS_CLIENT_*`, `LINKEDIN_CLIENT_*` and `OPENPOST_PROVIDER_APPS`.
 - [ ] A provider whose `lookup('api_enabled', ...)` is false cannot be connected in the UI.
 - [ ] Connected provider tokens are stored encrypted, verified by reading the token column from Postgres and finding no plaintext token.
-- [ ] The X monthly budget (`OPENPOST_X_MONTHLY_BUDGET_MICROUSD`) is configurable through the inventory and documented.
+- [ ] `Administration.md` documents that OpenPost's X budget guardrail (`OPENPOST_X_MONTHLY_BUDGET_MICROUSD`) applies only in its cloud edition, so a self-hosted deployment caps X spending through the prepaid credits of the X developer account.
 
 ### Single sign-on (story AC3)
 
 - [ ] `meta/services.yml` declares `sso.flavor: oidc`, and OpenPost reads its issuer from `OIDC.CLIENT.ISSUER_URL`, its client from `OIDC.CLIENT.ID` and `OIDC.CLIENT.SECRET`, and uses the scopes `openid profile email`.
-- [ ] Password self-registration is disabled, and SSO users are provisioned just in time on their first login.
+- [ ] Password self-registration is closed and SSO users are provisioned just in time on their first login; because OpenPost gates both with `OPENPOST_DISABLE_REGISTRATIONS`, the role keeps the switch open when Keycloak is deployed and the shared proxy answers `POST /api/v1/auth/register` with HTTP 403.
 - [ ] The platform administrator becomes instance administrator through `OPENPOST_OIDC_BOOTSTRAP_ALLOWLIST` on first SSO login.
 - [ ] A just-in-time provisioned user without a workspace invitation cannot see or use the organisation workspace or its connected accounts.
 - [ ] `Administration.md` documents the break-glass procedure (`OPENPOST_SSO_BREAK_GLASS_EMAILS`), linking an existing account to its SSO identity, and the trusted-proxy fallback through oauth2-proxy.
+- [ ] `README.md` documents that OpenPost ships no LDAP adapter, so the role declares no `ldap` service and directory accounts sign in through Keycloak's OpenLDAP federation over OIDC.
 
 ### Telemetry and data minimisation (story AC7)
 
@@ -231,6 +241,7 @@ simulator:
 
 ### Fediverse publishing (story AC4)
 
+- [ ] The deploy registers an `OpenPost` app once on each deployed sibling Mastodon and Pixelfed instance, persists it, and pins it through `MASTODON_SERVERS` and `PIXELFED_SERVERS` named by the canonical URL, because the dynamic registration path of v7.22.9 fails its own readiness check on code exchange.
 - [ ] An administrator connects a local Mastodon account through the out-of-band code flow and publishes a text post that appears on the Mastodon instance.
 - [ ] An administrator connects a local Pixelfed account and publishes an image post that appears on the Pixelfed instance.
 - [ ] An administrator connects a local PeerTube account and publishes a video that appears on the PeerTube instance.
@@ -238,7 +249,7 @@ simulator:
 ### Provider simulator (story AC4, AC8)
 
 - [ ] A `simulator` entity running the pinned `wiremock/wiremock` image is enabled by one `meta/variants.yml` variant only and is absent from the base configuration.
-- [ ] Inside that variant, the simulator joins the egress network with aliases for the API hostnames OpenPost uses for X, Facebook, Instagram and YouTube, presents a certificate for those names signed by a per-deploy test CA, and OpenPost trusts that CA.
+- [ ] Inside that variant, the simulator joins the role network with aliases for the API hostnames OpenPost uses for X, Facebook, Instagram and YouTube, presents a certificate for those names signed by a per-deploy test CA, and OpenPost trusts that CA.
 - [ ] An X, Facebook Page, Instagram and YouTube account each connect through OpenPost's real callback against the simulator without a real provider login.
 - [ ] Publishing to those accounts produces the documented request sequence, asserted from the simulator's request journal: one X post within 280 weighted characters, one Facebook Page post, an Instagram media container followed by a publish call with a public JPEG URL, and a resumable YouTube upload.
 - [ ] Simulated 429 responses with a reset header and 503 responses lead to retries and exactly one successful delivery.
@@ -253,7 +264,7 @@ simulator:
 
 ### Variants, tests and quality (story AC8)
 
-- [ ] `meta/variants.yml` defines a full variant with every integration and the simulator, separate variants that add the local Mastodon, Pixelfed and PeerTube targets so no single CI runner deploys all three instances, and an all-off variant; every variant deploys cleanly on a fresh host.
+- [ ] `meta/variants.yml` stays within the three-variant limit: variant 0 enables every integration, the simulator and the local Mastodon target, variant 1 adds the local Pixelfed and PeerTube targets with the integrations off, and variant 2 switches everything off, so no single round deploys all three instances; every variant deploys cleanly on a fresh host.
 - [ ] `files/playwright/` covers the `guest`, `biber` and `administrator` personas per the [Playwright contract](../contributing/artefact/files/role/playwright.specs.js.md), with the administrator connecting a Fediverse account and publishing, and `biber` being denied the organisation workspace.
 - [ ] `files/test/test.sh` with `templates/test.env.j2` covers readiness, the telemetry flags, the egress relay and its negative controls, token encryption at rest, Fediverse delivery and the simulator journal assertions.
 - [ ] `make compose-playwright role=web-app-openpost` exits 0 without stub tests and ends logged out.
@@ -280,7 +291,7 @@ Before implementation, the agent MUST read [AGENTS.md](../../AGENTS.md), then [C
 
 ## Implementation Strategy
 
-Execute autonomously and start from the proven egress topology: an egress network in `NETWORK_EGRESS_RELAY_CIDR`, an nginx `stream` relay with `ssl_preread` and an SNI map, and OpenPost attached to that network.
+Execute autonomously and start from the proven egress topology: the role network on `192.88.99.0/24`, an nginx `stream` relay with `ssl_preread` and an SNI map, and OpenPost attached to that network.
 Verify against the pinned upstream image before claiming a criterion: the provider hostnames and OAuth endpoints the simulator must answer, how OpenPost validates the OAuth `state` on its callback, and the account-linking flow.
 Prove every relay and simulator change in the live stack via `make compose-exec` and `make compose-inner-run` before redeploying.
 
