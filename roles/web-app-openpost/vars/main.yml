@@ -1,0 +1,92 @@
+---
+application_id: "web-app-openpost"
+container_port: "{{ lookup('config', application_id, 'services.openpost.ports.internal.http') }}"
+
+OPENPOST_NAME: "{{ lookup('config', application_id, 'services.openpost.name') }}"
+OPENPOST_RELAY_NAME: "{{ lookup('config', application_id, 'services.relay.name') }}"
+OPENPOST_URL: "{{ lookup('tls', application_id, 'url.base') | regex_replace('/+$', '') }}"
+OPENPOST_LOCAL_URL: "http://{{ DOCKER_REACH_HOST if DEPLOYMENT_MODE == 'compose' else '127.0.0.1' }}:{{ lookup('config', application_id, 'services.openpost.ports.local.http') }}"
+OPENPOST_API_HEADERS:
+  Host: "{{ lookup('domain', application_id) }}"
+  X-Forwarded-Proto: "{{ OPENPOST_URL | urlsplit('scheme') }}"
+OPENPOST_RELAY_CONF_HOST: "{{ [lookup('container', application_id, 'directories.config'), 'relay.conf'] | path_join }}"
+
+OPENPOST_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.sso.enabled') }}"
+OPENPOST_EMAIL_ENABLED: "{{ lookup('config', application_id, 'services.email.enabled') }}"
+OPENPOST_OBJSTORE_ENABLED: "{{ lookup('objstore', application_id, 'enabled') }}"
+
+OPENPOST_JWT_SECRET: "{{ lookup('config', application_id, 'secrets.credentials.jwt_secret') }}"
+OPENPOST_ENCRYPTION_KEY: "{{ lookup('config', application_id, 'secrets.credentials.encryption_key') }}"
+OPENPOST_MEDIA_SIGNING_KEY: "{{ lookup('config', application_id, 'secrets.credentials.media_signing_key') }}"
+
+OPENPOST_TRUSTED_PROXY_CIDRS: >-
+  {%- set _cidrs = [] -%}
+  {%- for _entry in NETWORK_TRUSTED_PROXY_CIDRS + [lookup('config', application_id, 'networks.local.subnet')] -%}
+  {%- set _ = _cidrs.append(_entry if '/' in _entry else _entry ~ ('/128' if ':' in _entry else '/32')) -%}
+  {%- endfor -%}
+  {{ _cidrs }}
+
+OPENPOST_ADMIN_USERNAME: "{{ lookup('users', 'web-app-openpost-breakglass').username }}"
+OPENPOST_ADMIN_PASSWORD: "{{ lookup('users', 'web-app-openpost-breakglass').password }}"
+OPENPOST_ADMIN_EMAIL: "{{ lookup('users', 'web-app-openpost-breakglass').email }}"
+OPENPOST_ORGANISATION_WORKSPACE: "{{ SOFTWARE_NAME }}"
+
+OPENPOST_BOOTSTRAP_ADMINS:
+  - "{{ lookup('users', 'administrator').email }}"
+
+OPENPOST_RELAY_SIBLINGS:
+  mastodon: web-app-mastodon
+  pixelfed: web-app-pixelfed
+  peertube: web-app-peertube
+OPENPOST_RELAY_DOMAINS: >-
+  {%- set _domains = [] -%}
+  {%- for _key, _role in OPENPOST_RELAY_SIBLINGS.items() -%}
+  {%- if lookup('config', application_id, 'services.' ~ _key ~ '.enabled') | bool -%}
+  {%- set _ = _domains.append(lookup('domain', _role)) -%}
+  {%- endif -%}
+  {%- endfor -%}
+  {{ _domains }}
+OPENPOST_PINNED_INSTANCES: >-
+  {%- set _instances = [] -%}
+  {%- for _key in ['mastodon', 'pixelfed'] -%}
+  {%- if lookup('config', application_id, 'services.' ~ _key ~ '.enabled') | bool -%}
+  {%- set _ = _instances.append({'platform': _key, 'url': lookup('tls', OPENPOST_RELAY_SIBLINGS[_key], 'url.base') | regex_replace('/+$', '')}) -%}
+  {%- endif -%}
+  {%- endfor -%}
+  {{ _instances }}
+OPENPOST_FEDIVERSE_APPS_HOST: "{{ [lookup('container', application_id, 'directories.config'), 'fediverse-apps.json'] | path_join }}"
+OPENPOST_RELAY_UPSTREAM_HOST: "host.docker.internal"
+OPENPOST_RELAY_UPSTREAM_PORT: "{{ lookup('config', 'svc-prx-openresty', 'services.openresty.ports.public.https') }}"
+
+OPENPOST_SIMULATOR_ENABLED: "{{ lookup('config', application_id, 'services.simulator.enabled') | bool }}"
+OPENPOST_SIMULATOR_NAME: "{{ lookup('config', application_id, 'services.simulator.name') }}"
+OPENPOST_SIMULATOR_DIR: "{{ [lookup('container', application_id, 'directories.config'), 'simulator'] | path_join }}"
+OPENPOST_SIMULATOR_HOSTS: "{{ lookup('config', application_id, 'services.simulator.hosts') }}"
+OPENPOST_SIMULATOR_KEYSTORE_PASSWORD: "simulator"
+
+OPENPOST_PROVIDER_CREDENTIALS: >-
+  {%- set _credentials = {} -%}
+  {%- for _provider in ['x', 'meta', 'threads', 'linkedin', 'youtube', 'tiktok'] -%}
+  {%- if OPENPOST_SIMULATOR_ENABLED | bool and _provider in lookup('config', application_id, 'services.simulator.providers') -%}
+  {%- set _ = _credentials.update({_provider: {'client_id': 'simulator-' ~ _provider, 'client_secret': 'simulator-' ~ _provider ~ '-secret'}}) -%}
+  {%- elif lookup('api_enabled', _provider) -%}
+  {%- set _ = _credentials.update({_provider: {'client_id': lookup('api', _provider ~ '.client_id'), 'client_secret': lookup('api', _provider ~ '.client_secret')}}) -%}
+  {%- endif -%}
+  {%- endfor -%}
+  {{ _credentials }}
+OPENPOST_PROVIDER_APP_KEYS:
+  meta:
+    - facebook
+    - instagram
+  youtube:
+    - youtube
+  tiktok:
+    - tiktok
+OPENPOST_PROVIDER_APPS: >-
+  {%- set _apps = [] -%}
+  {%- for _provider, _keys in OPENPOST_PROVIDER_APP_KEYS.items() if _provider in OPENPOST_PROVIDER_CREDENTIALS -%}
+  {%- for _key in _keys -%}
+  {%- set _ = _apps.append({'provider': _key} | combine(OPENPOST_PROVIDER_CREDENTIALS[_provider])) -%}
+  {%- endfor -%}
+  {%- endfor -%}
+  {{ _apps }}
