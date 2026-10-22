@@ -50,19 +50,12 @@ These decisions were confirmed by the operator before implementation starts and 
 | 4 | Crossposting state lives in a `crossposter` schema of the role's Postgres database, unique per source post and target account. | Durable duplicate prevention independent of platform idempotency windows. |
 | 5 | Routes are declared in the inventory with a `review` mode (OpenPost draft) and an `auto` mode (immediate publishing). | Configurable routing with optional manual approval. |
 | 6 | CI covers Mastodon, Pixelfed and PeerTube as sources against local instances, Fediverse targets end to end, and commercial targets through the 040 provider simulator. | Operator decision on automated testing. |
-
-## Proposed Defaults
-
-These defaults complete the confirmed design and MAY be adjusted by the operator before implementation starts.
-
-| # | Default | Reason |
-|---|---|---|
-| 1 | New routes start in `review` mode. | Routes are cleared for unattended publishing one by one. |
-| 2 | Activating a route forwards no existing posts; its cursor starts at the newest item. | Prevents flooding targets with the account history. |
-| 3 | The opt-out hashtag is `nocrosspost`. | Authors can keep a single post local. |
-| 4 | The X attribution template omits the source link. | A post with a URL costs about 13 times more on X. |
-| 5 | One active instance, enforced by a Postgres advisory lock. | Two pollers would race for the same cursors. |
-| 6 | Dead-lettered items are reported by email through the platform mail service. | Failures reach the PR team without another dashboard. |
+| 7 | New routes start in `review` mode. | Routes are cleared for unattended publishing one by one. |
+| 8 | Activating a route forwards no existing posts; its cursor starts at the newest item. | Prevents flooding targets with the account history. |
+| 9 | The opt-out hashtag is `nocrosspost`. | Authors can keep a single post local. |
+| 10 | The X attribution template omits the source link. | A post with a URL costs about 13 times more on X. |
+| 11 | One active instance, enforced by a Postgres advisory lock. | Two pollers would race for the same cursors. |
+| 12 | Dead-lettered items are reported by email through the platform mail service. | Failures reach the PR team without another dashboard. |
 
 ## Target Schema
 
