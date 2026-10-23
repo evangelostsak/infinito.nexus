@@ -90,3 +90,27 @@ OPENPOST_PROVIDER_APPS: >-
   {%- endfor -%}
   {%- endfor -%}
   {{ _apps }}
+
+OPENPOST_CROSSPOSTER: "{{ lookup('config', application_id, 'services.crossposter') }}"
+OPENPOST_CROSSPOSTER_ROUTES: "{{ OPENPOST_CROSSPOSTER.routes }}"
+OPENPOST_CROSSPOSTER_ENABLED: "{{ (lookup('config', application_id, 'services.crossposter.enabled') | bool) and (OPENPOST_CROSSPOSTER_ROUTES | length > 0) }}"
+OPENPOST_CROSSPOSTER_NAME: "{{ OPENPOST_CROSSPOSTER.name }}"
+OPENPOST_CROSSPOSTER_UID: 10001
+OPENPOST_CROSSPOSTER_TOKEN_NAME: "crossposter"
+OPENPOST_CROSSPOSTER_DIR: "{{ [lookup('container', application_id, 'directories.config'), 'crossposter'] | path_join }}"
+OPENPOST_CROSSPOSTER_STATE_FILE: "{{ [OPENPOST_CROSSPOSTER_DIR, 'state.json'] | path_join }}"
+OPENPOST_CROSSPOSTER_CONFIG_HOST: "{{ [OPENPOST_CROSSPOSTER_DIR, 'crossposter.json'] | path_join }}"
+OPENPOST_CROSSPOSTER_SECRETS_HOST: "{{ [OPENPOST_CROSSPOSTER_DIR, 'crossposter-secrets.json'] | path_join }}"
+OPENPOST_CROSSPOSTER_CONFIG_TARGET: "{{ lookup('volume', application_id, 'crossposter_config').target }}"
+OPENPOST_CROSSPOSTER_SECRETS_TARGET: "{{ lookup('volume', application_id, 'crossposter_secrets').target }}"
+OPENPOST_CROSSPOSTER_BUILD_CONTEXT: "{{ [lookup('container', application_id, 'directories.services'), 'crossposter'] | path_join }}"
+OPENPOST_CROSSPOSTER_IMAGE: "openpost_crossposter_custom"
+OPENPOST_CROSSPOSTER_BASE_IMAGE: "{{ OPENPOST_CROSSPOSTER.image }}"
+OPENPOST_CROSSPOSTER_BASE_VERSION: "{{ OPENPOST_CROSSPOSTER.version }}"
+OPENPOST_CROSSPOSTER_ADDRESS: "{{ lookup('container_address', application_id, 'crossposter') }}"
+OPENPOST_CROSSPOSTER_SEED_PROBES:
+  mastodon: /api/v1/accounts/verify_credentials
+  pixelfed: /api/v1/accounts/verify_credentials
+  peertube: /api/v1/users/me
+OPENPOST_SEED_PIXELFED_USER: "33"
+OPENPOST_SEED_PEERTUBE_USERNAME: "root"
