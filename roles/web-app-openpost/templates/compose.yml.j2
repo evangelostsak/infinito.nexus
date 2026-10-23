@@ -21,6 +21,26 @@
     {{ lookup('container_extra_hosts', host_alias=True) | indent(4) }}
     {{ lookup('container_networks', aliases=OPENPOST_RELAY_DOMAINS) | indent(4) }}
 
+  {% if OPENPOST_CROSSPOSTER_ENABLED | bool %}
+  {% set service_name = 'crossposter' %}
+  {{ service_name }}:
+    {% include 'roles/sys-svc-container/templates/deploy.yml.j2' %}
+    build:
+      context: "{{ OPENPOST_CROSSPOSTER_BUILD_CONTEXT }}"
+      dockerfile: Dockerfile
+      args:
+        CROSSPOSTER_BASE_IMAGE: "{{ OPENPOST_CROSSPOSTER_BASE_IMAGE }}"
+        CROSSPOSTER_BASE_VERSION: "{{ OPENPOST_CROSSPOSTER_BASE_VERSION }}"
+        CROSSPOSTER_UID: "{{ OPENPOST_CROSSPOSTER_UID }}"
+    {{ lookup('container_image', application_id, service_name, image=OPENPOST_CROSSPOSTER_IMAGE) }}
+    {{ lookup('compose_only', 'container_name', OPENPOST_CROSSPOSTER_NAME) }}
+    {{ lookup('compose_only', 'pull_policy', 'never') }}
+    {{ lookup('compose_restart') }}
+    {{ lookup('container_volumes', service_name) | indent(4) }}
+    {{ lookup('container_extra_hosts') | indent(4) }}
+    {{ lookup('container_networks') | indent(4) }}
+  {% endif %}
+
   {% if OPENPOST_SIMULATOR_ENABLED | bool %}
   {% set service_name = 'simulator' %}
   {{ service_name }}:
