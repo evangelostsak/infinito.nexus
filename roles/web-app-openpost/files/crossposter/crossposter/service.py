@@ -69,7 +69,7 @@ class Service:
             )
             for route in config.routes
         }
-        self.rng = random.Random()  # noqa: S311 spreads retry delays, no security decision
+        self.rng = random.SystemRandom()
 
     def heartbeat(self, state: str) -> None:
         Path(self.config.heartbeat_file).write_text(f"{time.time():.0f} {state}\n")
