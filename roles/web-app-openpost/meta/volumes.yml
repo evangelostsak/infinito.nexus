@@ -33,6 +33,24 @@ simulator_ca:
       target: /etc/ssl/openpost-simulator/ca.crt
       when: "{{ lookup('config', 'web-app-openpost', 'services.simulator.enabled') | bool }}"
 
+crossposter_config:
+  type: config
+  source: "{{ [lookup('container', 'web-app-openpost', 'directories.config'), 'crossposter', 'crossposter.json'] | path_join }}"
+  mode: "0444"
+  mounts:
+    - service: crossposter
+      target: /config/crossposter.json
+      when: "{{ (lookup('config', 'web-app-openpost', 'services.crossposter.enabled') | bool) and (lookup('config', 'web-app-openpost', 'services.crossposter.routes') | length) > 0 }}"
+
+crossposter_secrets:
+  type: secret
+  source: "{{ [lookup('container', 'web-app-openpost', 'directories.config'), 'crossposter', 'crossposter-secrets.json'] | path_join }}"
+  mode: "0400"
+  mounts:
+    - service: crossposter
+      target: /run/secrets/crossposter.json
+      when: "{{ (lookup('config', 'web-app-openpost', 'services.crossposter.enabled') | bool) and (lookup('config', 'web-app-openpost', 'services.crossposter.routes') | length) > 0 }}"
+
 relay_conf:
   type: config
   source: "{{ [lookup('container', 'web-app-openpost', 'directories.config'), 'relay.conf'] | path_join }}"
