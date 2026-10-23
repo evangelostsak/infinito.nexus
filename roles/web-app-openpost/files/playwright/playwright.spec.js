@@ -13,4 +13,5 @@ require("./test-login-native-administrator").register(shared);
 require("./test-login-oidc-administrator").register(shared);
 require("./test-login-oidc-biber").register(shared);
 require("./test-publish-mastodon").register(shared);
+require("./test-publish-pixelfed").register(shared);
 require("./test-seaweedfs").register(shared);
