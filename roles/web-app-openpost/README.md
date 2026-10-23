@@ -80,6 +80,7 @@ Solid `1:1` edges are fixed relationships; dashed `0..1` edges are conditional (
 - **Break-glass admin:** A local instance admin is bootstrapped on the first deploy so the instance stays manageable when Keycloak is unavailable.
 - **Data minimisation:** Diagnostics, the update check, product telemetry, feedback, public profiles, stock media search and workflow AI are switched off.
 - **Central credentials:** Developer app credentials for X, Meta, Threads, LinkedIn, YouTube and TikTok come from the central `API` mapping, and a network without credentials stays unavailable.
+- **Automated crossposting:** A crossposter sidecar polls configured Mastodon, Pixelfed and PeerTube accounts and hands every new post to OpenPost, as a draft for review or for immediate publishing, with per-network shortening, attribution, opt-out by hashtag, loop prevention and mailed reports of failed deliveries.
 
 ## Quick Setup
 
