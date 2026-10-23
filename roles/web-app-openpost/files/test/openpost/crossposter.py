@@ -18,11 +18,11 @@ import time
 import urllib.parse
 from pathlib import Path
 
-from openpost_api import DEADLINE, accounts, call, check, render_media
-from openpost_journal import hits, statuses
-from openpost_mailbox import reports_naming
-from openpost_simulator import SCENARIOS, simulator_admin
-from openpost_sources import (
+from openpost.api import DEADLINE, accounts, call, check, render_media
+from openpost.journal import hits, statuses
+from openpost.mailbox import reports_naming
+from openpost.simulator import SCENARIOS, simulator_admin
+from openpost.sources import (
     mastodon_post,
     mastodon_statuses,
     peertube_upload,
