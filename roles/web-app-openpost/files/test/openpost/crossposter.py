@@ -18,7 +18,7 @@ import time
 import urllib.parse
 from pathlib import Path
 
-from openpost.api import DEADLINE, accounts, call, check, render_media
+from openpost.api import DEADLINE, accounts, call, check, public_url, render_media
 from openpost.journal import hits, statuses
 from openpost.mailbox import reports_naming
 from openpost.simulator import SCENARIOS, simulator_admin
@@ -29,7 +29,12 @@ from openpost.sources import (
     pixelfed_post,
 )
 
-ROUTES = json.loads(base64.b64decode(os.environ["OPENPOST_CROSSPOSTER_ROUTES_B64"]))
+ROUTES = [
+    {**route, "base_url": public_url(route["base_url"])}
+    for route in json.loads(
+        base64.b64decode(os.environ["OPENPOST_CROSSPOSTER_ROUTES_B64"])
+    )
+]
 SECRETS_FILE = os.environ["OPENPOST_CROSSPOSTER_SECRETS_FILE"]
 CROSSPOSTER = os.environ["OPENPOST_CROSSPOSTER_CONTAINER"]
 CONFIG = os.environ["OPENPOST_CROSSPOSTER_CONFIG"]
@@ -137,7 +142,11 @@ def fill_sets(token: str, workspace: str) -> None:
         status, body = call(
             "PUT",
             f"/social-sets/{chosen['id']}",
-            {"name": chosen["name"], "workspace_id": workspace, "accounts": members},
+            {
+                "name": chosen["name"],
+                "is_default": bool(chosen.get("is_default")),
+                "accounts": members,
+            },
             token,
         )
         check(
