@@ -4,7 +4,7 @@ import json
 import re
 import urllib.parse
 
-from openpost_api import anonymous_jpeg, check
+from openpost.api import anonymous_jpeg, check
 
 X_LIMIT = 280
 FACEBOOK_PAGES = ("424242", "525252")
