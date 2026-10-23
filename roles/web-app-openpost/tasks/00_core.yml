@@ -30,9 +30,23 @@
         dest: "{{ OPENPOST_RELAY_CONF_HOST }}"
         mode: "0644"
 
+- name: "📮 Stage and render the crossposter"
+  include_tasks: crossposter/render.yml
+  when: OPENPOST_CROSSPOSTER_ENABLED | bool
+
 - name: "🚿 flush handlers for '{{ application_id }}'"
   meta: flush_handlers
 
 - name: "🔑 Bootstrap the break-glass instance admin"
   include_tasks: 03_breakglass.yml
   when: IS_STACK_HOST | bool
+
+- name: "🔑 Provision the crossposter API token"
+  include_tasks: crossposter/provision.yml
+  when:
+    - OPENPOST_CROSSPOSTER_ENABLED | bool
+    - IS_STACK_HOST | bool
+
+- name: "✅ Apply and validate the crossposter"
+  include_tasks: crossposter/apply.yml
+  when: OPENPOST_CROSSPOSTER_ENABLED | bool
