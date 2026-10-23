@@ -2,7 +2,7 @@
 - name: "🧾 Pick the CI routes whose source token the deploy has to mint"
   ansible.builtin.set_fact:
     openpost_crossposter_seed_routes: "{{ OPENPOST_CROSSPOSTER_ROUTES | rejectattr('source.token') | list }}"
-    openpost_crossposter_seed_platforms: "{{ OPENPOST_CROSSPOSTER_ROUTES | rejectattr('source.token') | map(attribute='source.platform') | unique | list }}"
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
 
 - name: "🔎 Check the source tokens minted by an earlier deploy"
   uri_retry:
@@ -32,21 +32,25 @@
 - name: "🧾 Pick the CI routes that still lack a working source token"
   ansible.builtin.set_fact:
     openpost_crossposter_seed_missing: "{{ openpost_crossposter_seed_routes | rejectattr('name', 'in', openpost_crossposter_sources.keys() | list) | list }}"
+  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
 
 - name: "🐘 Mint the Mastodon source tokens"
-  ansible.builtin.include_tasks: 06_crossposter_seed/mastodon.yml
+  ansible.builtin.include_tasks: crossposter/seed/mastodon.yml
   when: openpost_crossposter_seed_missing | selectattr('source.platform', 'equalto', 'mastodon') | list | length > 0
 
 - name: "📷 Mint the Pixelfed source tokens"
-  ansible.builtin.include_tasks: 06_crossposter_seed/pixelfed.yml
+  ansible.builtin.include_tasks: crossposter/seed/pixelfed.yml
   when: openpost_crossposter_seed_missing | selectattr('source.platform', 'equalto', 'pixelfed') | list | length > 0
 
 - name: "🎞️ Mint the PeerTube source tokens"
-  ansible.builtin.include_tasks: 06_crossposter_seed/peertube.yml
+  ansible.builtin.include_tasks:
+    file: crossposter/seed/peertube.yml
+    apply:
+      no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
   when: openpost_crossposter_seed_missing | selectattr('source.platform', 'equalto', 'peertube') | list | length > 0
 
 - name: "🐘 Connect the CI Mastodon account as a target"
-  ansible.builtin.include_tasks: 06_crossposter_seed/mastodon_target.yml
+  ansible.builtin.include_tasks: crossposter/seed/target.yml
   when: OPENPOST_CROSSPOSTER_ROUTES | selectattr('source.platform', 'equalto', 'mastodon') | list | length > 0
 
 - name: "📚 List the social sets of the organisation workspace"
