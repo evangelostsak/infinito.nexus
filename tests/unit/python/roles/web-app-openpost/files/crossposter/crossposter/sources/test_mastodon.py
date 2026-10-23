@@ -26,7 +26,7 @@ class FakeMastodon:
         parsed = urllib.parse.urlparse(url)
         query = dict(urllib.parse.parse_qsl(parsed.query))
         if parsed.path == "/api/v1/accounts/lookup":
-            return fixture("mastodon_account.json")
+            return fixture("mastodon/account.json")
         self.queries.append(query)
         ordered = sorted(self.statuses, key=lambda status: int(status["id"]))
         limit = int(query["limit"])
@@ -40,7 +40,7 @@ class FakeMastodon:
 
 class TestParse(unittest.TestCase):
     def setUp(self) -> None:
-        self.statuses = fixture("mastodon_statuses.json")
+        self.statuses = fixture("mastodon/statuses.json")
 
     def test_a_status_becomes_a_source_item(self) -> None:
         item = mastodon.parse_status(self.statuses[0], "mastodon")
@@ -68,7 +68,7 @@ class TestParse(unittest.TestCase):
 
 class TestPolling(unittest.TestCase):
     def test_the_newest_status_becomes_the_activation_cursor(self) -> None:
-        fake = FakeMastodon(fixture("mastodon_statuses.json"))
+        fake = FakeMastodon(fixture("mastodon/statuses.json"))
         with patch.object(mastodon.web, "get_json", fake):
             cursor = mastodon.MastodonSource(
                 "https://microblog.example", "press", "token"
@@ -80,7 +80,7 @@ class TestPolling(unittest.TestCase):
     def test_fetch_returns_newer_statuses_oldest_first_and_excludes_replies_and_boosts(
         self,
     ) -> None:
-        fake = FakeMastodon(fixture("mastodon_statuses.json"))
+        fake = FakeMastodon(fixture("mastodon/statuses.json"))
         with patch.object(mastodon.web, "get_json", fake):
             items = mastodon.MastodonSource(
                 "https://microblog.example", "press", "token"
@@ -93,7 +93,7 @@ class TestPolling(unittest.TestCase):
     def test_fetch_pages_with_the_min_id_cursor(self) -> None:
         many = [
             dict(
-                fixture("mastodon_statuses.json")[0],
+                fixture("mastodon/statuses.json")[0],
                 id=str(200 + index),
                 uri=f"https://m/{index}",
             )
