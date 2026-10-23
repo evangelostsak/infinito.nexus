@@ -8,7 +8,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from openpost_api import (
+from openpost.api import (
     ADMIN_EMAIL,
     ADMIN_PASSWORD,
     CONTAINER,
@@ -37,7 +37,8 @@ from openpost_api import (
     team,
     upload,
 )
-from openpost_simulator import check_simulator
+from openpost.crossposter import ROUTES, check_crossposter
+from openpost.simulator import check_simulator
 
 PRIVATE_TARGETS = ("https://postgres", "https://10.0.0.1")
 SQLITE_PATTERNS = (
@@ -389,6 +390,8 @@ def main() -> int:
         check_simulator(token, workspace)
     if "peertube" in RELAY_TARGETS:
         check_peertube(token, workspace)
+    if ROUTES:
+        check_crossposter(token, workspace)
     if failures:
         print(f"[FAIL] {len(failures)} check(s) failed: {', '.join(failures)}")
         return 1
