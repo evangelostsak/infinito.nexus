@@ -11,7 +11,7 @@ exports.register = function (shared) {
     await shared.signInViaOidc(page, shared.env.adminUsername, shared.env.adminPassword, "administrator");
     const account = await shared.connectMastodonAccount(page, context, "administrator");
     try {
-      await shared.publishNow(page, account, marker, "administrator");
+      await shared.publishNow(page, account, marker);
       await expect
         .poll(() => shared.mastodonStatusExists(page, account, marker), {
           timeout: resolveTimeout(180_000),
