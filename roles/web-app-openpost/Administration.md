@@ -104,6 +104,106 @@ The simulator never runs in production; leave the variant to CI and local tests.
 
 Sources: the [OpenPost provider reference](https://github.com/getopenpost/openpost/blob/0deadaf7bbf3b3be045e783c3eeef323c9e3c440/docs/reference/providers/index.md), its [environment variables](https://github.com/getopenpost/openpost/blob/0deadaf7bbf3b3be045e783c3eeef323c9e3c440/docs/reference/configuration/environment-variables.md) and the platform sources listed in the role's requirement.
 
+## Crossposter
+
+The `crossposter` sidecar polls Mastodon, Pixelfed and PeerTube accounts and hands every new post to OpenPost through a workspace API token that the deploy issues for the organisation workspace.
+It runs only while at least one route is configured, keeps its cursors and delivery records in the `crossposter` schema of the OpenPost database and lets exactly one instance work at a time through a Postgres advisory lock.
+
+### Routes
+
+Routes live under `services.crossposter.routes` of `web-app-openpost` in the inventory:
+
+```yaml
+applications:
+  web-app-openpost:
+    services:
+      crossposter:
+        poll_interval_seconds: 60
+        opt_out_tag: nocrosspost
+        retry:
+          max_attempts: 8
+          base_seconds: 30
+          cap_seconds: 3600
+        notify:
+          recipients:
+            - press@example.org
+        routes:
+          - name: press-mastodon
+            source:
+              platform: mastodon
+              base_url: "https://microblog.example.org"
+              account: press
+              token: "{{ vault_crosspost_press_mastodon_token }}"
+            filters:
+              visibility: [public]
+              exclude_replies: true
+              exclude_reblogs: true
+              tags: []
+              media: any
+            targets:
+              social_set: Commercial
+            mode: review
+            attribution:
+              default: "{text}\n\n{source_url}"
+              x: "{text}"
+```
+
+| Key | Meaning |
+|---|---|
+| `source.platform` | `mastodon`, `pixelfed` or `peertube`. |
+| `source.account` | Mastodon or Pixelfed username, or PeerTube channel name. |
+| `source.token` | Read token of the source account, vault-encrypted. It reaches the container as a secret file, never as an environment variable. |
+| `filters.visibility` | Visibilities that are forwarded, usually `[public]`. |
+| `filters.tags` | Forward only posts carrying one of these hashtags; empty forwards every post. |
+| `filters.media` | `any`, `required` or `none`. |
+| `targets` | Either `social_set` (name of an OpenPost Social Set) or `accounts` (list of account slugs). |
+| `mode` | `review` creates an unscheduled draft; `auto` publishes immediately. New routes start in `review`. |
+| `attribution` | Template per network with `{text}` and `{source_url}`; `default` covers networks without their own entry. |
+
+The deploy validates every route against OpenPost and fails with the route name and the field when a platform is unknown, a token is missing or a target is not connected.
+Connect the target accounts and create the Social Set in OpenPost before adding the route.
+On the CI rounds with the provider simulator the routes carry no token: the deploy mints read tokens on the local instances, connects the local Mastodon account and creates the empty Social Sets that the CLI probe fills.
+
+### Review and auto
+
+In `review` mode an editor finds the crossposted post among the drafts of the desk, adjusts it and schedules or publishes it.
+In `auto` mode the crossposter publishes immediately.
+A post with a content warning, or with mentions that a commercial network cannot resolve, always becomes a draft.
+
+Activating a route forwards none of the account's existing posts: its cursor starts at the newest post.
+Each poll costs a route one request plus one per further page of new posts (at most five), and on PeerTube one more per new video, so the default 60-second interval stays far below Mastodon's and Pixelfed's 300 requests per five minutes and PeerTube's API limit.
+An author keeps a single post local by adding the `#nocrosspost` hashtag.
+Posts that OpenPost itself published to Mastodon are never forwarded again, so one account can be source and target.
+
+### Attribution and X cost
+
+Each network gets its own template.
+The default X template omits the source link, because a post with a URL costs about 13 times more on the X API.
+Text is shortened to each network's limit without breaking words, links or hashtags, and Fediverse mentions become plain names on X and profile links elsewhere.
+
+### Source tokens
+
+| Platform | How to create the read token |
+|---|---|
+| Mastodon | Preferences → Development → New application with the `read` scope, then copy the access token. |
+| Pixelfed | Settings → Applications → Personal access tokens, create one with the `read` scope. |
+| PeerTube | `POST /api/v1/users/token` with the local OAuth client and the account's password; PeerTube channel listings are public, the token only identifies the crossposter. |
+
+### Failed deliveries
+
+Transient errors (network errors, HTTP 429 and 5xx) are retried with capped exponential backoff and jitter that honours `Retry-After` and rate-limit reset headers.
+When OpenPost reports a provider outage for an automatic publication, the crossposter publishes it again under a new idempotency key.
+After `retry.max_attempts` the item is dead-lettered; a permanent rejection by the provider marks it failed.
+Both reach `notify.recipients` in one mail per poll, with the source post, the target and the last error.
+
+List every crossposted item with its state:
+
+```bash
+container exec <crossposter container> python -m crossposter list --config /config/crossposter.json
+```
+
+A dead-lettered item stays in that state; publish the post again from the OpenPost desk when the cause is fixed.
+
 ## Unsupported features and workarounds
 
 | Limitation | Workaround |
