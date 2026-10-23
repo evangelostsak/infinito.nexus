@@ -1,64 +1,55 @@
-"""Env (rendered into test.env from templates/test.env.j2):
-    OPENPOST_LOCAL_URL           published OpenPost origin on the stack host
-    OPENPOST_API_HEADERS_B64     base64 JSON of the Host and proto headers the proxy would send
-    OPENPOST_ADMIN_EMAIL         break-glass instance admin e-mail
-    OPENPOST_ADMIN_PASSWORD_B64  base64 break-glass password
-    OPENPOST_RELAY_TARGETS       JSON map of sibling platform to the domain the relay carries
-    OPENPOST_DEADLINE_SECONDS    readiness budget, below the harness timeout
-    OPENPOST_PUBLIC_URL          public origin served by the shared proxy
-    OPENPOST_SSO_ENABLED         true when Keycloak provisions users, so the proxy closes password sign-up
-"""
-
 from __future__ import annotations
 
-import base64
 import json
-import os
+import secrets
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 
-BASE = os.environ["OPENPOST_LOCAL_URL"].rstrip("/") + "/api/v1"
-HEADERS = json.loads(base64.b64decode(os.environ["OPENPOST_API_HEADERS_B64"]))
-ADMIN_EMAIL = os.environ["OPENPOST_ADMIN_EMAIL"]
-ADMIN_PASSWORD = base64.b64decode(os.environ["OPENPOST_ADMIN_PASSWORD_B64"]).decode()
-RELAY_TARGETS = json.loads(os.environ["OPENPOST_RELAY_TARGETS"])
-DEADLINE = time.monotonic() + int(os.environ["OPENPOST_DEADLINE_SECONDS"])
-PUBLIC_URL = os.environ["OPENPOST_PUBLIC_URL"].rstrip("/")
-SSO_ENABLED = os.environ["OPENPOST_SSO_ENABLED"] == "true"
+from openpost_api import (
+    ADMIN_EMAIL,
+    ADMIN_PASSWORD,
+    CONTAINER,
+    DEADLINE,
+    MAIL_RECIPIENT,
+    OPENER,
+    PEERTUBE_PASSWORD,
+    PEERTUBE_USERNAME,
+    PUBLIC_URL,
+    RELAY_TARGETS,
+    S3_PUBLIC_URL,
+    SETTLE_SECONDS,
+    SIMULATOR_PLATFORMS,
+    SSO_ADMIN_EMAIL,
+    SSO_ENABLED,
+    UNCONFIGURED_PLATFORMS,
+    anonymous_jpeg,
+    call,
+    check,
+    draft,
+    failures,
+    in_container,
+    release,
+    revoke_invitations,
+    settle,
+    team,
+    upload,
+)
+from openpost_simulator import check_simulator
 
 PRIVATE_TARGETS = ("https://postgres", "https://10.0.0.1")
-
-failures: list[str] = []
-
-
-def call(method: str, path: str, body: object = None, token: str = "") -> tuple[int, object]:
-    data = json.dumps(body).encode() if body is not None else None
-    request = urllib.request.Request(BASE + path, data=data, method=method)
-    for name, value in HEADERS.items():
-        request.add_header(name, value)
-    request.add_header("Content-Type", "application/json")
-    if token:
-        request.add_header("Authorization", "Bearer " + token)
-    try:
-        with urllib.request.urlopen(request, timeout=60) as response:
-            raw = response.read().decode()
-            status = response.status
-    except urllib.error.HTTPError as error:
-        raw = error.read().decode()
-        status = error.code
-    try:
-        return status, json.loads(raw) if raw else None
-    except ValueError:
-        return status, raw
-
-
-def check(label: str, ok: bool, detail: object = "") -> None:
-    print(("[OK]   " if ok else "[FAIL] ") + label + (f": {detail}" if not ok and detail else ""))
-    if not ok:
-        failures.append(label)
+SQLITE_PATTERNS = (
+    "-name",
+    "*.sqlite",
+    "-o",
+    "-name",
+    "*.sqlite3",
+    "-o",
+    "-name",
+    "*.db",
+)
 
 
 def wait_ready() -> None:
@@ -75,31 +66,101 @@ def wait_ready() -> None:
 
 
 def login() -> str:
-    status, body = call("POST", "/auth/login", {"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD})
+    status, body = call(
+        "POST", "/auth/login", {"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}
+    )
     if status != 200 or not isinstance(body, dict) or not body.get("token"):
         sys.exit(f"[FAIL] break-glass login returned HTTP {status}")
     print("[OK]   break-glass instance admin signs in")
     return str(body["token"])
 
 
-def flag(path: str, key: str, token: str = "") -> object:
-    status, body = call("GET", path, token=token)
+def flag(path: str, key: str) -> object:
+    status, body = call("GET", path)
     if status != 200 or not isinstance(body, dict):
         return f"HTTP {status}"
     return body.get(key)
 
 
 def public_status(method: str, path: str) -> int:
-    request = urllib.request.Request(PUBLIC_URL + path, data=b"{}", method=method)
+    request = urllib.request.Request(PUBLIC_URL + path, data=b"{}", method=method)  # noqa: S310 fixed public OpenPost origin
     request.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310 fixed public OpenPost origin
             return response.status
     except urllib.error.HTTPError as error:
         return error.code
 
 
-def check_data_minimisation(token: str) -> None:
+def anonymous_get(path: str) -> int:
+    request = urllib.request.Request(PUBLIC_URL + path)  # noqa: S310 fixed public OpenPost origin
+    try:
+        with OPENER.open(request, timeout=60) as response:
+            return response.status
+    except urllib.error.HTTPError as error:
+        return error.code
+
+
+def check_access() -> None:
+    status = anonymous_get("/api/v1/accounts/mastodon/callback")
+    check(
+        "the provider callback answers without a session",
+        status in (302, 303, 307),
+        f"HTTP {status}",
+    )
+    status = anonymous_get("/api/v1/workspaces")
+    check("the API refuses anonymous requests", status == 401, f"HTTP {status}")
+    found = in_container(
+        CONTAINER,
+        "find",
+        "/",
+        "(",
+        "-path",
+        "/proc",
+        "-o",
+        "-path",
+        "/sys",
+        ")",
+        "-prune",
+        "-o",
+        "-type",
+        "f",
+        "(",
+        *SQLITE_PATTERNS,
+        ")",
+        "-print",
+        user="0",
+    )
+    check(
+        "no SQLite database exists in the container",
+        not found.strip(),
+        found.decode()[:400],
+    )
+
+
+def check_sso_administrator(token: str) -> None:
+    status, body = call("GET", "/admin/users?per_page=100", token=token)
+    users = body.get("users") if status == 200 and isinstance(body, dict) else None
+    found = [
+        user
+        for user in users or []
+        if str(user.get("email")).lower() == SSO_ADMIN_EMAIL.lower()
+    ]
+    check(
+        "the SSO administrator from the bootstrap allowlist is an instance admin",
+        bool(found) and found[0].get("is_admin") is True,
+        found,
+    )
+    if found and "mastodon" in RELAY_TARGETS:
+        count = found[0].get("publication_count")
+        check(
+            "the SSO administrator's publications survived the backup drill",
+            isinstance(count, int) and count >= 1,
+            count,
+        )
+
+
+def check_data_minimisation() -> None:
     for label, path, key in (
         ("PostHog telemetry is off", "/telemetry/config", "enabled"),
         ("diagnostics reports are off", "/diagnostics/public-config", "enabled"),
@@ -109,10 +170,18 @@ def check_data_minimisation(token: str) -> None:
         check(label, value is False, f"{path} {key}={value!r}")
     if SSO_ENABLED:
         status = public_status("POST", "/api/v1/auth/register")
-        check("the proxy refuses password self-registration", status == 403, f"HTTP {status}")
+        check(
+            "the proxy refuses password self-registration",
+            status == 403,
+            f"HTTP {status}",
+        )
     else:
         value = flag("/auth/config", "registration_enabled")
-        check("password self-registration is off", value is False, f"registration_enabled={value!r}")
+        check(
+            "password self-registration is off",
+            value is False,
+            f"registration_enabled={value!r}",
+        )
 
 
 def workspace_id(token: str) -> str:
@@ -125,9 +194,27 @@ def workspace_id(token: str) -> str:
     return str(body["id"])
 
 
-def auth_url(token: str, workspace: str, platform: str, instance_url: str) -> tuple[int, object]:
-    query = urllib.parse.urlencode({"workspace_id": workspace, "instance_url": instance_url})
+def auth_url(
+    token: str, workspace: str, platform: str, instance_url: str
+) -> tuple[int, object]:
+    query = urllib.parse.urlencode(
+        {"workspace_id": workspace, "instance_url": instance_url}
+    )
     return call("GET", f"/accounts/{platform}/auth-url?{query}", token=token)
+
+
+def check_unconfigured(token: str, workspace: str) -> None:
+    for platform in UNCONFIGURED_PLATFORMS:
+        status, body = call(
+            "GET",
+            f"/accounts/{platform}/auth-url?workspace_id={workspace}",
+            token=token,
+        )
+        check(
+            f"{platform} cannot be connected without provider credentials",
+            status != 200,
+            f"HTTP {status} {body}",
+        )
 
 
 def check_relay(token: str, workspace: str) -> None:
@@ -135,19 +222,173 @@ def check_relay(token: str, workspace: str) -> None:
         if platform == "peertube":
             continue
         status, body = auth_url(token, workspace, platform, f"https://{domain}")
-        check(f"relay carries {platform} at {domain} past the guard", status == 200, f"HTTP {status} {body}")
+        check(
+            f"relay carries {platform} at {domain} past the guard",
+            status == 200,
+            f"HTTP {status} {body}",
+        )
     for target in PRIVATE_TARGETS:
         status, body = auth_url(token, workspace, "mastodon", target)
         check(f"guard still rejects {target}", status != 200, f"HTTP {status} {body}")
+
+
+def check_media(token: str, workspace: str) -> None:
+    media, key = upload(token, workspace, "image")
+    publication = draft(
+        token, workspace, [], f"Media probe {media}", "image", media, {}, ""
+    )
+    attached: dict = {}
+    budget = min(DEADLINE, time.monotonic() + 60)
+    while not attached.get("public_url_checked_at") and time.monotonic() < budget:
+        status, body = call("GET", f"/publications/{publication['id']}", token=token)
+        attached = (
+            (body.get("media") if status == 200 and isinstance(body, dict) else None)
+            or [{}]
+        )[0]
+        time.sleep(0 if attached.get("public_url_checked_at") else 3)
+    check(
+        "OpenPost reaches the public URL of uploaded media without a session",
+        attached.get("public_url_ready") is True
+        and attached.get("public_url_status") == 200,
+        attached,
+    )
+    if S3_PUBLIC_URL:
+        check(
+            f"uploaded media lands in S3 and is fetchable anonymously under {S3_PUBLIC_URL}",
+            anonymous_jpeg(S3_PUBLIC_URL + key),
+            key,
+        )
+    else:
+        check(
+            "uploaded media is served under /media/",
+            str(attached.get("url")).startswith("/media/"),
+            attached.get("url"),
+        )
+    call("DELETE", f"/publications/{publication['id']}", token=token)
+
+
+def check_mail(token: str, workspace: str) -> None:
+    revoke_invitations(token, workspace, MAIL_RECIPIENT)
+    status, invitation = call(
+        "POST",
+        f"/workspaces/{workspace}/invitations",
+        {"email": MAIL_RECIPIENT, "role": "viewer"},
+        token,
+    )
+    if status != 200 or not isinstance(invitation, dict):
+        check("OpenPost sends an invitation mail", False, f"HTTP {status} {invitation}")
+        return
+    state = str(invitation["email_delivery_status"])
+    while state in ("created", "queued") and time.monotonic() < DEADLINE:
+        time.sleep(5)
+        current = [
+            item
+            for item in team(token, workspace).get("invitations") or []
+            if item["id"] == invitation["id"]
+        ]
+        state = str(current[0]["email_delivery_status"]) if current else "revoked"
+    call(
+        "DELETE", f"/workspaces/{workspace}/invitations/{invitation['id']}", token=token
+    )
+    check(
+        "OpenPost hands an invitation mail to the platform mail server",
+        state in ("sent", "delivered"),
+        state,
+    )
+
+
+def peertube_has(domain: str, tag: str) -> bool:
+    query = urllib.parse.urlencode({"count": 25, "sort": "-publishedAt"})
+    try:
+        with urllib.request.urlopen(
+            f"https://{domain}/api/v1/accounts/{PEERTUBE_USERNAME}/videos?{query}",
+            timeout=60,
+        ) as response:
+            videos = json.loads(response.read().decode()).get("data") or []
+    except (urllib.error.URLError, OSError, ValueError):
+        return False
+    return any(tag in str(video.get("name")) for video in videos)
+
+
+def check_peertube(token: str, workspace: str) -> None:
+    domain = RELAY_TARGETS["peertube"]
+    credentials = {"username": PEERTUBE_USERNAME, "password": PEERTUBE_PASSWORD}
+    status, body = call(
+        "POST",
+        "/accounts/peertube/login",
+        {"workspace_id": workspace, "instance_url": f"https://{domain}", **credentials},
+        token,
+    )
+    if status == 200 and isinstance(body, dict) and body.get("selection_required"):
+        choice = [str(option["id"]) for option in body.get("options") or []]
+        status, body = call(
+            "POST",
+            f"/accounts/selections/{body['connection_id']}/complete",
+            {"selection_ids": choice},
+            token,
+        )
+    check(
+        f"a local PeerTube account at {domain} connects with its password",
+        status == 200,
+        f"HTTP {status} {body}",
+    )
+    listed = call("GET", f"/accounts?workspace_id={workspace}", token=token)[1]
+    channels = (
+        [item for item in listed if item.get("platform") == "peertube"]
+        if isinstance(listed, list)
+        else []
+    )
+    if status != 200 or not channels:
+        return
+    tag = f"openpost-cli-peertube-{secrets.token_hex(4)}"
+    media, _ = upload(token, workspace, "video")
+    settings = {"channel": channels[0]["account_id"], "title": tag, "privacy": "public"}
+    publication = draft(
+        token,
+        workspace,
+        [str(channels[0]["id"])],
+        f"PeerTube delivery {tag}",
+        "video",
+        media,
+        settings,
+        "",
+    )
+    status, body = release(token, publication, "publish-now")
+    check("the PeerTube video can be published", status == 200, f"HTTP {status} {body}")
+    if status != 200:
+        return
+    current = settle(token, {"peertube": str(publication["id"])}).get("peertube") or [
+        {}
+    ]
+    check(
+        "the PeerTube destination ends published",
+        current[0].get("status") == "published",
+        current[0],
+    )
+    budget = min(DEADLINE, time.monotonic() + SETTLE_SECONDS)
+    while not peertube_has(domain, tag) and time.monotonic() < budget:
+        time.sleep(5)
+    check("the video appears on the PeerTube instance", peertube_has(domain, tag), tag)
 
 
 def main() -> int:
     wait_ready()
     print("[OK]   /api/v1/ready answers 200")
     token = login()
-    check_data_minimisation(token)
+    check_data_minimisation()
+    check_access()
+    if SSO_ADMIN_EMAIL:
+        check_sso_administrator(token)
     workspace = workspace_id(token)
     check_relay(token, workspace)
+    check_unconfigured(token, workspace)
+    check_media(token, workspace)
+    if MAIL_RECIPIENT:
+        check_mail(token, workspace)
+    if SIMULATOR_PLATFORMS:
+        check_simulator(token, workspace)
+    if "peertube" in RELAY_TARGETS:
+        check_peertube(token, workspace)
     if failures:
         print(f"[FAIL] {len(failures)} check(s) failed: {', '.join(failures)}")
         return 1
