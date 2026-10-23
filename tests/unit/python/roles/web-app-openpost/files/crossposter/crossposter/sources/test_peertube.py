@@ -20,10 +20,10 @@ def fixture(name: str) -> object:
 def fake_get_json(url: str, headers: dict[str, str]) -> object:
     parsed = urllib.parse.urlparse(url)
     if parsed.path.startswith("/api/v1/videos/"):
-        detail = fixture("peertube_video_detail.json")
+        detail = fixture("peertube/video_detail.json")
         return dict(detail, uuid=parsed.path.rsplit("/", 1)[-1])
     start = int(dict(urllib.parse.parse_qsl(parsed.query))["start"])
-    listing = fixture("peertube_videos.json")
+    listing = fixture("peertube/videos.json")
     return dict(listing, data=listing["data"][start:])
 
 
@@ -31,8 +31,8 @@ class TestParse(unittest.TestCase):
     def test_a_published_public_video_carries_title_description_tags_and_one_mp4(
         self,
     ) -> None:
-        video = fixture("peertube_videos.json")["data"][0]
-        item = peertube.parse_video(video, fixture("peertube_video_detail.json"))
+        video = fixture("peertube/videos.json")["data"][0]
+        item = peertube.parse_video(video, fixture("peertube/video_detail.json"))
         self.assertEqual(item.title, video["name"])
         self.assertTrue(item.text.startswith("Full description"))
         self.assertEqual(item.tags, ("talk", "fediverse"))
@@ -42,7 +42,7 @@ class TestParse(unittest.TestCase):
         self.assertEqual(item.cursor, video["publishedAt"])
 
     def test_only_published_public_videos_pass(self) -> None:
-        videos = fixture("peertube_videos.json")["data"]
+        videos = fixture("peertube/videos.json")["data"]
         self.assertEqual(
             [peertube.published_public(video) for video in videos], [True, False, False]
         )
