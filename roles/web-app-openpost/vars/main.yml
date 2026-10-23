@@ -93,9 +93,9 @@ OPENPOST_PROVIDER_APPS: >-
 
 OPENPOST_CROSSPOSTER: "{{ lookup('config', application_id, 'services.crossposter') }}"
 OPENPOST_CROSSPOSTER_ROUTES: "{{ OPENPOST_CROSSPOSTER.routes }}"
-OPENPOST_CROSSPOSTER_ENABLED: "{{ (lookup('config', application_id, 'services.crossposter.enabled') | bool) and (OPENPOST_CROSSPOSTER_ROUTES | length > 0) }}"
+OPENPOST_CROSSPOSTER_ENABLED: "{{ lookup('config', application_id, 'services.crossposter.enabled') | bool }}"
 OPENPOST_CROSSPOSTER_NAME: "{{ OPENPOST_CROSSPOSTER.name }}"
-OPENPOST_CROSSPOSTER_UID: 10001
+OPENPOST_CROSSPOSTER_UID: "{{ OPENPOST_CROSSPOSTER.uid }}"
 OPENPOST_CROSSPOSTER_TOKEN_NAME: "crossposter"
 OPENPOST_CROSSPOSTER_DIR: "{{ [lookup('container', application_id, 'directories.config'), 'crossposter'] | path_join }}"
 OPENPOST_CROSSPOSTER_STATE_FILE: "{{ [OPENPOST_CROSSPOSTER_DIR, 'state.json'] | path_join }}"
