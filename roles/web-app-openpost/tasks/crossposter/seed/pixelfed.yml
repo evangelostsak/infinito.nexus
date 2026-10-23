@@ -23,10 +23,12 @@
         require '/var/www/vendor/autoload.php';
         $app = require '/var/www/bootstrap/app.php';
         $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-        $user = App\User::where('username', getenv('CROSSPOSTER_ACCOUNT'))->firstOrFail();
-        if (! Laravel\Passport\Client::where('personal_access_client', true)->exists()) {
-        Illuminate\Support\Facades\Artisan::call('passport:client', ['--personal' => true, '--name' => 'Crossposter CI', '--no-interaction' => true]); }
-        echo 'CROSSPOSTER_TOKEN=' . $user->createToken('crossposter-ci', ['read', 'write'])->accessToken . PHP_EOL;
+        $user = App\Models\User::where('username', getenv('CROSSPOSTER_ACCOUNT'))->firstOrFail();
+        $mint = fn () => $user->createToken('crossposter-ci', ['read', 'write'])->accessToken;
+        try { $token = $mint(); } catch (RuntimeException $missing) {
+        Illuminate\Support\Facades\Artisan::call('passport:client', ['--personal' => true, '--provider' => 'users', '--name' => 'Crossposter CI', '--no-interaction' => true]);
+        $token = $mint(); }
+        echo 'CROSSPOSTER_TOKEN=' . $token . PHP_EOL;
   loop: "{{ openpost_crossposter_seed_missing | selectattr('source.platform', 'equalto', 'pixelfed') | list }}"
   loop_control:
     label: "{{ item.name }}"
