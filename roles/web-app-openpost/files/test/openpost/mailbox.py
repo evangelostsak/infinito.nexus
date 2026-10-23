@@ -10,7 +10,7 @@ import imaplib
 import os
 import ssl
 
-from openpost.api import MAIL_RECIPIENT
+from openpost.api import MAIL_RECIPIENT, PROXY_ADDRESS
 
 MAIL_HOST = os.environ["OPENPOST_MAIL_HOST"]
 MAIL_PASSWORD = base64.b64decode(os.environ["OPENPOST_MAIL_PASSWORD_B64"]).decode()
@@ -25,7 +25,7 @@ def reports_naming(urls: list[str]) -> list[str]:
     found: list[str] = []
     try:
         with imaplib.IMAP4_SSL(
-            MAIL_HOST, IMAPS_PORT, ssl_context=context, timeout=60
+            PROXY_ADDRESS or MAIL_HOST, IMAPS_PORT, ssl_context=context, timeout=60
         ) as imap:
             imap.login(MAIL_RECIPIENT, MAIL_PASSWORD)
             imap.select("INBOX", readonly=True)
