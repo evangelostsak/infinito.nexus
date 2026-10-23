@@ -17,7 +17,7 @@ COPY crossposter ./crossposter
 
 USER crossposter
 
-HEALTHCHECK --interval=1m --timeout=10s --retries=3 --start-period=2m \
+HEALTHCHECK --interval=2m --timeout=5s --retries=3 --start-period=10m --start-interval=5s \
     CMD ["python", "-m", "crossposter", "health", "--config", "/config/crossposter.json"]
 
 CMD ["python", "-m", "crossposter", "run", "--config", "/config/crossposter.json"]
