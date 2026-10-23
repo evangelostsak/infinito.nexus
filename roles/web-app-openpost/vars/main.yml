@@ -45,6 +45,9 @@ OPENPOST_RELAY_DOMAINS: >-
   {%- set _ = _domains.append(lookup('domain', _role)) -%}
   {%- endif -%}
   {%- endfor -%}
+  {%- if OPENPOST_OBJSTORE_ENABLED | bool -%}
+  {%- set _ = _domains.append(lookup('objstore', application_id, 'public_domain')) -%}
+  {%- endif -%}
   {{ _domains }}
 OPENPOST_PINNED_INSTANCES: >-
   {%- set _instances = [] -%}
