@@ -3,7 +3,7 @@
 # Env (rendered into test.env from templates/test.env.j2):
 #   OPENPOST_CONTAINER   resolved OpenPost container (CLI_LOCAL_CID)
 #   OPENPOST_RELAY_PORT  port the relay listens on inside the role network
-#   every OPENPOST_* variable openpost_api.py documents
+#   every OPENPOST_* variable the openpost/ probe modules document
 
 set -uo pipefail
 
