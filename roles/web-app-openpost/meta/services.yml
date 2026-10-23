@@ -68,6 +68,8 @@ openpost:
   version: "v7.22.9"
   update:
     type: registry_tags
+    image: ghcr.io/getopenpost/openpost
+    match: "v"
   name: openpost
   cpus: 1.0
   mem_reservation: 256m
@@ -140,10 +142,15 @@ simulator:
     - graph.instagram.com
     - oauth2.googleapis.com
     - www.googleapis.com
+    - open.tiktokapis.com
+    - www.linkedin.com
+    - api.linkedin.com
   providers:
     - x
     - meta
     - youtube
+    - tiktok
+    - linkedin
 
 # nocheck: playwright-service-flag
 # nocheck: variants-coverage — sso-variant-tor requires the onion on in every variant, so the false polarity has no variant left to live in
