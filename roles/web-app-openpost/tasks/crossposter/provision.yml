@@ -51,7 +51,7 @@
   no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
 
 - name: "🌱 Seed the CI source tokens and social sets"
-  ansible.builtin.include_tasks: 06_crossposter_seed.yml
+  ansible.builtin.include_tasks: crossposter/seed.yml
   when: OPENPOST_SIMULATOR_ENABLED | bool
 
 - name: "💾 Persist the crossposter workspace, API token and CI source tokens"
