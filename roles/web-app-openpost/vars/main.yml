@@ -28,7 +28,7 @@ OPENPOST_TRUSTED_PROXY_CIDRS: >-
 
 OPENPOST_ADMIN_USERNAME: "{{ lookup('users', 'web-app-openpost-breakglass').username }}"
 OPENPOST_ADMIN_PASSWORD: "{{ lookup('users', 'web-app-openpost-breakglass').password }}"
-OPENPOST_ADMIN_EMAIL: "{{ lookup('users', 'web-app-openpost-breakglass').email }}"
+OPENPOST_ADMIN_EMAIL: "{{ lookup('users', 'administrator').email | regex_replace('@', '+' ~ OPENPOST_ADMIN_USERNAME ~ '@') }}"
 OPENPOST_ORGANISATION_WORKSPACE: "{{ SOFTWARE_NAME }}"
 
 OPENPOST_BOOTSTRAP_ADMINS:
