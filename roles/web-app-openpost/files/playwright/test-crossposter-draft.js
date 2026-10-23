@@ -1,36 +1,78 @@
 const { test, expect } = require("@playwright/test");
-const { gotoOnion } = require("./personas");
+const { gotoOnion, performKeycloakLoginForm } = require("./personas");
 const { resolveTimeout } = require("./timeouts");
 
-async function crosspostedDraft(page, shared, headers) {
-  for (const workspace of await shared.apiRequest(page, headers, "GET", "/workspaces")) {
-    const drafts = await shared.apiRequest(
-      page,
-      headers,
-      "GET",
-      `/publications?workspace_id=${workspace.id}&status=draft&search=crossposterreview&limit=50`,
-    );
-    const found = (drafts || []).find((item) => (item.metadata || {}).crossposter_route === "ci-review");
-    if (found) {
-      return { workspace: workspace.id, publication: found };
-    }
+const REVIEW_ROUTE = "ci-review";
+const REVIEW_SET = "Crossposter review";
+const REVIEW_TAG = "crossposterreview";
+
+async function routeReviewToMastodon(page, shared, headers) {
+  const target = await shared.apiAccount(page, headers, "mastodon");
+  const sets = await shared.apiRequest(page, headers, "GET", `/social-sets?workspace_id=${target.workspace}`);
+  const reviewSet = (sets || []).find((item) => item.name === REVIEW_SET);
+  expect(reviewSet, `the deploy must create the "${REVIEW_SET}" social set`).toBeTruthy();
+  await shared.apiRequest(page, headers, "PUT", `/social-sets/${reviewSet.id}`, {
+    name: reviewSet.name,
+    workspace_id: target.workspace,
+    accounts: [{ social_account_id: target.account, default_settings: {} }],
+  });
+  return target.workspace;
+}
+
+async function postOnMastodon(page, shared, text, label) {
+  await gotoOnion(page, `${shared.env.mastodonBaseUrl}/auth/sign_in`, { waitUntil: "domcontentloaded" });
+  await page.getByRole("link", { name: /sso|single sign-on/i }).click();
+  await page.waitForLoadState("domcontentloaded");
+  if (page.url().includes(`${shared.env.oidcIssuerUrl}/protocol/openid-connect/auth`)) {
+    await performKeycloakLoginForm(page, shared.env.adminUsername, shared.env.adminPassword);
   }
-  return null;
+  await expect
+    .poll(() => page.url(), { timeout: resolveTimeout(60_000), message: `${label}: expected Mastodon's home timeline` })
+    .not.toContain("/auth/sign_in");
+  await gotoOnion(page, `${shared.env.mastodonBaseUrl}/home`, { waitUntil: "domcontentloaded" });
+  const token = await page.evaluate(() => JSON.parse(document.getElementById("initial-state").textContent).meta.access_token);
+  expect(token, `${label}: Mastodon's web client must hold a session token`).toBeTruthy();
+  const response = await page.request.post(`${shared.env.mastodonBaseUrl}/api/v1/statuses`, {
+    headers: { Authorization: `Bearer ${token}` },
+    form: { status: text, visibility: "public" },
+  });
+  expect(response.ok(), `${label}: Mastodon must accept the status, got HTTP ${response.status()}`).toBeTruthy();
+}
+
+async function crosspostedDraft(page, shared, headers, workspace, marker) {
+  const drafts = await shared.apiRequest(
+    page,
+    headers,
+    "GET",
+    `/publications?workspace_id=${workspace}&status=draft&search=${encodeURIComponent(marker)}&limit=10`,
+  );
+  return (drafts || []).find((item) => (item.metadata || {}).crossposter_route === REVIEW_ROUTE) || null;
 }
 
 exports.register = function (shared) {
   test("administrator: finds a crossposted draft in the desk, edits it and schedules it", async ({ page }) => {
     shared.skipUnlessServiceEnabled("crossposter");
     shared.skipUnlessServiceEnabled("mastodon");
-    test.setTimeout(resolveTimeout(300_000)); // draft lookup, composer autosave and the scheduling round-trip
-    const label = "break-glass administrator";
-    const edited = `Edited in the desk ${Date.now()}`;
+    test.setTimeout(resolveTimeout(420_000)); // Mastodon sign-in, the crossposter's poll interval, composer autosave and scheduling
+    const label = "administrator";
+    const marker = `cp-desk-${Date.now()}`;
+    const edited = `Edited in the desk ${marker}`;
 
     await shared.signInViaLocal(page, shared.env.breakglassEmail, shared.env.breakglassPassword, label);
     const headers = shared.apiSession();
-    const found = await crosspostedDraft(page, shared, headers);
-    expect(found, `${label}: the CLI run must leave a crossposted review draft`).toBeTruthy();
-    const marker = String(found.publication.title || found.publication.source_text).split(" ")[1];
+    const workspace = await routeReviewToMastodon(page, shared, headers);
+    await postOnMastodon(page, shared, `Desk review ${marker} #${REVIEW_TAG}`, label);
+
+    let draft = null;
+    await expect
+      .poll(
+        async () => {
+          draft = await crosspostedDraft(page, shared, headers, workspace, marker);
+          return Boolean(draft);
+        },
+        { timeout: resolveTimeout(180_000), message: `${label}: the crossposter must turn the status into a review draft` },
+      )
+      .toBe(true);
 
     await gotoOnion(page, `${shared.env.appBaseUrl}/publications?tab=drafts`, { waitUntil: "domcontentloaded" });
     await page.getByRole("textbox", { name: /search posts/i }).fill(marker);
@@ -52,7 +94,7 @@ exports.register = function (shared) {
     await expect
       .poll(
         async () => {
-          const current = await shared.apiRequest(page, headers, "GET", `/publications/${found.publication.id}`);
+          const current = await shared.apiRequest(page, headers, "GET", `/publications/${draft.id}`);
           return `${current.status}|${String(current.source_text).includes(edited)}`;
         },
         { timeout: resolveTimeout(60_000), message: `${label}: the edited draft must end scheduled` },
