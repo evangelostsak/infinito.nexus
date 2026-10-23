@@ -16,6 +16,7 @@ const env = {
   breakglassEmail: decodeDotenvQuotedValue(process.env.BREAKGLASS_EMAIL),
   breakglassPassword: decodeDotenvQuotedValue(process.env.BREAKGLASS_PASSWORD),
   mastodonBaseUrl: normalizeBaseUrl(decodeDotenvQuotedValue(process.env.MASTODON_BASE_URL || "")),
+  pixelfedBaseUrl: normalizeBaseUrl(decodeDotenvQuotedValue(process.env.PIXELFED_BASE_URL || "")),
   organisationWorkspace: decodeDotenvQuotedValue(process.env.ORGANISATION_WORKSPACE),
   oidcEnabled: isServiceEnabled("sso"),
 };
@@ -311,6 +312,158 @@ async function mastodonStatusExists(page, account, marker) {
   return (await statuses.json()).some((status) => String(status.content || "").includes(marker));
 }
 
+async function openPixelfedConnectDialog(page, label) {
+  await gotoOnion(page, `${env.appBaseUrl}/settings?tab=accounts`, { waitUntil: "domcontentloaded" });
+  const card = page.locator('[data-testid="provider-card-pixelfed"]');
+  await expect(card, `${label}: the Pixelfed provider card must render`).toBeVisible({ timeout: resolveTimeout(60_000) });
+  await card.getByRole("button", { name: /^connect$/i }).click();
+  const dialog = page.getByRole("dialog", { name: /connect pixelfed/i });
+  await dialog.getByRole("button", { name: /continue to pixelfed/i }).click();
+  await dialog.getByRole("textbox", { name: /server address/i }).fill(env.pixelfedBaseUrl);
+  return dialog;
+}
+
+function pixelfedChannelActions(page, account) {
+  return page.getByRole("button", { name: new RegExp(`^actions for ${account.handle} · pixelfed$`, "i") });
+}
+
+const OOB_REDIRECT = "urn:ietf:wg:oauth:2.0:oob";
+
+async function pixelfedAuthorizationCode(page, label, redirectedCode) {
+  await expect
+    .poll(() => page.url(), { timeout: resolveTimeout(60_000), message: `${label}: expected Pixelfed's sign-in or consent page` })
+    .toContain(env.pixelfedBaseUrl);
+  const password = page.locator('input[name="password"]');
+  if (!redirectedCode() && (await password.isVisible())) {
+    await page.locator('input[name="email"]').fill(env.adminEmail);
+    await password.fill(env.adminPassword);
+    await page.locator("form").filter({ has: password }).locator('button[type="submit"]').click();
+  }
+  const authorize = page.getByRole("button", { name: /^authorize$/i });
+  const codeShown = async () => (await page.locator("body").innerText()).includes('"code"');
+  await expect
+    .poll(async () => Boolean(redirectedCode()) || (await codeShown()) || (await authorize.isVisible()), {
+      timeout: resolveTimeout(60_000),
+      message: `${label}: expected Pixelfed's consent screen or its authorization code`,
+    })
+    .toBe(true);
+  if (redirectedCode()) {
+    return redirectedCode();
+  }
+  if (await authorize.isVisible()) {
+    await authorize.click();
+  }
+  await expect
+    .poll(codeShown, {
+      timeout: resolveTimeout(60_000),
+      message: `${label}: Pixelfed must answer the out-of-band approval with the authorization code`,
+    })
+    .toBe(true);
+  return JSON.parse(await page.locator("body").innerText()).code;
+}
+
+async function connectPixelfedAccount(page, label) {
+  const account = { handle: `@${env.adminUsername}` };
+  let redirected = "";
+  const capture = (response) => {
+    const location = response.headers().location || "";
+    if (location.startsWith(OOB_REDIRECT)) {
+      redirected = new URLSearchParams(location.split("?")[1] || "").get("code") || "";
+    }
+  };
+  page.on("response", capture);
+  const dialog = await openPixelfedConnectDialog(page, label);
+  await dialog.getByRole("button", { name: /^connect$/i }).click();
+  const code = await pixelfedAuthorizationCode(page, label, () => redirected);
+  page.off("response", capture);
+  expect(code, `${label}: Pixelfed must issue an authorization code`).toBeTruthy();
+  const codeDialog = await openPixelfedConnectDialog(page, label);
+  await codeDialog.getByRole("button", { name: /^code$/i }).click();
+  await page.getByRole("textbox", { name: /authorization code/i }).fill(code);
+  await page.getByRole("button", { name: /connect account/i }).click();
+  await expect
+    .poll(() => new URL(page.url()).pathname, {
+      timeout: resolveTimeout(60_000),
+      message: `${label}: OpenPost must leave the code page after the exchange`,
+    })
+    .not.toContain("/accounts/pixelfed/callback");
+  await gotoOnion(page, `${env.appBaseUrl}/settings?tab=accounts`, { waitUntil: "domcontentloaded" });
+  await expect(
+    pixelfedChannelActions(page, account),
+    `${label}: ${account.handle} must be listed among the connected Pixelfed channels`,
+  ).toBeVisible({ timeout: resolveTimeout(60_000) });
+  return account;
+}
+
+async function apiRequest(page, headers, method, path, data) {
+  const response = await page.request.fetch(`${env.appBaseUrl}/api/v1${path}`, { method, headers, data });
+  expect(response.ok(), `${method} ${path} must succeed, got HTTP ${response.status()}`).toBeTruthy();
+  return response.status() === 204 ? null : response.json();
+}
+
+function apiSession() {
+  return { Origin: new URL(env.appBaseUrl).origin };
+}
+
+async function apiAccount(page, headers, platform) {
+  for (const workspace of await apiRequest(page, headers, "GET", "/workspaces")) {
+    const accounts = await apiRequest(page, headers, "GET", `/accounts?workspace_id=${workspace.id}`);
+    const account = accounts.find((item) => item.platform === platform);
+    if (account) {
+      return { workspace: workspace.id, account: account.id };
+    }
+  }
+  throw new Error(`no connected ${platform} account in any workspace`);
+}
+
+async function apiUploadImage(page, headers, workspace, fileName) {
+  const buffer = uniquePng(fileName);
+  const session = await apiRequest(page, headers, "POST", "/media/upload-session", {
+    workspace_id: workspace,
+    filename: fileName,
+    mime_type: "image/png",
+    size: buffer.length,
+  });
+  const target = new URL(session.upload.url, env.appBaseUrl);
+  const uploadHeaders = { ...(session.upload.headers || {}) };
+  if (target.origin === new URL(env.appBaseUrl).origin) {
+    Object.assign(uploadHeaders, headers);
+  }
+  const upload = await page.request.fetch(target.toString(), { method: session.upload.method, headers: uploadHeaders, data: buffer });
+  expect(upload.ok(), `the media upload must succeed, got HTTP ${upload.status()}`).toBeTruthy();
+  const complete = new URL(session.complete_url, env.appBaseUrl).pathname.replace(/^\/api\/v1/, "");
+  await apiRequest(page, headers, "POST", complete, { workspace_id: workspace });
+  return session.media_id;
+}
+
+async function apiPublishImage(page, headers, target, text, label) {
+  const media = await apiUploadImage(page, headers, target.workspace, `${label}-${Date.now()}.png`);
+  const publication = await apiRequest(page, headers, "POST", "/publications", {
+    workspace_id: target.workspace,
+    title: text,
+    content_profile: "image_post",
+    source_text: text,
+    social_account_ids: [target.account],
+    renditions: [{ social_account_id: target.account, settings: {} }],
+    media: [{ media_id: media }],
+  });
+  await apiRequest(page, headers, "POST", `/publications/${publication.id}/publish-now`, {
+    expected_revision: publication.revision,
+  });
+  let rendition = {};
+  await expect
+    .poll(
+      async () => {
+        const current = await apiRequest(page, headers, "GET", `/publications/${publication.id}`);
+        rendition = (current.renditions || [])[0] || {};
+        return rendition.status;
+      },
+      { timeout: resolveTimeout(180_000), message: `${label}: the ${text} destination must end published` },
+    )
+    .toBe("published");
+  return rendition;
+}
+
 async function beforeEach({ page }) {
   await page.setViewportSize({ width: 1440, height: 1100 });
   expect(env.appBaseUrl, "APP_BASE_URL must be set").toBeTruthy();
@@ -333,6 +486,10 @@ module.exports = {
   assertWorkspaceHidden,
   uploadMedia,
   connectMastodonAccount,
+  connectPixelfedAccount,
+  apiSession,
+  apiAccount,
+  apiPublishImage,
   disconnectAccount,
   publishNow,
   mastodonStatusExists,
