@@ -105,6 +105,29 @@
       }
     },
     {
+      "name": "x-tweet-unavailable-always",
+      "priority": 1,
+      "request": {
+        "method": "POST",
+        "urlPath": "/2/tweets",
+        "bodyPatterns": [
+          {
+            "contains": "[simulate-503-always]"
+          }
+        ]
+      },
+      "response": {
+        "status": 503,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "title": "Service Unavailable",
+          "status": 503
+        }
+      }
+    },
+    {
       "name": "x-tweet-unavailable-once",
       "priority": 1,
       "scenarioName": "x-unavailable",
