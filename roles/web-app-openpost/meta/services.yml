@@ -152,10 +152,9 @@ simulator:
     - tiktok
     - linkedin
 
-# nocheck: dynamic-flag  a sidecar of this role switched on per inventory with its routes; no other role's presence decides it
+# nocheck: dynamic-flag  a sidecar of this role, provided by no other role; it runs exactly while routes are configured
 crossposter:
-  enabled: false
-  shared: false
+  enabled: "{{ (lookup('config', 'web-app-openpost', 'services.crossposter.routes') | length) > 0 }}"
   custom: true
   modes:
     compose:
@@ -165,6 +164,7 @@ crossposter:
   image: python
   version: 3.13.7-slim
   name: openpost-crossposter
+  uid: 10001
   cpus: "0.25"
   mem_reservation: 64m
   mem_limit: 256m
