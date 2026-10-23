@@ -64,11 +64,16 @@ def command_validate(path: str) -> int:
     return 0
 
 
-def wait_for_configuration(path: str, error: Exception) -> float:
+def liveness(path: str) -> tuple[Path, float]:
     raw = json.loads(Path(path).read_text())
-    Path(raw["heartbeat_file"]).write_text(f"{time.time():.0f} waiting\n")
+    return Path(raw["heartbeat_file"]), float(raw["poll_interval_seconds"])
+
+
+def wait_for_configuration(path: str, error: Exception) -> float:
+    heartbeat, interval = liveness(path)
+    heartbeat.write_text(f"{time.time():.0f} waiting\n")
     LOG.warning("crossposter waits for a valid configuration: %s", error)
-    return float(raw["poll_interval_seconds"])
+    return interval
 
 
 def command_run(path: str) -> int:
@@ -101,12 +106,11 @@ def command_list(path: str) -> int:
 
 
 def command_health(path: str) -> int:
-    loaded = settings.load(path)
-    heartbeat = Path(loaded.heartbeat_file)
+    heartbeat, interval = liveness(path)
     if not heartbeat.is_file():
         return 1
     stamp, _, state = heartbeat.read_text().strip().partition(" ")
-    fresh = time.time() - float(stamp) < STALE_INTERVALS * loaded.poll_interval_seconds
+    fresh = time.time() - float(stamp) < STALE_INTERVALS * interval
     return 0 if fresh and state in HEALTHY else 1
 
 
