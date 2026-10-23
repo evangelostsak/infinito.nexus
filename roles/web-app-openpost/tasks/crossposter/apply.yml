@@ -1,6 +1,6 @@
 ---
 - name: "📄 Render the crossposter files from the current state"
-  ansible.builtin.include_tasks: 04_crossposter.yml
+  ansible.builtin.include_tasks: crossposter/render.yml
 
 - name: "📁 Re-render the compose file with the crossposter"
   stack_host_template:
