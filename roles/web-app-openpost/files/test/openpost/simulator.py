@@ -6,7 +6,7 @@ import sys
 import time
 import urllib.parse
 
-from openpost_api import (
+from openpost.api import (
     CONTAINER,
     DB_CONTAINER,
     DB_NAME,
@@ -29,7 +29,7 @@ from openpost_api import (
     settle,
     upload,
 )
-from openpost_journal import check_journal, hits
+from openpost.journal import check_journal, hits
 
 SIMULATOR_TOKENS = (
     "simulator-access-token",
