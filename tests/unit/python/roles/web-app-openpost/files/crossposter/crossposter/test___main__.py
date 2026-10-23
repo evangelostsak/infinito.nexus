@@ -63,6 +63,14 @@ class TestHealth(CliFixture, unittest.TestCase):
     def test_a_missing_heartbeat_is_unhealthy(self) -> None:
         self.assertEqual(cli.command_health(str(self.config)), 1)
 
+    def test_a_waiting_instance_stays_healthy_while_its_configuration_is_incomplete(
+        self,
+    ) -> None:
+        self.raw["routes"] = [{"name": "press", "source": {"platform": "mastodon"}}]
+        self.write()
+        self.heartbeat.write_text(f"{time.time():.0f} waiting\n")
+        self.assertEqual(cli.command_health(str(self.config)), 0)
+
     def test_waiting_for_provisioning_stays_healthy(self) -> None:
         pause = cli.wait_for_configuration(str(self.config), ValueError("no token yet"))
         self.assertEqual(pause, 60)
