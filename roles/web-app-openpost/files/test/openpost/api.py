@@ -22,14 +22,17 @@ OPENPOST_PEERTUBE_USERNAME   local PeerTube account OpenPost connects through it
 OPENPOST_PEERTUBE_PASSWORD_B64  base64 password of that PeerTube account
 OPENPOST_MEMBER_EMAIL        deliverable plus-address of the administrator mailbox for the probe's workspace member
 OPENPOST_MEMBER_PASSWORD_B64 base64 password of the probe's workspace member, stable across credential rotation
+OPENPOST_PROXY_ADDRESS       stack host address that serves every public vhost, empty when the probe runs on that host's network
 """
 
 from __future__ import annotations
 
 import base64
+import http.client
 import json
 import os
 import secrets
+import socket
 import subprocess
 import sys
 import time
@@ -63,6 +66,7 @@ PEERTUBE_PASSWORD = base64.b64decode(
 MEMBER_USERNAME = "openpost-cli-member"
 MEMBER_PASSWORD = base64.b64decode(os.environ["OPENPOST_MEMBER_PASSWORD_B64"]).decode()
 MEMBER_EMAIL = os.environ["OPENPOST_MEMBER_EMAIL"]
+PROXY_ADDRESS = os.environ["OPENPOST_PROXY_ADDRESS"]
 
 SETTLE_SECONDS = 300
 PROFILES = {"text": "short_text", "image": "image_post", "video": "video"}
@@ -76,7 +80,20 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-OPENER = urllib.request.build_opener(_NoRedirect)
+class _ProxyConnection(http.client.HTTPSConnection):
+    def connect(self) -> None:
+        raw = socket.create_connection((PROXY_ADDRESS, self.port), self.timeout)
+        self.sock = self._context.wrap_socket(raw, server_hostname=self.host)
+
+
+class _ProxyHandler(urllib.request.HTTPSHandler):
+    def https_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
+        return self.do_open(_ProxyConnection, req, context=self._context)
+
+
+PROXY_HANDLERS = [_ProxyHandler()] if PROXY_ADDRESS else []
+OPENER = urllib.request.build_opener(_NoRedirect, *PROXY_HANDLERS)
+urllib.request.install_opener(urllib.request.build_opener(*PROXY_HANDLERS))
 
 
 def call(
