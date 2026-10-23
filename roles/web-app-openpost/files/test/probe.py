@@ -31,6 +31,7 @@ from openpost.api import (
     draft,
     failures,
     in_container,
+    public_url,
     release,
     revoke_invitations,
     settle,
@@ -310,8 +311,9 @@ def check_mail(token: str, workspace: str) -> None:
 def peertube_has(domain: str, tag: str) -> bool:
     query = urllib.parse.urlencode({"count": 25, "sort": "-publishedAt"})
     try:
-        with urllib.request.urlopen(
-            f"https://{domain}/api/v1/accounts/{PEERTUBE_USERNAME}/videos?{query}",
+        with OPENER.open(
+            public_url(f"https://{domain}")
+            + f"/api/v1/accounts/{PEERTUBE_USERNAME}/videos?{query}",
             timeout=60,
         ) as response:
             videos = json.loads(response.read().decode()).get("data") or []
