@@ -1,6 +1,10 @@
 ---
 - include_tasks: utils/once/flag.yml
 
+- name: "🧭 Remember the stack host address that serves the public vhosts to swarm peers"
+  ansible.builtin.set_fact:
+    openpost_stack_address: "{{ hostvars[STACK_HOST].ansible_facts.default_ipv4.address if DEPLOYMENT_MODE == 'swarm' else '' }}"
+
 - name: "🔗 Pin OpenPost apps on the sibling Mastodon and Pixelfed instances"
   include_tasks: 01_fediverse_apps.yml
 
