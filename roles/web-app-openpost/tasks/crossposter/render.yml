@@ -29,7 +29,9 @@
     src: "{{ role_path }}/files/crossposter/"
     dest: "{{ OPENPOST_CROSSPOSTER_BUILD_CONTEXT }}/"
     mode: preserve
-  register: openpost_crossposter_context
+  notify:
+    - compose-build
+    - compose-up
 
 - name: "📄 Render the crossposter configuration and secrets"
   ansible.builtin.include_tasks:
