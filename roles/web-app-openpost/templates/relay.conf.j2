@@ -8,6 +8,7 @@ events {
 stream {
     log_format relay '$remote_addr sni=$ssl_preread_server_name upstream=$upstream_addr status=$status';
     access_log /dev/stdout relay;
+    map_hash_bucket_size 128;
 
     upstream shared_proxy {
         server {{ OPENPOST_RELAY_UPSTREAM_HOST }}:{{ OPENPOST_RELAY_UPSTREAM_PORT }};
