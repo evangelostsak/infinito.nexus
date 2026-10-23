@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import base64
 import http.client
+import ipaddress
 import json
 import os
 import secrets
@@ -40,18 +41,26 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+
+def public_url(url: str) -> str:
+    parts = urllib.parse.urlsplit(url)
+    if (parts.hostname or "").endswith(".onion") and parts.scheme == "https":
+        return urllib.parse.urlunsplit(("http", *parts[1:]))
+    return url
+
+
 BASE = os.environ["OPENPOST_LOCAL_URL"].rstrip("/") + "/api/v1"
 HEADERS = json.loads(base64.b64decode(os.environ["OPENPOST_API_HEADERS_B64"]))
 ADMIN_EMAIL = os.environ["OPENPOST_ADMIN_EMAIL"]
 ADMIN_PASSWORD = base64.b64decode(os.environ["OPENPOST_ADMIN_PASSWORD_B64"]).decode()
 RELAY_TARGETS = json.loads(os.environ["OPENPOST_RELAY_TARGETS"])
 DEADLINE = time.monotonic() + int(os.environ["OPENPOST_DEADLINE_SECONDS"])
-PUBLIC_URL = os.environ["OPENPOST_PUBLIC_URL"].rstrip("/")
+PUBLIC_URL = public_url(os.environ["OPENPOST_PUBLIC_URL"]).rstrip("/")
 SSO_ENABLED = os.environ["OPENPOST_SSO_ENABLED"] == "true"
 CONTAINER = os.environ["OPENPOST_CONTAINER"]
 SIMULATOR_PLATFORMS = json.loads(os.environ["OPENPOST_SIMULATOR_PLATFORMS"])
 UNCONFIGURED_PLATFORMS = json.loads(os.environ["OPENPOST_UNCONFIGURED_PLATFORMS"])
-S3_PUBLIC_URL = os.environ["OPENPOST_S3_PUBLIC_URL"]
+S3_PUBLIC_URL = public_url(os.environ["OPENPOST_S3_PUBLIC_URL"])
 SIMULATOR_ADMIN = "https://" + os.environ["OPENPOST_SIMULATOR_HOST"] + "/__admin"
 DB_CONTAINER = os.environ["OPENPOST_DB_CONTAINER"]
 DB_NAME = os.environ["OPENPOST_DB_NAME"]
@@ -80,18 +89,36 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-class _ProxyConnection(http.client.HTTPSConnection):
+def dial(host: str) -> str:
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        return PROXY_ADDRESS
+    return host
+
+
+class _ProxyConnection(http.client.HTTPConnection):
     def connect(self) -> None:
-        raw = socket.create_connection((PROXY_ADDRESS, self.port), self.timeout)
+        self.sock = socket.create_connection((dial(self.host), self.port), self.timeout)
+
+
+class _ProxyTlsConnection(http.client.HTTPSConnection):
+    def connect(self) -> None:
+        raw = socket.create_connection((dial(self.host), self.port), self.timeout)
         self.sock = self._context.wrap_socket(raw, server_hostname=self.host)
 
 
-class _ProxyHandler(urllib.request.HTTPSHandler):
+class _ProxyHandler(urllib.request.HTTPHandler):
+    def http_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
+        return self.do_open(_ProxyConnection, req)
+
+
+class _ProxyTlsHandler(urllib.request.HTTPSHandler):
     def https_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
-        return self.do_open(_ProxyConnection, req, context=self._context)
+        return self.do_open(_ProxyTlsConnection, req, context=self._context)
 
 
-PROXY_HANDLERS = [_ProxyHandler()] if PROXY_ADDRESS else []
+PROXY_HANDLERS = [_ProxyHandler(), _ProxyTlsHandler()] if PROXY_ADDRESS else []
 OPENER = urllib.request.build_opener(_NoRedirect, *PROXY_HANDLERS)
 urllib.request.install_opener(urllib.request.build_opener(*PROXY_HANDLERS))
 
