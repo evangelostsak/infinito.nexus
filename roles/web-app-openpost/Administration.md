@@ -34,7 +34,8 @@ The role configures OpenPost's instance-wide OIDC provider against the shared Ke
 
 The deploy bootstraps the local account `web-app-openpost-breakglass` (username `openpost-breakglass`, password generated into the inventory) as the first OpenPost account, which makes it the instance admin.
 Use it when Keycloak is unavailable: open `https://publish.<DOMAIN_PRIMARY>/` and sign in with the e-mail address and password from the inventory.
-If the deploy reports that the break-glass account can neither sign in nor be registered, another account became the first instance admin or the password was changed in the UI; sign in with that account and reset the break-glass password, or restore the database from backup.
+When the inventory password changes, for example through credential rotation, the deploy writes its bcrypt hash into the existing account, so a password changed in the UI is reset on the next deploy as well.
+If the deploy reports that the break-glass account can neither sign in nor be registered, another account became the first instance admin; sign in with that account and repair the break-glass account, or restore the database from backup.
 
 ## Egress guard and relay
 
@@ -75,6 +76,16 @@ For Mastodon and Pixelfed the deploy registers an `OpenPost` app on every deploy
 OpenPost v7.22.9 can register apps on any other instance by itself, but its code exchange then checks provider readiness against the bare host name the dialog sends and refuses with `provider operation is not ready: needs_configuration`; an external instance therefore needs the same pinning through those two variables.
 Every callback URL has the form `https://publish.<DOMAIN_PRIMARY>/api/v1/accounts/<provider>/callback`.
 
+## Provider simulator
+
+Variant 0 of `meta/variants.yml` starts a WireMock `simulator` on the role network that answers for X, Facebook, Instagram, YouTube, LinkedIn and TikTok under their real API host names.
+The deploy signs a certificate for those names with a per-deploy test CA in the role's config directory, OpenPost trusts that CA through `SSL_CERT_DIR`, and the role renders `simulator-<provider>` credentials instead of the `API` entries for the simulated providers.
+The mappings live in `files/simulator/openpost.json`; a post whose text contains `[simulate-429]`, `[simulate-503]` or `[simulate-400]` gets that answer from the X endpoint once.
+OpenPost v7.22.9 retries a 429 by itself after the reset header, but treats a 503 to a write as an ambiguous delivery: the destination stays in "Manual review required", its retry is refused, and after confirming on the network that nothing was posted the post has to be published again to that destination.
+A destination that failed with a definite rejection can be retried on its own.
+TikTok renditions need `content_posting_method`, `privacy_level` and `music_usage_confirmed`, YouTube renditions need `privacy` and `category_id` and wait for the media analysis to finish, and LinkedIn Organization Pages stay off, so a LinkedIn account connects as the member's personal profile.
+The simulator never runs in production; leave the variant to CI and local tests.
+
 ## Networks
 
 | Network | Post types | Developer app and account | Scopes | Review or verification | Quota | Cost (October 2026) | Token upkeep |
@@ -106,6 +117,7 @@ Sources: the [OpenPost provider reference](https://github.com/getopenpost/openpo
 | LinkedIn requires vetting of the legal entity and re-authorisation every 60 days. | Plan the vetting before launch and schedule a re-authorisation reminder. |
 | YouTube projects in testing status lose refresh tokens after 7 days. | Move the Google OAuth client to production status and complete verification. |
 | Bluesky is also reachable without OpenPost through `web-app-bridgy-fed`. | Use the bridge for automatic federation and OpenPost for deliberate Bluesky-native posts. |
+| OpenPost connects PeerTube only through the OAuth password grant, and PeerTube accounts that sign in through Keycloak have no local password. | Connect a local PeerTube account: the `root` account, which a fresh `web-app-peertube` instance creates with the platform administrator's password, or one the PeerTube administrator creates for publishing. PeerTube then asks for the channel each video goes to. |
 | Sibling Fediverse instances are reachable only over TLS on port 443. | Keep TLS enabled for `web-app-mastodon`, `web-app-pixelfed` and `web-app-peertube`. |
 
 ## Data processing and dependencies
@@ -122,7 +134,7 @@ Sources: the [OpenPost provider reference](https://github.com/getopenpost/openpo
 
 - With `web-app-seaweedfs` deployed, browsers upload media directly to its public S3 vhost through presigned URLs, which is why `OPENPOST_S3_ENDPOINT` is the public endpoint and the CSP allows it in `connect-src`; OpenPost deduplicates identical files by content hash.
 - The platform backup covers the OpenPost database in the shared Postgres and the `openpost_media` volume; media in `web-app-seaweedfs` is covered by that role's backup.
-- A restore needs the database, the media and the inventory secrets, especially `encryption_key`; without it the stored provider tokens cannot be decrypted and every network has to be reconnected.
+- A restore needs the database, the media and the inventory secrets, especially `encryption_key`; without it the stored provider tokens cannot be decrypted and every network has to be reconnected. The key is pinned `rotatable: false` because OpenPost refuses to start once a stored row no longer decrypts; the other secrets rotate freely.
 - Changing the pinned version in `meta/services.yml` and redeploying runs OpenPost's own migrations, which take a Postgres advisory lock.
   Only the latest upstream release receives security fixes, so follow new release tags promptly.
 
@@ -141,9 +153,15 @@ Run these checks against real platforms after onboarding a network and after eve
 
 | Network | Content type | OpenPost version | Date | Result |
 |---|---|---|---|---|
-| Mastodon (local instance) | Text | v7.22.9 | pending | CI end-to-end test |
-| Pixelfed (local instance) | Image | v7.22.9 | pending | CI end-to-end test |
-| PeerTube (local instance) | Video | v7.22.9 | pending | CI end-to-end test |
+| Mastodon (local instance) | Text | v7.22.9 | 2026-10-22 | Published, CI end-to-end test |
+| Pixelfed (local instance) | Image | v7.22.9 | 2026-10-22 | Published, CI end-to-end test |
+| PeerTube (local instance) | Video | v7.22.9 | 2026-10-22 | Published to the `root` channel, CI end-to-end test |
+| X (simulator) | Text, scheduled text | v7.22.9 | 2026-10-22 | Published; 429 retried, 503 held for manual review, 400 failed |
+| Facebook Pages (simulator) | Text to two Pages | v7.22.9 | 2026-10-22 | Published |
+| Instagram (simulator) | JPEG image | v7.22.9 | 2026-10-22 | Published from a public media URL |
+| YouTube (simulator) | Video | v7.22.9 | 2026-10-22 | Published through a resumable upload |
+| LinkedIn (simulator) | Text | v7.22.9 | 2026-10-22 | Published |
+| TikTok (simulator) | Photo | v7.22.9 | 2026-10-22 | Published |
 | Facebook Pages | Text, image | v7.22.9 | not yet verified | Manual staging check |
 | Instagram | Image | v7.22.9 | not yet verified | Manual staging check |
 | X | Text | v7.22.9 | not yet verified | Manual staging check |
