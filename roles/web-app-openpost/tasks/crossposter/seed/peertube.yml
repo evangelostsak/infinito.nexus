@@ -9,7 +9,6 @@
   register: openpost_crossposter_peertube_clients
   delegate_to: "{{ STACK_HOST }}"
   run_once: true
-  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
 
 - name: "🔑 Log the administrator into each PeerTube source"
   uri_retry:
@@ -30,7 +29,6 @@
   changed_when: true
   delegate_to: "{{ STACK_HOST }}"
   run_once: true
-  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
 
 - name: "🧾 Keep the minted PeerTube tokens"
   ansible.builtin.set_fact:
@@ -40,4 +38,3 @@
       {%- set _ = _minted.update({_result.item.item.name: _result.json.access_token}) -%}
       {%- endfor -%}
       {{ _minted }}
-  no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
