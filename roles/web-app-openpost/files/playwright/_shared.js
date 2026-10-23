@@ -488,6 +488,7 @@ module.exports = {
   connectMastodonAccount,
   connectPixelfedAccount,
   apiSession,
+  apiRequest,
   apiAccount,
   apiPublishImage,
   disconnectAccount,
