@@ -50,6 +50,7 @@ flowchart LR
         svc_openpost["openpost"]
         svc_relay["relay"]
         svc_simulator["simulator ❌"]
+        svc_crossposter["crossposter"]
         svc_tor["tor"]
         svc_container_backup["container_backup"]
     end
