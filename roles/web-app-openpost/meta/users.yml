@@ -5,5 +5,4 @@ web-app-openpost-breakglass:
   password:
     algorithm: alphanumeric
   accounts: []
-  forward: administrator
-  description: OpenPost local break-glass instance admin; not provisioned to IAM, mail forwards to the administrator mailbox
+  description: OpenPost local break-glass instance admin; not provisioned to IAM, its mail goes to a plus-address of the administrator mailbox
