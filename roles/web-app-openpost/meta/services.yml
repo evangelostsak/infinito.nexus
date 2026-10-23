@@ -152,6 +152,33 @@ simulator:
     - tiktok
     - linkedin
 
+# nocheck: dynamic-flag  a sidecar of this role switched on per inventory with its routes; no other role's presence decides it
+crossposter:
+  enabled: false
+  shared: false
+  custom: true
+  modes:
+    compose:
+      enabled: true
+    swarm:
+      enabled: true
+  image: python
+  version: 3.13.7-slim
+  name: openpost-crossposter
+  cpus: "0.25"
+  mem_reservation: 64m
+  mem_limit: 256m
+  pids_limit: 64
+  poll_interval_seconds: 60
+  opt_out_tag: nocrosspost
+  retry:
+    max_attempts: 8
+    base_seconds: 30
+    cap_seconds: 3600
+  notify:
+    recipients: []
+  routes: []
+
 # nocheck: playwright-service-flag
 # nocheck: variants-coverage — sso-variant-tor requires the onion on in every variant, so the false polarity has no variant left to live in
 tor:
