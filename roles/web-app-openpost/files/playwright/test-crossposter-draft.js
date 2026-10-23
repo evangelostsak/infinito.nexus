@@ -13,7 +13,7 @@ async function routeReviewToMastodon(page, shared, headers) {
   expect(reviewSet, `the deploy must create the "${REVIEW_SET}" social set`).toBeTruthy();
   await shared.apiRequest(page, headers, "PUT", `/social-sets/${reviewSet.id}`, {
     name: reviewSet.name,
-    workspace_id: target.workspace,
+    is_default: Boolean(reviewSet.is_default),
     accounts: [{ social_account_id: target.account, default_settings: {} }],
   });
   return target.workspace;
