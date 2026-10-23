@@ -10,7 +10,7 @@ import imaplib
 import os
 import ssl
 
-from openpost_api import MAIL_RECIPIENT
+from openpost.api import MAIL_RECIPIENT
 
 MAIL_HOST = os.environ["OPENPOST_MAIL_HOST"]
 MAIL_PASSWORD = base64.b64decode(os.environ["OPENPOST_MAIL_PASSWORD_B64"]).decode()
