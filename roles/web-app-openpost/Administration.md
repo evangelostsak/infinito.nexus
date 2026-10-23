@@ -211,6 +211,7 @@ A dead-lettered item stays in that state; publish the post again from the OpenPo
 | TikTok's content sharing guidelines reject in-house upload tools as a use case for the Content Posting API. | Publish to TikTok manually, or apply with a use case TikTok accepts; keep TikTok credentials empty until then. |
 | X charges $0.20 instead of $0.015 for a post that contains a URL. | Write the X rendition without links, or accept the surcharge per post. |
 | X forbids identical content across accounts of the same owner. | Give each X account its own rendition. |
+| On an onion-only deployment OpenPost marks uploaded media as unreachable for providers, because X, Meta, LinkedIn, YouTube and TikTok cannot fetch from a `.onion` origin. | Serve media from object storage with a clearnet public URL, or publish text-only posts to commercial networks. |
 | OpenPost's X budget guardrail (`OPENPOST_X_MONTHLY_BUDGET_MICROUSD`) applies only in its cloud edition. | Cap X spending through the prepaid credits of the X developer account. |
 | Instagram accepts JPEG only and fetches media from a public URL. | Deploy `web-app-seaweedfs` so media gets public HTTPS URLs; convert other image formats before upload. |
 | Facebook, Instagram, Threads and TikTok fetch media from public HTTPS URLs. | Same as above; without `web-app-seaweedfs` media is served under `/media/` of the public OpenPost domain, which also works when that domain is reachable from the internet. |
