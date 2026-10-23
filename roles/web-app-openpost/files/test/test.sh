@@ -3,7 +3,7 @@
 # Env (rendered into test.env from templates/test.env.j2):
 #   OPENPOST_CONTAINER   resolved OpenPost container (CLI_LOCAL_CID)
 #   OPENPOST_RELAY_PORT  port the relay listens on inside the role network
-#   every OPENPOST_* variable probe.py documents
+#   every OPENPOST_* variable openpost_api.py documents
 
 set -uo pipefail
 
@@ -14,7 +14,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 	exit 2
 }
 
-python3 -I "${here}/probe.py"
+python3 -E -s "${here}/probe.py"
 rc=$?
 
 # nocheck: container-exec-resolver, shell-download-retry  address resolved by the caller; a single attempt is the point of a refusal probe
