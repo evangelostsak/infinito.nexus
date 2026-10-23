@@ -40,7 +40,7 @@ crossposter_config:
   mounts:
     - service: crossposter
       target: /config/crossposter.json
-      when: "{{ (lookup('config', 'web-app-openpost', 'services.crossposter.enabled') | bool) and (lookup('config', 'web-app-openpost', 'services.crossposter.routes') | length) > 0 }}"
+      when: "{{ lookup('config', 'web-app-openpost', 'services.crossposter.enabled') | bool }}"
 
 crossposter_secrets:
   type: secret
@@ -49,7 +49,9 @@ crossposter_secrets:
   mounts:
     - service: crossposter
       target: /run/secrets/crossposter.json
-      when: "{{ (lookup('config', 'web-app-openpost', 'services.crossposter.enabled') | bool) and (lookup('config', 'web-app-openpost', 'services.crossposter.routes') | length) > 0 }}"
+      uid: "{{ lookup('config', 'web-app-openpost', 'services.crossposter.uid') }}"
+      gid: "{{ lookup('config', 'web-app-openpost', 'services.crossposter.uid') }}"
+      when: "{{ lookup('config', 'web-app-openpost', 'services.crossposter.enabled') | bool }}"
 
 relay_conf:
   type: config
