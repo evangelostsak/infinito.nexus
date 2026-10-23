@@ -287,7 +287,7 @@ async function connectMastodonAccount(page, context, label) {
   return account;
 }
 
-async function publishNow(page, account, text, label) {
+async function publishNow(page, account, text) {
   await page.getByRole("link", { name: /^new post$/i }).click();
   await page.getByRole("textbox", { name: /post text/i }).first().fill(text);
   await page.getByRole("main").getByRole("button", { name: /^more$/i }).click();
