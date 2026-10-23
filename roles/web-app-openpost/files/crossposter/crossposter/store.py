@@ -124,7 +124,11 @@ class Store:
             )
 
     def rows(self, where: str, parameters: tuple) -> list[dict]:
-        query = f"SELECT {COLUMNS} FROM crossposter.items WHERE {where} ORDER BY id"  # noqa: S608 fixed clauses from this module
+        from psycopg import sql
+
+        query = sql.SQL("SELECT {} FROM crossposter.items WHERE {} ORDER BY id").format(
+            sql.SQL(COLUMNS), sql.SQL(where)
+        )
         return list(self.connection.execute(query, parameters).fetchall())
 
     def due(self) -> list[dict]:
