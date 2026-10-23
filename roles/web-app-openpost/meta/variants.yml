@@ -4,7 +4,6 @@
     container_backup:
       enabled: true
     crossposter:
-      enabled: true # nocheck: variants-static-override  CI crossposter routes the Mastodon round exercises
       poll_interval_seconds: 15
       retry:
         max_attempts: 3
@@ -95,7 +94,6 @@
       enabled: false
       shared: false # nocheck: variants-static-override backup shared stays literally true
     crossposter:
-      enabled: true # nocheck: variants-static-override  CI crossposter routes the Pixelfed and PeerTube round exercises
       poll_interval_seconds: 15
       retry:
         max_attempts: 3
