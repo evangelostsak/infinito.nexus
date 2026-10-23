@@ -247,12 +247,21 @@ def check_media(token: str, workspace: str) -> None:
             or [{}]
         )[0]
         time.sleep(0 if attached.get("public_url_checked_at") else 3)
-    check(
-        "OpenPost reaches the public URL of uploaded media without a session",
-        attached.get("public_url_ready") is True
-        and attached.get("public_url_status") == 200,
-        attached,
-    )
+    origin = urllib.parse.urlparse(S3_PUBLIC_URL or PUBLIC_URL).hostname or ""
+    if origin.endswith(".onion"):
+        check(
+            "OpenPost flags media on an onion origin as unreachable for providers",
+            attached.get("public_url_ready") is False
+            and "OPENPOST_MEDIA_URL" in str(attached.get("public_url_error")),
+            attached,
+        )
+    else:
+        check(
+            "OpenPost reaches the public URL of uploaded media without a session",
+            attached.get("public_url_ready") is True
+            and attached.get("public_url_status") == 200,
+            attached,
+        )
     if S3_PUBLIC_URL:
         check(
             f"uploaded media lands in S3 and is fetchable anonymously under {S3_PUBLIC_URL}",
