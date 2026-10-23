@@ -48,7 +48,8 @@ The role therefore runs an `nginx` stream relay next to OpenPost:
 
 - The role network uses `192.88.99.0/24`, the deprecated 6to4 relay anycast block (RFC 7526), which `netguard` accepts as a global unicast range and which never leaves the Docker host.
   `group_vars/all/08_networks.yml` lists the role in `NETWORK_ROLE_SUBNET_EXCEPTION_ROLES` for that reason.
-- The relay carries the canonical domains of the deployed Mastodon, Pixelfed and PeerTube roles as network aliases, so OpenPost resolves those names to the relay.
+- The relay carries the canonical domains of the deployed Mastodon, Pixelfed and PeerTube roles, and the public domain of the object store, as network aliases, so OpenPost resolves those names to the relay.
+  OpenPost writes media to the object store's public endpoint because browsers upload through the same presigned URLs; the alias keeps those writes on the shared proxy even where that public name only resolves through Tor.
 - The relay reads the SNI of each TLS connection, forwards a mapped name unchanged to the shared OpenResty proxy and closes every other connection.
   It forwards to `host.docker.internal`, which points at the Docker host in compose and at the stack host in swarm.
 - TLS stays end to end between OpenPost and OpenResty; in self-signed mode OpenPost trusts the platform CA through the compose CA injection.
