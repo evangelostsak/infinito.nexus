@@ -58,6 +58,7 @@
     body_format: json
     body:
       code: "{{ (openpost_crossposter_mastodon_grant.stdout_lines | select('match', 'CROSSPOSTER_GRANT=') | first) | replace('CROSSPOSTER_GRANT=', '') | trim }}"
+      instance_url: ""
       server_name: "{{ openpost_crossposter_mastodon_server }}"
       workspace_id: "{{ openpost_crossposter_target_workspace }}"
     status_code: [200, 201]
