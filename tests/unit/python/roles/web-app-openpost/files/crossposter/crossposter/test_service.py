@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -18,7 +19,7 @@ from crossposter.config import (
 )
 from crossposter.notify import Mail
 from crossposter.openpost import Destination
-from crossposter.sources import SourceItem
+from crossposter.sources import Media, SourceItem
 
 DESTINATIONS = [
     Destination("acc-x", "x-press", "x", {}),
@@ -68,10 +69,22 @@ class TestMediaCredentials(unittest.TestCase):
         )
 
 
+def picture(number: int, url: str) -> SourceItem:
+    return replace(post(number), media=(Media(url, "image/jpeg", "", 0),))
+
+
 class FakeSource:
     def __init__(self, items: list[SourceItem]) -> None:
         self.items = items
         self.headers: dict[str, str] = {}
+        self.fresh_url = ""
+
+    def refresh(self, item: SourceItem) -> SourceItem:
+        if not self.fresh_url:
+            return item
+        return replace(
+            item, media=tuple(replace(m, url=self.fresh_url) for m in item.media)
+        )
 
     def newest_cursor(self) -> str:
         return "100"
@@ -158,6 +171,7 @@ class FakeStore:
         row.update(
             state="pending",
             resends=row["resends"] + 1,
+            publication_id="",
             attempts=attempts,
             last_error=error,
             delay=delay_seconds,
@@ -187,6 +201,7 @@ class FakeOpenPost:
         self.metadata: list[dict] = []
         self.published: list[str] = []
         self.failure: web.RequestError | None = None
+        self.publish_failure: web.RequestError | None = None
         self.outcome: list[dict] = []
 
     def destinations(self, targets: Targets) -> list[Destination]:
@@ -199,7 +214,15 @@ class FakeOpenPost:
         self.metadata.append(metadata)
         return {"id": f"pub-{len(self.created)}", "revision": 1, "status": "draft"}
 
+    def publication(self, publication_id: str) -> dict:
+        return {"id": publication_id, "revision": 1, "status": "draft"}
+
+    def upload(self, source: Path, filename: str, mime: str) -> str:
+        return f"media-{filename}"
+
     def publish_now(self, publication: dict) -> None:
+        if self.publish_failure:
+            raise self.publish_failure
         self.published.append(publication["id"])
 
     def renditions(self, publication_id: str) -> list[dict]:
@@ -315,6 +338,55 @@ class TestDelivery(ServiceFixture, unittest.TestCase):
         runner.deliver_due()
         self.assertEqual({row["state"] for row in database.items}, {"dead_lettered"})
         self.assertIn("HTTP 503", database.items[0]["last_error"])
+
+    def test_a_retry_after_creation_reuses_the_publication(self) -> None:
+        runner, database, client = self.queued("auto")
+        client.publish_failure = web.RequestError(
+            "https://openpost/api/v1/publications/pub-1/publish-now", 503, {}, "busy"
+        )
+        runner.deliver_due()
+        self.assertEqual(
+            [row["publication_id"] for row in database.items], ["pub-1", "pub-2"]
+        )
+        client.publish_failure = None
+        runner.deliver_due()
+        self.assertEqual({row["state"] for row in database.items}, {"submitted"})
+        self.assertEqual(len(client.created), 2)
+        self.assertEqual(client.published, ["pub-1", "pub-2"])
+
+    def test_media_is_fetched_from_the_refreshed_source_post(self) -> None:
+        runner, database, _ = self.build(
+            "review", [picture(101, "https://microblog.example/m/original.jpg")]
+        )
+        database.cursors["press"] = "100"
+        runner.detect(runner.routes["press"])
+        runner.sources["press"].fresh_url = "https://microblog.example/m/optimised.jpg"
+        fetched: list[str] = []
+
+        def download(url: str, headers: dict, target: Path) -> Path:
+            fetched.append(url)
+            target.write_bytes(b"\xff\xd8 image")
+            return target
+
+        with patch.object(service.web, "download", download):
+            runner.deliver_due()
+        self.assertEqual(set(fetched), {"https://microblog.example/m/optimised.jpg"})
+        self.assertEqual({row["state"] for row in database.items}, {"drafted"})
+
+    def test_source_media_that_is_not_ready_is_retried(self) -> None:
+        runner, database, _ = self.build(
+            "review", [picture(101, "https://microblog.example/m/original.jpg")]
+        )
+        database.cursors["press"] = "100"
+        runner.detect(runner.routes["press"])
+
+        def download(url: str, headers: dict, target: Path) -> Path:
+            raise web.RequestError(url, 403, {}, "no-preview")
+
+        with patch.object(service.web, "download", download):
+            runner.deliver_due()
+        self.assertEqual({row["state"] for row in database.items}, {"pending"})
+        self.assertIn("not available yet", database.items[0]["last_error"])
 
     def test_permanent_errors_dead_letter_at_once(self) -> None:
         runner, database, client = self.queued("auto")
