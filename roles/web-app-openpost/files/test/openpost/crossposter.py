@@ -43,6 +43,7 @@ MEMBERS = {
     ("peertube", "auto"): ("youtube",),
 }
 SETTINGS = {label: settings for label, _, _, _, settings in SCENARIOS if settings}
+FORMATS = {"youtube": "youtube.video", "tiktok": "tiktok.photo"}
 SQL = (
     "import json, sys, psycopg\n"
     "from crossposter import config\n"
@@ -130,6 +131,11 @@ def fill_sets(token: str, workspace: str) -> None:
             {
                 "social_account_id": connected[platform][0],
                 "default_settings": SETTINGS.get(platform, {}),
+                **(
+                    {"default_output_profile": FORMATS[platform]}
+                    if platform in SETTINGS
+                    else {}
+                ),
             }
             for platform in MEMBERS[(route["platform"], route["mode"])]
             if connected.get(platform)
