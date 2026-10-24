@@ -169,7 +169,7 @@ openpost:
     internal:
       http: 8080
     local:
-      http: 8098
+      http: 8100
   lifecycle: alpha
 relay:
   image: nginx
