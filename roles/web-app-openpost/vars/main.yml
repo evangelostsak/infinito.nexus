@@ -60,6 +60,7 @@ OPENPOST_PINNED_INSTANCES: >-
 OPENPOST_FEDIVERSE_APPS_HOST: "{{ [lookup('container', application_id, 'directories.config'), 'fediverse-apps.json'] | path_join }}"
 OPENPOST_RELAY_UPSTREAM_HOST: "host.docker.internal"
 OPENPOST_RELAY_UPSTREAM_PORT: "{{ lookup('config', 'svc-prx-openresty', 'services.openresty.ports.public.https') }}"
+OPENPOST_RELAY_UPSTREAM_HTTP_PORT: "{{ lookup('config', 'svc-prx-openresty', 'services.openresty.ports.public.http') }}"
 
 OPENPOST_SIMULATOR_ENABLED: "{{ lookup('config', application_id, 'services.simulator.enabled') | bool }}"
 OPENPOST_SIMULATOR_NAME: "{{ lookup('config', application_id, 'services.simulator.name') }}"
