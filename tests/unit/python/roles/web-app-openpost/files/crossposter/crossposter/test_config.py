@@ -127,6 +127,12 @@ class TestParse(ConfigFixture, unittest.TestCase):
         )
         self.assertIn("source.base_url", message)
 
+    def test_an_onion_source_may_use_plain_http(self) -> None:
+        raw = copy.deepcopy(self.raw)
+        onion = "http://microblog." + "a" * 56 + ".onion"
+        raw["routes"][0]["source"]["base_url"] = onion
+        self.assertEqual(config.parse(raw).routes[0].source.base_url, onion)
+
     def test_route_names_are_unique(self) -> None:
         raw = copy.deepcopy(self.raw)
         raw["routes"].append(copy.deepcopy(raw["routes"][0]))
