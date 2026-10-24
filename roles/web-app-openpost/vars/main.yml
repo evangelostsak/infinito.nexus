@@ -59,6 +59,7 @@ OPENPOST_PINNED_INSTANCES: >-
   {%- endif -%}
   {%- endfor -%}
   {{ _instances }}
+OPENPOST_PINNED_PIXELFED: "{{ OPENPOST_PINNED_INSTANCES | selectattr('platform', 'equalto', 'pixelfed') | list }}"
 OPENPOST_FEDIVERSE_APPS_HOST: "{{ [lookup('container', application_id, 'directories.config'), 'fediverse-apps.json'] | path_join }}"
 OPENPOST_RELAY_UPSTREAM_HOST: "host.docker.internal"
 OPENPOST_RELAY_UPSTREAM_PORT: "{{ lookup('config', 'svc-prx-openresty', 'services.openresty.ports.public.https') }}"
@@ -118,5 +119,5 @@ OPENPOST_CROSSPOSTER_SEED_PROBES:
   mastodon: /api/v1/accounts/verify_credentials
   pixelfed: /api/v1/accounts/verify_credentials
   peertube: /api/v1/users/me
-OPENPOST_SEED_PIXELFED_USER: "33"
+OPENPOST_PIXELFED_PHP_USER: "33"
 OPENPOST_SEED_PEERTUBE_USERNAME: "root"
