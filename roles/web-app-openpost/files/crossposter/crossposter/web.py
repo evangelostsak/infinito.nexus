@@ -46,11 +46,11 @@ class RequestError(RuntimeError):
 def _outgoing(
     url: str, method: str, headers: dict[str, str], body: bytes | IO[bytes] | None
 ) -> urllib.request.Request:
-    return urllib.request.Request(url, data=body, method=method, headers=headers)  # noqa: S310 validated https routes and OpenPost
+    return urllib.request.Request(url, data=body, method=method, headers=headers)  # noqa: S310 validated route and OpenPost URLs
 
 
 def _open(outgoing: urllib.request.Request, timeout: float) -> HTTPResponse:
-    return urllib.request.urlopen(outgoing, timeout=timeout)  # noqa: S310 validated https routes and OpenPost
+    return urllib.request.urlopen(outgoing, timeout=timeout)  # noqa: S310 validated route and OpenPost URLs
 
 
 def _exchange(
