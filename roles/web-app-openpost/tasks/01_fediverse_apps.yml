@@ -48,6 +48,10 @@
       {{ _apps }}
   no_log: "{{ MASK_CREDENTIALS_IN_LOGS | bool }}"
 
+- name: "👤 Give OpenPost's Pixelfed app an owner"
+  ansible.builtin.include_tasks: fediverse/pixelfed_owner.yml
+  when: OPENPOST_PINNED_PIXELFED | length > 0
+
 - name: "📁 Ensure the directory for the registered apps exists"
   ansible.builtin.file:
     path: "{{ OPENPOST_FEDIVERSE_APPS_HOST | dirname }}"
