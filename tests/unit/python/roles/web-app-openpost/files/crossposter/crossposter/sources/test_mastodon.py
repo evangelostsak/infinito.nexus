@@ -106,3 +106,23 @@ class TestPolling(unittest.TestCase):
             ).fetch("0")
         self.assertEqual(len(items), 45)
         self.assertEqual(fake.queries[1]["min_id"], "239")
+
+    def test_refresh_rereads_the_status_with_its_current_media(self) -> None:
+        stale = mastodon.parse_status(fixture("mastodon/statuses.json")[1], "mastodon")
+        current = dict(fixture("mastodon/statuses.json")[1])
+        current["media_attachments"] = [
+            dict(current["media_attachments"][0], url="https://m/optimised.png")
+        ]
+        asked: list[str] = []
+
+        def get_json(url: str, headers: dict[str, str]) -> object:
+            asked.append(urllib.parse.urlparse(url).path)
+            return current
+
+        with patch.object(mastodon.web, "get_json", get_json):
+            fresh = mastodon.MastodonSource(
+                "https://microblog.example", "press", "token"
+            ).refresh(stale)
+        self.assertEqual(asked, [f"/api/v1/statuses/{stale.cursor}"])
+        self.assertEqual(fresh.media[0].url, "https://m/optimised.png")
+        self.assertEqual(fresh.cursor, stale.cursor)
