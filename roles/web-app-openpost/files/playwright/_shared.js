@@ -1,4 +1,4 @@
-const { expect } = require("@playwright/test");
+const { test, expect } = require("@playwright/test");
 const { resolveTimeout } = require("./timeouts");
 
 const { decodeDotenvQuotedValue, normalizeBaseUrl, performKeycloakLoginForm, gotoOnion } = require("./personas");
@@ -219,6 +219,13 @@ async function openMastodonConnectDialog(page, label) {
 
 function mastodonChannelActions(page, account) {
   return page.getByRole("button", { name: new RegExp(`^actions for ${account.handle} · mastodon$`, "i") });
+}
+
+function skipOnOnionSibling(platform) {
+  test.skip(
+    env[`${platform}BaseUrl`].includes(".onion"),
+    `OpenPost cannot connect an onion ${platform} instance: its Go resolver refuses .onion names`,
+  );
 }
 
 async function disconnectAccount(page, account) {
@@ -504,4 +511,5 @@ module.exports = {
   logout,
   beforeEach,
   skipUnlessServiceEnabled,
+  skipOnOnionSibling,
 };
