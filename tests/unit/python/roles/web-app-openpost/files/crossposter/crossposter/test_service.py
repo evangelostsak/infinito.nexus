@@ -43,6 +43,31 @@ def post(number: int, tags: tuple[str, ...] = ()) -> SourceItem:
     )
 
 
+SOURCE_TOKEN = {"Authorization": "Bearer source-token"}
+
+
+class TestMediaCredentials(unittest.TestCase):
+    def test_media_on_the_source_origin_gets_the_source_token(self) -> None:
+        self.assertEqual(
+            service.credentials_for(
+                "https://microblog.example",
+                "https://microblog.example/system/media/1.png",
+                SOURCE_TOKEN,
+            ),
+            SOURCE_TOKEN,
+        )
+
+    def test_media_in_an_object_store_never_sees_the_source_token(self) -> None:
+        self.assertEqual(
+            service.credentials_for(
+                "https://microblog.example",
+                "https://s3.example/mastodon/media/1.png",
+                SOURCE_TOKEN,
+            ),
+            {},
+        )
+
+
 class FakeSource:
     def __init__(self, items: list[SourceItem]) -> None:
         self.items = items
