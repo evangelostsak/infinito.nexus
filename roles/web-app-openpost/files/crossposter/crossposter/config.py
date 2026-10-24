@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -153,11 +154,13 @@ def _route(raw: dict, tokens: dict) -> Route:
         f"{platform!r} is not one of {sorted(PLATFORMS)}",
     )
     base_url = str(source.get("base_url") or "").rstrip("/")
+    parts = urllib.parse.urlsplit(base_url)
     _require(
-        base_url.startswith("https://"),
+        parts.scheme == "https"
+        or (parts.scheme == "http" and (parts.hostname or "").endswith(".onion")),
         name,
         "source.base_url",
-        "must be an https:// URL",
+        "must be an https:// URL, or http:// for an onion service",
     )
     account = str(source.get("account") or "")
     _require(bool(account), name, "source.account", "names no account")
