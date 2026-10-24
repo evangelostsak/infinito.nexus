@@ -51,7 +51,9 @@
 
 - name: "🐘 Connect the CI Mastodon account as a target"
   ansible.builtin.include_tasks: crossposter/seed/target.yml
-  when: OPENPOST_CROSSPOSTER_ROUTES | selectattr('source.platform', 'equalto', 'mastodon') | list | length > 0
+  when:
+    - OPENPOST_CROSSPOSTER_ROUTES | selectattr('source.platform', 'equalto', 'mastodon') | list | length > 0
+    - OPENPOST_PINNED_INSTANCES | selectattr('platform', 'equalto', 'mastodon') | list | length > 0
 
 - name: "📚 List the social sets of the organisation workspace"
   uri_retry:
