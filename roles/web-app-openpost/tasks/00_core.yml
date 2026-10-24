@@ -1,9 +1,26 @@
 ---
 - include_tasks: utils/once/flag.yml
 
-- name: "🧭 Remember the stack host address that serves the public vhosts to swarm peers"
+- name: "🧭 Remember the public view of this deploy for the CLI probe"
   ansible.builtin.set_fact:
-    openpost_stack_address: "{{ hostvars[STACK_HOST].ansible_facts.default_ipv4.address if DEPLOYMENT_MODE == 'swarm' else '' }}"
+    openpost_public_view:
+      proxy_address: "{{ hostvars[STACK_HOST].ansible_facts.default_ipv4.address if DEPLOYMENT_MODE == 'swarm' else '' }}"
+      public_url: "{{ OPENPOST_URL }}"
+      api_headers: "{{ OPENPOST_API_HEADERS }}"
+      s3_public_url: "{{ lookup('objstore', application_id, 'public_url') | regex_replace('/?$', '/') if OPENPOST_OBJSTORE_ENABLED | bool else '' }}"
+      mail_host: "{{ lookup('email', application_id).host if OPENPOST_EMAIL_ENABLED | bool else '' }}"
+      relay_targets: >-
+        {%- set _targets = {} -%}
+        {%- for _key, _role in OPENPOST_RELAY_SIBLINGS.items() if lookup('config', application_id, 'services.' ~ _key ~ '.enabled') | bool -%}
+        {%- set _ = _targets.update({_key: lookup('domain', _role)}) -%}
+        {%- endfor -%}
+        {{ _targets }}
+      routes: >-
+        {%- set _routes = [] -%}
+        {%- for _route in OPENPOST_CROSSPOSTER_ROUTES -%}
+        {%- set _ = _routes.append({'name': _route.name, 'platform': _route.source.platform, 'base_url': _route.source.base_url, 'account': _route.source.account, 'mode': _route.mode, 'tags': _route.filters.tags, 'social_set': _route.targets.social_set | default('', true)}) -%}
+        {%- endfor -%}
+        {{ _routes }}
 
 - name: "🔗 Pin OpenPost apps on the sibling Mastodon and Pixelfed instances"
   include_tasks: 01_fediverse_apps.yml
