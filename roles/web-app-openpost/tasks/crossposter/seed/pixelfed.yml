@@ -13,7 +13,7 @@
       - container
       - exec
       - -u
-      - "{{ OPENPOST_SEED_PIXELFED_USER }}"
+      - "{{ OPENPOST_PIXELFED_PHP_USER }}"
       - -e
       - "CROSSPOSTER_ACCOUNT={{ item.source.account }}"
       - "{{ OPENPOST_SEED_PIXELFED_LOCAL_CID }}" # nocheck: container-exec-resolver  OPENPOST_SEED_PIXELFED_LOCAL_CID resolved at delegate_to runtime
