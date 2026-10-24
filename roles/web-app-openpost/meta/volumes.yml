@@ -30,8 +30,17 @@ simulator_ca:
   mode: "0444"
   mounts:
     - service: openpost
-      target: /etc/ssl/openpost-simulator/ca.crt
+      target: /etc/ssl/openpost-trust/simulator-ca.crt
       when: "{{ lookup('config', 'web-app-openpost', 'services.simulator.enabled') | bool }}"
+
+root_ca:
+  type: config
+  source: "{{ CA_TRUST.cert_host }}"
+  mode: "0444"
+  mounts:
+    - service: openpost
+      target: /etc/ssl/openpost-trust/root-ca.crt
+      when: "{{ (lookup('objstore', 'web-app-openpost', 'enabled') | bool) and TLS_MODE == 'self_signed' }}"
 
 crossposter_config:
   type: config
