@@ -160,3 +160,42 @@ class TestRequests(unittest.TestCase):
         self.assertTrue(
             fake.calls[-1][1].endswith("/media/upload-session/media-1/complete")
         )
+
+
+class TestPublicMedia(unittest.TestCase):
+    def answers(self, states: list[list[dict]]) -> list[str]:
+        asked: list[str] = []
+
+        def request(method, url, headers, body, accepted) -> web.Response:
+            asked.append(url)
+            media = states[min(len(asked), len(states)) - 1]
+            return web.Response(200, {}, json.dumps({"media": media}).encode())
+
+        self.request = request
+        return asked
+
+    def test_publishing_waits_until_every_medium_is_public(self) -> None:
+        asked = self.answers(
+            [
+                [{"public_url_checked_at": None}],
+                [{"public_url_checked_at": "now", "public_url_ready": False}],
+                [{"public_url_checked_at": "now", "public_url_ready": True}],
+            ]
+        )
+        with (
+            patch.object(openpost.web, "request", self.request),
+            patch.object(openpost.time, "sleep", lambda seconds: None),
+        ):
+            client().await_public_media("pub-1")
+        self.assertEqual(len(asked), 3)
+        self.assertTrue(asked[0].endswith("/publications/pub-1"))
+
+    def test_media_that_never_turns_public_is_a_transient_error(self) -> None:
+        self.answers([[{"public_url_checked_at": "now", "public_url_ready": False}]])
+        with (
+            patch.object(openpost.web, "request", self.request),
+            patch.object(openpost.time, "sleep", lambda seconds: None),
+            self.assertRaises(web.RequestError) as raised,
+        ):
+            client().await_public_media("pub-1")
+        self.assertTrue(raised.exception.transient)
