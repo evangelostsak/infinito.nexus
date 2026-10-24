@@ -55,12 +55,12 @@ ADMIN_EMAIL = os.environ["OPENPOST_ADMIN_EMAIL"]
 ADMIN_PASSWORD = base64.b64decode(os.environ["OPENPOST_ADMIN_PASSWORD_B64"]).decode()
 RELAY_TARGETS = json.loads(os.environ["OPENPOST_RELAY_TARGETS"])
 DEADLINE = time.monotonic() + int(os.environ["OPENPOST_DEADLINE_SECONDS"])
-PUBLIC_URL = public_url(os.environ["OPENPOST_PUBLIC_URL"]).rstrip("/")
+PUBLIC_URL = os.environ["OPENPOST_PUBLIC_URL"].rstrip("/")
 SSO_ENABLED = os.environ["OPENPOST_SSO_ENABLED"] == "true"
 CONTAINER = os.environ["OPENPOST_CONTAINER"]
 SIMULATOR_PLATFORMS = json.loads(os.environ["OPENPOST_SIMULATOR_PLATFORMS"])
 UNCONFIGURED_PLATFORMS = json.loads(os.environ["OPENPOST_UNCONFIGURED_PLATFORMS"])
-S3_PUBLIC_URL = public_url(os.environ["OPENPOST_S3_PUBLIC_URL"])
+S3_PUBLIC_URL = os.environ["OPENPOST_S3_PUBLIC_URL"]
 SIMULATOR_ADMIN = "https://" + os.environ["OPENPOST_SIMULATOR_HOST"] + "/__admin"
 DB_CONTAINER = os.environ["OPENPOST_DB_CONTAINER"]
 DB_NAME = os.environ["OPENPOST_DB_NAME"]
