@@ -36,6 +36,13 @@ def to_jpeg(source: Path) -> Path:
     return target
 
 
+def credentials_for(source_url: str, media_url: str, headers: dict) -> dict:
+    source = urllib.parse.urlsplit(source_url)
+    media = urllib.parse.urlsplit(media_url)
+    same_origin = (source.scheme, source.netloc) == (media.scheme, media.netloc)
+    return dict(headers) if same_origin else {}
+
+
 def failure(rendition: dict) -> str:
     delivery = rendition.get("delivery") or {}
     reason = (
@@ -145,14 +152,16 @@ class Service:
         self, route: Route, plan: adapt.Plan, folder: Path
     ) -> list[tuple[str, str]]:
         uploaded = []
-        headers = dict(self.sources[route.name].headers)
+        headers = self.sources[route.name].headers
         for index, attachment in enumerate(plan.media):
             name = (
                 Path(urllib.parse.urlparse(attachment.media.url).path).name
                 or f"media-{index}"
             )
             local = web.download(
-                attachment.media.url, headers, folder / f"{index}-{name}"
+                attachment.media.url,
+                credentials_for(route.source.base_url, attachment.media.url, headers),
+                folder / f"{index}-{name}",
             )
             mime = attachment.media.mime
             if attachment.jpeg and mime != "image/jpeg":
