@@ -53,6 +53,7 @@ exports.register = function (shared) {
   test("administrator: finds a crossposted draft in the desk, edits it and schedules it", async ({ page }) => {
     shared.skipUnlessServiceEnabled("crossposter");
     shared.skipUnlessServiceEnabled("mastodon");
+    shared.skipOnOnionSibling("mastodon");
     test.setTimeout(resolveTimeout(420_000)); // Mastodon sign-in, the crossposter's poll interval, composer autosave and scheduling
     const label = "administrator";
     const marker = `cp-desk-${Date.now()}`;
