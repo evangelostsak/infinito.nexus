@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from crossposter import adapt
 from crossposter.notify import Mail
 
 if TYPE_CHECKING:
@@ -60,7 +61,10 @@ class Route:
         return self.attribution.get(network, self.attribution["default"])
 
     def refusal(self, item: SourceItem, opt_out_tag: str) -> str | None:
-        tags = {tag.lower() for tag in item.tags}
+        tags = {
+            tag.lower().lstrip("#")
+            for tag in (*item.tags, *adapt.HASHTAG_RE.findall(item.text))
+        }
         if opt_out_tag.lower() in tags:
             return "opt-out"
         if item.application == LOOP_APPLICATION:
