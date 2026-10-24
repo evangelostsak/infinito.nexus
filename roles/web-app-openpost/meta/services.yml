@@ -112,6 +112,7 @@ relay:
   pids_limit: 64
   ports:
     internal:
+      http: 80
       https: 443
 # nocheck: playwright-service-flag  CI provider simulator, covered by the role's CLI test
 # nocheck: dynamic-flag  a test fixture switched on by one variant only; no other role's presence decides it
