@@ -84,6 +84,9 @@ class PeerTubeSource:
             web.get_json(f"{self.base_url}/api/v1/videos/{video['uuid']}", self.headers)
         )
 
+    def refresh(self, item: SourceItem) -> SourceItem:
+        return item
+
     def newest_cursor(self) -> str:
         page = self._page(0)
         return str(page[0].get("publishedAt") or "") if page else ""
