@@ -205,6 +205,23 @@ class TestRouting(ConfigFixture, unittest.TestCase):
         self.assertEqual(tagged.refusal(item(), "nocrosspost"), "tags")
         self.assertIsNone(tagged.refusal(item(tags=("Press",)), "nocrosspost"))
 
+    def test_hashtags_in_the_text_count_when_the_source_lists_no_tags(self) -> None:
+        raw = copy.deepcopy(self.raw)
+        raw["routes"][0]["filters"]["tags"] = ["press"]
+        tagged = config.parse(raw).routes[0]
+        self.assertIsNone(
+            tagged.refusal(item(text="Launch day #Press", tags=()), "nocrosspost")
+        )
+        self.assertEqual(
+            tagged.refusal(item(text="Press day", tags=()), "nocrosspost"), "tags"
+        )
+
+    def test_the_opt_out_hashtag_in_the_text_is_never_forwarded(self) -> None:
+        self.assertEqual(
+            self.route.refusal(item(text="Hi #NoCrossPost", tags=()), "nocrosspost"),
+            "opt-out",
+        )
+
     def test_media_filters(self) -> None:
         raw = copy.deepcopy(self.raw)
         raw["routes"][0]["filters"]["media"] = "required"
