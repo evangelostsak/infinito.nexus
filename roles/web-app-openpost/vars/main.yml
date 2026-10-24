@@ -14,6 +14,7 @@ OPENPOST_RELAY_CONF_HOST: "{{ [lookup('container', application_id, 'directories.
 OPENPOST_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.sso.enabled') }}"
 OPENPOST_EMAIL_ENABLED: "{{ lookup('config', application_id, 'services.email.enabled') }}"
 OPENPOST_OBJSTORE_ENABLED: "{{ lookup('objstore', application_id, 'enabled') }}"
+OPENPOST_ROOT_CA_TRUSTED: "{{ OPENPOST_OBJSTORE_ENABLED | bool and TLS_MODE == 'self_signed' }}"
 
 OPENPOST_JWT_SECRET: "{{ lookup('config', application_id, 'secrets.credentials.jwt_secret') }}"
 OPENPOST_ENCRYPTION_KEY: "{{ lookup('config', application_id, 'secrets.credentials.encryption_key') }}"
@@ -53,7 +54,8 @@ OPENPOST_PINNED_INSTANCES: >-
   {%- set _instances = [] -%}
   {%- for _key in ['mastodon', 'pixelfed'] -%}
   {%- if lookup('config', application_id, 'services.' ~ _key ~ '.enabled') | bool -%}
-  {%- set _ = _instances.append({'platform': _key, 'url': lookup('tls', OPENPOST_RELAY_SIBLINGS[_key], 'url.base') | regex_replace('/+$', '')}) -%}
+  {%- set _url = lookup('tls', OPENPOST_RELAY_SIBLINGS[_key], 'url.base') | regex_replace('/+$', '') -%}
+  {%- set _ = _instances.append({'platform': _key, 'url': _url, 'name': _url ~ '/'}) -%}
   {%- endif -%}
   {%- endfor -%}
   {{ _instances }}
