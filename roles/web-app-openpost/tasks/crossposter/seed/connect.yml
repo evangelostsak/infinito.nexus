@@ -1,4 +1,8 @@
 ---
+- name: "📌 Pick the pinned Mastodon server OpenPost connects through"
+  ansible.builtin.set_fact:
+    openpost_crossposter_mastodon_server: "{{ OPENPOST_PINNED_INSTANCES | selectattr('platform', 'equalto', 'mastodon') | map(attribute='name') | first }}"
+
 - name: "🔍 Resolve the Mastodon container that grants the OpenPost app"
   ansible.builtin.include_tasks: "{{ lookup('path_absolute', 'roles/sys-svc-compose/tasks/utils/swarm/resolve_host_cid.yml') }}"
   vars:
@@ -9,7 +13,7 @@
 
 - name: "🧭 Ask OpenPost for the Mastodon authorization it would start"
   uri_retry:
-    url: "{{ OPENPOST_LOCAL_URL }}/api/v1/accounts/mastodon/auth-url?workspace_id={{ openpost_crossposter_target_workspace }}&instance_url={{ openpost_crossposter_mastodon_route.source.base_url | urlencode }}"
+    url: "{{ OPENPOST_LOCAL_URL }}/api/v1/accounts/mastodon/auth-url?workspace_id={{ openpost_crossposter_target_workspace }}&server_name={{ openpost_crossposter_mastodon_server | urlencode }}"
     headers: "{{ openpost_breakglass_headers }}"
     status_code: 200
   register: openpost_crossposter_mastodon_authorize
@@ -54,8 +58,7 @@
     body_format: json
     body:
       code: "{{ (openpost_crossposter_mastodon_grant.stdout_lines | select('match', 'CROSSPOSTER_GRANT=') | first) | replace('CROSSPOSTER_GRANT=', '') | trim }}"
-      instance_url: "{{ openpost_crossposter_mastodon_route.source.base_url }}"
-      server_name: "{{ openpost_crossposter_mastodon_route.source.base_url }}"
+      server_name: "{{ openpost_crossposter_mastodon_server }}"
       workspace_id: "{{ openpost_crossposter_target_workspace }}"
     status_code: [200, 201]
   retries: 0
