@@ -82,6 +82,10 @@ class MastodonSource:
         )
         return str(statuses[0]["id"]) if statuses else "0"
 
+    def refresh(self, item: SourceItem) -> SourceItem:
+        status = self._get(f"/api/v1/statuses/{item.cursor}", {})
+        return parse_status(dict(status), self.platform)
+
     def fetch(self, cursor: str) -> list[SourceItem]:
         items: list[SourceItem] = []
         for _ in range(MAX_PAGES):
