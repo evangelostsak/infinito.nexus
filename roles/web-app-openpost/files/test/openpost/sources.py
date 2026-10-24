@@ -141,6 +141,7 @@ def peertube_upload(
         {
             "channelId": str(found["id"]),
             "name": name,
+            "description": f"{name} #{tag}",
             "privacy": "1",
             "waitTranscoding": "false",
             "tags[]": [tag],
