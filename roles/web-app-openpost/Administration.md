@@ -78,6 +78,8 @@ For Mastodon and Pixelfed the deploy registers an `OpenPost` app on every deploy
 OpenPost v7.22.9 can register apps on any other instance by itself, but its code exchange then checks provider readiness against the bare host name the dialog sends and refuses with `provider operation is not ready: needs_configuration`; an external instance therefore needs the same pinning through those two variables.
 The name has to differ from the URL, because OpenPost hides a server named exactly like its URL from the connect dialog, which then falls back to its own registration and accepts only `https://` instances.
 Its code exchange strips the trailing slash, so readiness still matches the canonical URL, and onion instances served over plain HTTP connect through the pinned app.
+Pixelfed registers API apps without an owner, and Laravel Passport 13 then treats them as `client_credentials` clients and rejects every token whose user ID equals the app's client ID, which on a fresh instance is the administrator and app number 1.
+The deploy therefore makes the Pixelfed administrator the owner of OpenPost's Pixelfed app on every run.
 Every callback URL has the form `https://publish.<DOMAIN_PRIMARY>/api/v1/accounts/<provider>/callback`.
 
 ## Provider simulator
