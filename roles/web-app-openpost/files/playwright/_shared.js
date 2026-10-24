@@ -334,15 +334,22 @@ async function pixelfedAuthorizationCode(page, label, redirectedCode) {
     .poll(() => page.url(), { timeout: resolveTimeout(60_000), message: `${label}: expected Pixelfed's sign-in or consent page` })
     .toContain(env.pixelfedBaseUrl);
   const password = page.locator('input[name="password"]');
-  if (!redirectedCode() && (await password.isVisible())) {
+  const authorize = page.getByRole("button", { name: /^authorize$/i });
+  const codeShown = async () => (await page.locator("body").innerText()).includes('"code"');
+  const consented = async () => Boolean(redirectedCode()) || (await codeShown()) || (await authorize.isVisible());
+  await expect
+    .poll(async () => (await consented()) || (await password.isVisible()), {
+      timeout: resolveTimeout(60_000),
+      message: `${label}: expected Pixelfed's sign-in form, consent screen or authorization code`,
+    })
+    .toBe(true);
+  if (!(await consented()) && (await password.isVisible())) {
     await page.locator('input[name="email"]').fill(env.adminEmail);
     await password.fill(env.adminPassword);
     await page.locator("form").filter({ has: password }).locator('button[type="submit"]').click();
   }
-  const authorize = page.getByRole("button", { name: /^authorize$/i });
-  const codeShown = async () => (await page.locator("body").innerText()).includes('"code"');
   await expect
-    .poll(async () => Boolean(redirectedCode()) || (await codeShown()) || (await authorize.isVisible()), {
+    .poll(consented, {
       timeout: resolveTimeout(60_000),
       message: `${label}: expected Pixelfed's consent screen or its authorization code`,
     })
