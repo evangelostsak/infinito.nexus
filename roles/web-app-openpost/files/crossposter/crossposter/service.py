@@ -25,6 +25,7 @@ SOURCES = {
     "peertube": PeerTubeSource,
 }
 JPEG_QUALITY = 90
+SOURCE_MEDIA_UNAVAILABLE = 503
 
 
 def to_jpeg(source: Path) -> Path:
@@ -158,11 +159,21 @@ class Service:
                 Path(urllib.parse.urlparse(attachment.media.url).path).name
                 or f"media-{index}"
             )
-            local = web.download(
-                attachment.media.url,
-                credentials_for(route.source.base_url, attachment.media.url, headers),
-                folder / f"{index}-{name}",
-            )
+            try:
+                local = web.download(
+                    attachment.media.url,
+                    credentials_for(
+                        route.source.base_url, attachment.media.url, headers
+                    ),
+                    folder / f"{index}-{name}",
+                )
+            except web.RequestError as error:
+                raise web.RequestError(
+                    attachment.media.url,
+                    SOURCE_MEDIA_UNAVAILABLE,
+                    error.headers,
+                    f"the source media is not available yet: {error}",
+                ) from error
             mime = attachment.media.mime
             if attachment.jpeg and mime != "image/jpeg":
                 local, mime = to_jpeg(local), "image/jpeg"
@@ -190,32 +201,39 @@ class Service:
             )
             return
         item = store.item_from_json(row["payload"])
+        publication_id = str(row["publication_id"])
         try:
+            if item.media and not publication_id:
+                item = self.sources[route.name].refresh(item)
             destination = self._destination(route, row["target"])
             plan = self._plan(route, item, destination)
-            key = store.idempotency_key(
-                item.uri, destination.account_id, int(row["resends"])
-            )
-            with tempfile.TemporaryDirectory(prefix="crossposter-") as folder:
-                media = self._media(route, plan, Path(folder))
-            publication = self.openpost.create(
-                destination,
-                plan.title,
-                plan.text,
-                plan.profile,
-                media,
-                key,
-                {"crossposter_route": route.name, "crossposter_source": item.url},
-            )
+            if publication_id:
+                publication = self.openpost.publication(publication_id)
+            else:
+                key = store.idempotency_key(
+                    item.uri, destination.account_id, int(row["resends"])
+                )
+                with tempfile.TemporaryDirectory(prefix="crossposter-") as folder:
+                    media = self._media(route, plan, Path(folder))
+                publication = self.openpost.create(
+                    destination,
+                    plan.title,
+                    plan.text,
+                    plan.profile,
+                    media,
+                    key,
+                    {"crossposter_route": route.name, "crossposter_source": item.url},
+                )
+                publication_id = str(publication["id"])
             if plan.draft_only:
                 state = store.transition("pending", "drafted")
             else:
                 if str(publication.get("status")) == "draft":
-                    if media:
-                        self.openpost.await_public_media(str(publication["id"]))
+                    if plan.media:
+                        self.openpost.await_media(publication_id)
                     self.openpost.publish_now(publication)
                 state = store.transition("pending", "submitted")
-            self.store.update(row["id"], state, str(publication["id"]), attempts, "", 0)
+            self.store.update(row["id"], state, publication_id, attempts, "", 0)
             LOG.info(
                 "%s -> %s %s: %s",
                 item.url,
@@ -239,7 +257,7 @@ class Service:
             self.store.update(
                 row["id"],
                 state,
-                str(row["publication_id"]),
+                publication_id,
                 attempts,
                 str(error),
                 pause,
