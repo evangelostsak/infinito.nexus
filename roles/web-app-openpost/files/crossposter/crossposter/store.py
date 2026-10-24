@@ -169,7 +169,8 @@ class Store:
         next_attempt = datetime.now(UTC) + timedelta(seconds=delay_seconds)
         self.connection.execute(
             """UPDATE crossposter.items
-               SET state = 'pending', resends = resends + 1, attempts = %s, last_error = %s,
+               SET state = 'pending', resends = resends + 1, publication_id = '',
+                   attempts = %s, last_error = %s,
                    next_attempt_at = %s, updated_at = now()
                WHERE id = %s""",
             (attempts, error, next_attempt, row_id),
