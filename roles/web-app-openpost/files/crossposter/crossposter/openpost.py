@@ -14,8 +14,17 @@ if TYPE_CHECKING:
     from crossposter.config import Targets
 
 
-PUBLIC_MEDIA_POLLS = 20
-PUBLIC_MEDIA_POLL_SECONDS = 3
+PUBLIC_MEDIA_POLLS = 24
+PUBLIC_MEDIA_POLL_SECONDS = 5
+ANALYSED = ("ready", "failed")
+
+
+def publishable(medium: dict) -> bool:
+    public = bool(medium.get("public_url_checked_at") and medium.get("public_url_ready"))
+    analysed = not str(medium.get("mime_type") or "").startswith("video/") or (
+        medium.get("analysis_status") in ANALYSED
+    )
+    return public and analysed
 
 
 @dataclass(frozen=True)
@@ -121,8 +130,10 @@ class OpenPost:
         complete = urllib.parse.urlparse(str(session["complete_url"])).path.split(
             "/api/v1", 1
         )[1]
-        self._call("POST", complete, {"workspace_id": self.workspace}, "", (200, 201))
-        return str(session["media_id"])
+        completed = self._call(
+            "POST", complete, {"workspace_id": self.workspace}, "", (200, 201)
+        )
+        return str(completed["id"])
 
     def create(
         self,
@@ -153,20 +164,23 @@ class OpenPost:
         }
         return dict(self._call("POST", "/publications", payload, key, (200, 201)))
 
-    def await_public_media(self, publication_id: str) -> None:
+    def publication(self, publication_id: str) -> dict:
+        return dict(self.get(f"/publications/{publication_id}") or {})
+
+    def await_media(self, publication_id: str) -> None:
         for _ in range(PUBLIC_MEDIA_POLLS):
-            media = (self.get(f"/publications/{publication_id}") or {}).get("media")
-            if all(
-                item.get("public_url_checked_at") and item.get("public_url_ready")
-                for item in media or []
-            ):
+            self._call(
+                "POST", f"/publications/{publication_id}/validate", None, "", (200,)
+            )
+            media = self.publication(publication_id).get("media")
+            if all(publishable(item) for item in media or []):
                 return
             time.sleep(PUBLIC_MEDIA_POLL_SECONDS)
         raise web.RequestError(
             f"{self.base_url}/publications/{publication_id}",
             503,
             {},
-            "OpenPost has not confirmed the public media URLs yet",
+            "OpenPost has not confirmed the public media URLs or video analysis yet",
         )
 
     def publish_now(self, publication: dict) -> None:
@@ -179,5 +193,4 @@ class OpenPost:
         )
 
     def renditions(self, publication_id: str) -> list[dict]:
-        body = self.get(f"/publications/{publication_id}")
-        return list((body or {}).get("renditions") or [])
+        return list(self.publication(publication_id).get("renditions") or [])
