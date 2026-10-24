@@ -63,6 +63,9 @@ class FakeOpenPost:
                 },
             }
             return web.Response(200, {}, json.dumps(session).encode())
+        if path.endswith("/complete"):
+            completed = {"id": "media-0", "deduped": True}
+            return web.Response(200, {}, json.dumps(completed).encode())
         return web.Response(200, {}, b"{}")
 
 
@@ -154,7 +157,7 @@ class TestRequests(unittest.TestCase):
                 patch.object(openpost.web, "upload", upload),
             ):
                 media = client().upload(image, "a.jpg", "image/jpeg")
-        self.assertEqual(media, "media-1")
+        self.assertEqual(media, "media-0")
         self.assertEqual(uploads[0][0], "http://openpost:8080/media/upload/media-1")
         self.assertEqual(uploads[0][1]["Authorization"], "Bearer op-token")
         self.assertTrue(
@@ -165,8 +168,12 @@ class TestRequests(unittest.TestCase):
 class TestPublicMedia(unittest.TestCase):
     def answers(self, states: list[list[dict]]) -> list[str]:
         asked: list[str] = []
+        self.validated: list[str] = []
 
         def request(method, url, headers, body, accepted) -> web.Response:
+            if method == "POST":
+                self.validated.append(url)
+                return web.Response(200, {}, b'{"valid": true, "issues": []}')
             asked.append(url)
             media = states[min(len(asked), len(states)) - 1]
             return web.Response(200, {}, json.dumps({"media": media}).encode())
@@ -186,9 +193,11 @@ class TestPublicMedia(unittest.TestCase):
             patch.object(openpost.web, "request", self.request),
             patch.object(openpost.time, "sleep", lambda seconds: None),
         ):
-            client().await_public_media("pub-1")
+            client().await_media("pub-1")
         self.assertEqual(len(asked), 3)
         self.assertTrue(asked[0].endswith("/publications/pub-1"))
+        self.assertEqual(len(self.validated), 3)
+        self.assertTrue(self.validated[0].endswith("/publications/pub-1/validate"))
 
     def test_media_that_never_turns_public_is_a_transient_error(self) -> None:
         self.answers([[{"public_url_checked_at": "now", "public_url_ready": False}]])
@@ -197,5 +206,32 @@ class TestPublicMedia(unittest.TestCase):
             patch.object(openpost.time, "sleep", lambda seconds: None),
             self.assertRaises(web.RequestError) as raised,
         ):
-            client().await_public_media("pub-1")
+            client().await_media("pub-1")
         self.assertTrue(raised.exception.transient)
+
+    def test_a_video_also_waits_for_its_analysis(self) -> None:
+        public = {"public_url_checked_at": "now", "public_url_ready": True}
+        asked = self.answers(
+            [
+                [{**public, "mime_type": "video/mp4", "analysis_status": "pending"}],
+                [{**public, "mime_type": "video/mp4", "analysis_status": "ready"}],
+            ]
+        )
+        with (
+            patch.object(openpost.web, "request", self.request),
+            patch.object(openpost.time, "sleep", lambda seconds: None),
+        ):
+            client().await_media("pub-1")
+        self.assertEqual(len(asked), 2)
+
+    def test_an_image_needs_no_analysis(self) -> None:
+        self.assertTrue(
+            openpost.publishable(
+                {
+                    "public_url_checked_at": "now",
+                    "public_url_ready": True,
+                    "mime_type": "image/jpeg",
+                    "analysis_status": "pending",
+                }
+            )
+        )
