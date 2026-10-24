@@ -5,6 +5,7 @@ exports.register = function (shared) {
   test("administrator: connects the local Mastodon account through the OOB code flow and publishes to it", async ({ page, context }) => {
     shared.skipUnlessServiceEnabled("sso");
     shared.skipUnlessServiceEnabled("mastodon");
+    shared.skipOnOnionSibling("mastodon");
     test.setTimeout(resolveTimeout(300_000)); // two Keycloak logins, Mastodon OAuth approval and the publishing worker round-trip
     const marker = `openpost-e2e ${Date.now()}`;
 
