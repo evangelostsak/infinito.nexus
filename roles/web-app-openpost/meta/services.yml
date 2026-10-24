@@ -82,7 +82,7 @@ openpost:
     internal:
       http: 8080
     local:
-      http: 8098
+      http: 8100
   run_after:
     - svc-db-postgres
     - web-app-keycloak
