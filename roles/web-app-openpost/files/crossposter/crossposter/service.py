@@ -211,6 +211,8 @@ class Service:
                 state = store.transition("pending", "drafted")
             else:
                 if str(publication.get("status")) == "draft":
+                    if media:
+                        self.openpost.await_public_media(str(publication["id"]))
                     self.openpost.publish_now(publication)
                 state = store.transition("pending", "submitted")
             self.store.update(row["id"], state, str(publication["id"]), attempts, "", 0)
