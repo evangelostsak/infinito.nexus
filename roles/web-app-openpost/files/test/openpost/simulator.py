@@ -17,6 +17,7 @@ from openpost.api import (
     MEMBER_USERNAME,
     SIMULATOR_ADMIN,
     SIMULATOR_PLATFORMS,
+    SSO_ENABLED,
     accounts,
     call,
     call_raw,
@@ -342,7 +343,11 @@ def check_simulator(token: str, workspace: str) -> None:
         if status != 200:
             sys.exit(f"[FAIL] publish-now for {label} returned HTTP {status}: {body}")
         publications[label] = str(publication["id"])
-    if "x" in connected:
+    if not SSO_ENABLED:
+        print(
+            "[SKIP] workspace roles: without SSO the role closes self-registration, so no second account can exist"
+        )
+    elif "x" in connected:
         tags["member"] = f"openpost-cli-member-{nonce}"
         promoted = check_roles(token, workspace, connected["x"][0], tags["member"])
         if promoted:
