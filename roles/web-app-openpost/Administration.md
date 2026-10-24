@@ -74,8 +74,10 @@ A network whose entry is incomplete (`lookup('api_enabled', '<provider>')` is fa
 | `tiktok` | `OPENPOST_PROVIDER_APPS` entry `tiktok` | TikTok |
 
 Mastodon, Pixelfed, PeerTube and Bluesky need no operator credentials: PeerTube exchanges the user's password once for tokens, and Bluesky uses an app password.
-For Mastodon and Pixelfed the deploy registers an `OpenPost` app on every deployed sibling instance once, stores its credentials in `fediverse-apps.json` in the role's config directory and renders them into `MASTODON_SERVERS` and `PIXELFED_SERVERS`, named by the instance's canonical URL.
+For Mastodon and Pixelfed the deploy registers an `OpenPost` app on every deployed sibling instance once, stores its credentials in `fediverse-apps.json` in the role's config directory and renders them into `MASTODON_SERVERS` and `PIXELFED_SERVERS`, named by the instance's canonical URL with a trailing slash.
 OpenPost v7.22.9 can register apps on any other instance by itself, but its code exchange then checks provider readiness against the bare host name the dialog sends and refuses with `provider operation is not ready: needs_configuration`; an external instance therefore needs the same pinning through those two variables.
+The name has to differ from the URL, because OpenPost hides a server named exactly like its URL from the connect dialog, which then falls back to its own registration and accepts only `https://` instances.
+Its code exchange strips the trailing slash, so readiness still matches the canonical URL, and onion instances served over plain HTTP connect through the pinned app.
 Every callback URL has the form `https://publish.<DOMAIN_PRIMARY>/api/v1/accounts/<provider>/callback`.
 
 ## Provider simulator
@@ -236,6 +238,7 @@ A dead-lettered item stays in that state; publish the post again from the OpenPo
 ## Backup, restore and upgrades
 
 - With `web-app-seaweedfs` deployed, browsers upload media directly to its public S3 vhost through presigned URLs, which is why `OPENPOST_S3_ENDPOINT` is the public endpoint and the CSP allows it in `connect-src`; OpenPost deduplicates identical files by content hash.
+  With `TLS_MODE=self_signed` the role mounts the root CA into OpenPost and adds it to `SSL_CERT_DIR`, because an onion-primary OpenPost receives no CA injection while that vhost stays on clearnet HTTPS.
 - The platform backup covers the OpenPost database in the shared Postgres and the `openpost_media` volume; media in `web-app-seaweedfs` is covered by that role's backup.
 - A restore needs the database, the media and the inventory secrets, especially `encryption_key`; without it the stored provider tokens cannot be decrypted and every network has to be reconnected. The key is pinned `rotatable: false` because OpenPost refuses to start once a stored row no longer decrypts; the other secrets rotate freely.
 - Changing the pinned version in `meta/services.yml` and redeploying runs OpenPost's own migrations, which take a Postgres advisory lock.
