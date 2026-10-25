@@ -199,6 +199,38 @@
       }
     },
     {
+      "name": "x-media-upload",
+      "request": {
+        "method": "POST",
+        "urlPath": "/1.1/media/upload.json"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "media_id": 1880000000000000001,
+          "media_id_string": "1880000000000000001",
+          "expires_after_secs": 86400
+        }
+      }
+    },
+    {
+      "name": "x-media-metadata",
+      "request": {
+        "method": "POST",
+        "urlPath": "/1.1/media/metadata/create.json"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{}"
+      }
+    },
+    {
       "name": "meta-access-token",
       "request": {
         "method": "POST",
@@ -411,7 +443,7 @@
       "name": "facebook-photos",
       "request": {
         "method": "POST",
-        "urlPathPattern": "/v[0-9.]+/424242/photos"
+        "urlPathPattern": "/v[0-9.]+/(424242|525252)/photos"
       },
       "response": {
         "status": 200,
@@ -420,8 +452,11 @@
         },
         "jsonBody": {
           "id": "2001",
-          "post_id": "424242_2001"
-        }
+          "post_id": "{{request.pathSegments.[1]}}_2001"
+        },
+        "transformers": [
+          "response-template"
+        ]
       }
     },
     {
