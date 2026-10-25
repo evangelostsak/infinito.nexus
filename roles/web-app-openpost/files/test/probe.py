@@ -14,6 +14,7 @@ from openpost.api import (
     CONTAINER,
     DEADLINE,
     MAIL_RECIPIENT,
+    ONION_ORIGIN,
     OPENER,
     PEERTUBE_PASSWORD,
     PEERTUBE_USERNAME,
@@ -22,6 +23,7 @@ from openpost.api import (
     S3_PUBLIC_URL,
     SETTLE_SECONDS,
     SIMULATOR_PLATFORMS,
+    SMTP_ENABLED,
     SSO_ADMIN_EMAIL,
     SSO_ENABLED,
     UNCONFIGURED_PLATFORMS,
@@ -153,7 +155,8 @@ def check_sso_administrator(token: str) -> None:
         bool(found) and found[0].get("is_admin") is True,
         found,
     )
-    if found and "mastodon" in RELAY_TARGETS:
+    mastodon = RELAY_TARGETS.get("mastodon")
+    if found and mastodon and not mastodon.endswith(".onion"):
         count = found[0].get("publication_count")
         check(
             "the SSO administrator's publications survived the backup drill",
@@ -223,6 +226,11 @@ def check_relay(token: str, workspace: str) -> None:
     for platform, domain in RELAY_TARGETS.items():
         if platform == "peertube":
             continue
+        if domain.endswith(".onion"):
+            print(
+                f"[SKIP] relay to {platform}: OpenPost cannot resolve the onion name {domain}"
+            )
+            continue
         status, body = auth_url(token, workspace, platform, f"https://{domain}")
         check(
             f"relay carries {platform} at {domain} past the guard",
@@ -248,8 +256,7 @@ def check_media(token: str, workspace: str) -> None:
             or [{}]
         )[0]
         time.sleep(0 if attached.get("public_url_checked_at") else 3)
-    origin = urllib.parse.urlparse(S3_PUBLIC_URL or PUBLIC_URL).hostname or ""
-    if origin.endswith(".onion"):
+    if ONION_ORIGIN:
         check(
             "OpenPost flags media on an onion origin as unreachable for providers",
             attached.get("public_url_ready") is False
@@ -395,13 +402,19 @@ def main() -> int:
     check_relay(token, workspace)
     check_unconfigured(token, workspace)
     check_media(token, workspace)
-    if MAIL_RECIPIENT:
+    if MAIL_RECIPIENT and SMTP_ENABLED:
         check_mail(token, workspace)
     if SIMULATOR_PLATFORMS:
         check_simulator(token, workspace)
-    if "peertube" in RELAY_TARGETS:
+    if RELAY_TARGETS.get("peertube", "").endswith(".onion"):
+        print("[SKIP] PeerTube connect: OpenPost cannot resolve an onion PeerTube")
+    elif "peertube" in RELAY_TARGETS:
         check_peertube(token, workspace)
-    if ROUTES:
+    if ROUTES and ONION_ORIGIN:
+        print(
+            "[SKIP] crossposter delivery: an onion OpenPost can neither hand media to providers nor connect onion Fediverse targets"
+        )
+    elif ROUTES:
         check_crossposter(token, workspace)
     if failures:
         print(f"[FAIL] {len(failures)} check(s) failed: {', '.join(failures)}")
