@@ -246,7 +246,7 @@ def mastodon_scenarios(
     )
     check(
         "Facebook and Instagram receive the post",
-        bool(hits(entries, "POST", r"/v[0-9.]+/(424242|525252)/feed", nonce))
+        bool(hits(entries, "POST", r"/v[0-9.]+/(424242|525252)/(feed|photos)", nonce))
         and bool(hits(entries, "POST", r"/v[0-9.]+/17841400000000000/media", nonce)),
     )
     copies = [
