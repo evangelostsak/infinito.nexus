@@ -12,7 +12,10 @@ OPENPOST_API_HEADERS:
 OPENPOST_RELAY_CONF_HOST: "{{ [lookup('container', application_id, 'directories.config'), 'relay.conf'] | path_join }}"
 
 OPENPOST_OIDC_ENABLED: "{{ lookup('config', application_id, 'services.sso.enabled') }}"
+OPENPOST_OIDC_ONION_ISSUER: "{{ lookup('tls', 'web-app-keycloak', 'domain').endswith('.onion') }}"
+OPENPOST_OIDC_SOCKS_PROXY: "{{ lookup('tor_socks_proxy') if OPENPOST_OIDC_ONION_ISSUER | bool else '' }}"
 OPENPOST_EMAIL_ENABLED: "{{ lookup('config', application_id, 'services.email.enabled') }}"
+OPENPOST_SMTP_ENABLED: "{{ OPENPOST_EMAIL_ENABLED | bool and (lookup('email', application_id).tls | bool or lookup('email', application_id).start_tls | bool) }}"
 OPENPOST_OBJSTORE_ENABLED: "{{ lookup('objstore', application_id, 'enabled') }}"
 OPENPOST_ROOT_CA_TRUSTED: "{{ OPENPOST_OBJSTORE_ENABLED | bool and TLS_MODE == 'self_signed' }}"
 
