@@ -17,6 +17,7 @@ OPENPOST_DB_NAME             OpenPost database name
 OPENPOST_DB_USER             OpenPost database user
 OPENPOST_DB_PASSWORD_B64     base64 OpenPost database password
 OPENPOST_MAIL_RECIPIENT      platform mailbox that receives a probe invitation, empty without mail
+OPENPOST_SMTP_ENABLED        true when OpenPost itself is given an SMTP relay it can use
 OPENPOST_SSO_ADMIN_EMAIL     platform administrator the Playwright run provisions through SSO before the backup drill, empty without SSO
 OPENPOST_PEERTUBE_USERNAME   local PeerTube account OpenPost connects through its password login
 OPENPOST_PEERTUBE_PASSWORD_B64  base64 password of that PeerTube account
@@ -56,6 +57,7 @@ ADMIN_PASSWORD = base64.b64decode(os.environ["OPENPOST_ADMIN_PASSWORD_B64"]).dec
 RELAY_TARGETS = json.loads(os.environ["OPENPOST_RELAY_TARGETS"])
 DEADLINE = time.monotonic() + int(os.environ["OPENPOST_DEADLINE_SECONDS"])
 PUBLIC_URL = os.environ["OPENPOST_PUBLIC_URL"].rstrip("/")
+ONION_ORIGIN = (urllib.parse.urlparse(PUBLIC_URL).hostname or "").endswith(".onion")
 SSO_ENABLED = os.environ["OPENPOST_SSO_ENABLED"] == "true"
 CONTAINER = os.environ["OPENPOST_CONTAINER"]
 SIMULATOR_PLATFORMS = json.loads(os.environ["OPENPOST_SIMULATOR_PLATFORMS"])
@@ -67,6 +69,7 @@ DB_NAME = os.environ["OPENPOST_DB_NAME"]
 DB_USER = os.environ["OPENPOST_DB_USER"]
 DB_PASSWORD = base64.b64decode(os.environ["OPENPOST_DB_PASSWORD_B64"]).decode()
 MAIL_RECIPIENT = os.environ["OPENPOST_MAIL_RECIPIENT"]
+SMTP_ENABLED = os.environ["OPENPOST_SMTP_ENABLED"] == "true"
 SSO_ADMIN_EMAIL = os.environ["OPENPOST_SSO_ADMIN_EMAIL"]
 PEERTUBE_USERNAME = os.environ["OPENPOST_PEERTUBE_USERNAME"]
 PEERTUBE_PASSWORD = base64.b64decode(
