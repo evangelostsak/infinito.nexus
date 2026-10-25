@@ -27,6 +27,7 @@ def reports_naming(urls: list[str]) -> list[str]:
         with imaplib.IMAP4_SSL(
             PROXY_ADDRESS or MAIL_HOST, IMAPS_PORT, ssl_context=context, timeout=60
         ) as imap:
+            imap._encoding = "utf-8"
             imap.login(MAIL_RECIPIENT, MAIL_PASSWORD)
             imap.select("INBOX", readonly=True)
             for url in urls:
