@@ -15,6 +15,7 @@ from openpost.api import (
     MEMBER_EMAIL,
     MEMBER_PASSWORD,
     MEMBER_USERNAME,
+    ONION_ORIGIN,
     SIMULATOR_ADMIN,
     SIMULATOR_PLATFORMS,
     SSO_ENABLED,
@@ -332,6 +333,11 @@ def check_simulator(token: str, workspace: str) -> None:
             or platform not in SIMULATOR_PLATFORMS
             or platform not in connected
         ):
+            continue
+        if ONION_ORIGIN and kind in ("image", "video"):
+            print(
+                f"[SKIP] {label}: providers cannot fetch media from an onion origin"
+            )
             continue
         targets = (
             connected[platform] if label == "facebook" else connected[platform][:1]
