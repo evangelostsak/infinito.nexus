@@ -26,6 +26,9 @@ PACKAGE_INSTALL_PATTERN = re.compile(
 PHP_PACKAGE_PATTERN = re.compile(
     r"(?<!\S)(?:[\w.+]+-)*php(\d)(?:\.?(\d))?(?:-[\w.+-]+)?(?:=\S*?)?(?=[;&|\\]*(?:\s|$))"
 )
+PHP_UNVERSIONED_PACKAGE_PATTERN = re.compile(
+    r"(?<!\S)(php|php-(?:cli|fpm|cgi|phpdbg)|libapache2-mod-php)(?:=\S*?)?(?=[;&|\\]*(?:\s|$))"
+)
 VERSION_PATTERN = re.compile(r"^(\d+)\.(\d+)\.(\d+)")
 
 
@@ -37,10 +40,15 @@ class PhpRuntime:
         version: ``PHP_VERSION`` the image sets, ``None`` when it sets none.
         lines: ``major[.minor]`` lines named by distro PHP packages or a
             ``PHP_BASE`` build argument.
+        packages: unversioned distro packages that are the interpreter itself
+            (``php``, ``php-cli``, ``php-fpm``, ``php-cgi``, ``php-phpdbg``,
+            ``libapache2-mod-php``); they name no line. Extension and library
+            packages such as ``php-mysql`` or ``php-pear`` do not count.
     """
 
     version: str | None
     lines: tuple[str, ...]
+    packages: tuple[str, ...]
 
 
 def load_php_floors() -> dict[str, str]:
@@ -139,11 +147,13 @@ def php_runtime(instructions: list[str]) -> PhpRuntime | None:
         instructions: see :func:`build_instructions`.
 
     Returns:
-        The last ``PHP_VERSION`` set and the lines of the distro PHP packages
-        and ``PHP_BASE`` arguments, or ``None`` when none of them appears.
+        The last ``PHP_VERSION`` set, the lines of the distro PHP packages
+        and ``PHP_BASE`` arguments, and the unversioned interpreter packages,
+        or ``None`` when none of them appears.
     """
     version = None
     lines: set[str] = set()
+    packages: set[str] = set()
     for instruction in instructions:
         for match in PHP_VERSION_PATTERN.finditer(instruction):
             version = match.group(1)
@@ -152,9 +162,14 @@ def php_runtime(instructions: list[str]) -> PhpRuntime | None:
             continue
         for major, minor in PHP_PACKAGE_PATTERN.findall(instruction):
             lines.add(f"{major}.{minor}" if minor else major)
-    if version is None and not lines:
+        packages.update(PHP_UNVERSIONED_PACKAGE_PATTERN.findall(instruction))
+    if version is None and not lines and not packages:
         return None
-    return PhpRuntime(version=version, lines=tuple(sorted(lines)))
+    return PhpRuntime(
+        version=version,
+        lines=tuple(sorted(lines)),
+        packages=tuple(sorted(packages)),
+    )
 
 
 def _numbers(text: str) -> tuple[int, ...]:
@@ -169,8 +184,10 @@ def php_finding(runtime: PhpRuntime, floors: dict[str, str]) -> str | None:
         floors: see :func:`load_php_floors`.
 
     Returns:
-        ``None`` when nothing is below its floor, otherwise the reason. A
-        version found only as a line is judged by that line.
+        ``None`` when nothing is below its floor, otherwise the reason. The
+        lines are judged next to ``PHP_VERSION``, so an end-of-life package
+        line fails an image whose ``PHP_VERSION`` is patched. Unversioned
+        packages alone are no finding: their patch level is unknown.
     """
     oldest = min(_numbers(line) for line in floors)
     newest = max(_numbers(line) for line in floors)
@@ -180,13 +197,10 @@ def php_finding(runtime: PhpRuntime, floors: dict[str, str]) -> str | None:
             return f"unparsable PHP_VERSION {runtime.version!r}"
         current = tuple(int(part) for part in match.groups())
         line = f"{current[0]}.{current[1]}"
-        if line in floors:
-            if current < _numbers(floors[line]):
-                return f"{runtime.version} is below the security floor {floors[line]}"
-            return None
-        if current[:2] > newest:
-            return None
-        return f"{runtime.version} runs the end-of-life line {line}"
+        if line in floors and current < _numbers(floors[line]):
+            return f"{runtime.version} is below the security floor {floors[line]}"
+        if line not in floors and current[:2] <= newest:
+            return f"{runtime.version} runs the end-of-life line {line}"
     eol = [line for line in runtime.lines if _numbers(line) < oldest]
     if eol:
         return f"line {', '.join(eol)} is end of life"

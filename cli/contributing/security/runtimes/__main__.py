@@ -51,7 +51,12 @@ def report(refs: list[ImageRef], probed: list, floors: dict[str, str]) -> int:
         if runtime is None:
             continue
         with_php += 1
-        php = runtime.version or f"line {', '.join(runtime.lines)}"
+        if runtime.version:
+            php = runtime.version
+        elif runtime.lines:
+            php = f"line {', '.join(runtime.lines)}"
+        else:
+            php = f"package {', '.join(runtime.packages)}"
         finding = php_finding(runtime, floors)
         if finding:
             findings += 1

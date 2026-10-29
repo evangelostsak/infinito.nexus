@@ -11,8 +11,10 @@ from utils.docker.image import runtime
 FLOORS = {"8.2": "8.2.35", "8.3": "8.3.36", "8.4": "8.4.27", "8.5": "8.5.12"}
 
 
-def _php(version=None, lines=()):
-    return runtime.PhpRuntime(version=version, lines=tuple(lines))
+def _php(version=None, lines=(), packages=()):
+    return runtime.PhpRuntime(
+        version=version, lines=tuple(lines), packages=tuple(packages)
+    )
 
 
 class TestPhpRuntime(TestCase):
@@ -75,6 +77,35 @@ class TestPhpRuntime(TestCase):
             )
         )
 
+    def test_an_unversioned_debian_runtime_package_is_php(self):
+        self.assertEqual(
+            runtime.php_runtime(["RUN apt-get install -y php-cli"]),
+            _php(packages=["php-cli"]),
+        )
+
+    def test_unversioned_runtime_packages_are_php(self):
+        found = runtime.php_runtime(
+            [
+                "RUN dnf install -y php php-fpm php-mysqlnd",
+                "RUN apt-get install -y libapache2-mod-php php-cgi=2:8.2+93 \\",
+            ]
+        )
+        self.assertEqual(
+            found, _php(packages=["libapache2-mod-php", "php", "php-cgi", "php-fpm"])
+        )
+
+    def test_php_libraries_extensions_and_paths_are_not_a_runtime(self):
+        self.assertIsNone(
+            runtime.php_runtime(
+                [
+                    (
+                        "RUN apt-get install -y php-common php-pear php-mysql phpmyadmin"
+                        " && docker-php-ext-install gd && cp php-fpm.conf /etc/php-fpm.d/"
+                    )
+                ]
+            )
+        )
+
     def test_an_image_without_php_has_no_runtime(self):
         self.assertIsNone(
             runtime.php_runtime(
@@ -113,6 +144,21 @@ class TestPhpFinding(TestCase):
 
     def test_a_supported_distro_line_is_no_finding(self):
         self.assertIsNone(runtime.php_finding(_php(lines=["8.3"]), FLOORS))
+
+    def test_an_eol_line_fails_next_to_a_patched_php_version(self):
+        self.assertEqual(
+            runtime.php_finding(_php("8.4.27", lines=["7"]), FLOORS),
+            "line 7 is end of life",
+        )
+
+    def test_a_php_version_below_its_floor_outranks_an_eol_line(self):
+        self.assertIn(
+            "below the security floor 8.4.27",
+            runtime.php_finding(_php("8.4.15", lines=["7"]), FLOORS),
+        )
+
+    def test_an_unversioned_package_alone_is_no_finding(self):
+        self.assertIsNone(runtime.php_finding(_php(packages=["php-cli"]), FLOORS))
 
 
 class TestLoadPhpFloors(TestCase):

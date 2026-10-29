@@ -223,6 +223,24 @@ class TestProbePhp(TestCase):
             SCRIPT.probe_php("abc")
 
 
+class TestRunningContainers(TestCase):
+    def test_every_engine_call_is_bounded_by_a_timeout(self):
+        timeouts = []
+
+        def fake_run(args, **kwargs):
+            timeouts.append(kwargs.get("timeout"))
+            if args[:2] == ["container", "ps"]:
+                return SimpleNamespace(returncode=0, stdout="id-app\n", stderr="")
+            inspected = [{"Id": "id-app", "Name": "/app", "Config": {"Labels": None}}]
+            return SimpleNamespace(
+                returncode=0, stdout=json.dumps(inspected), stderr=""
+            )
+
+        with mock.patch.object(SCRIPT.subprocess, "run", side_effect=fake_run):
+            SCRIPT.running_containers()
+        self.assertEqual(timeouts, [SCRIPT.EXEC_TIMEOUT_SECONDS] * 2)
+
+
 class TestMain(TestCase):
     def _main(self, php_versions):
         """Run main() against a fake engine.
@@ -277,6 +295,31 @@ class TestMain(TestCase):
     def test_main_passes_when_every_runtime_is_patched(self):
         code, _output = self._main({"wordpress": "8.4.27", "postgres": None})
         self.assertEqual(code, 0)
+
+    def _main_on_engine_error(self, error):
+        argv = ["--floors", json.dumps({"php": FLOORS}), "--hardened", "{}"]
+        with (
+            mock.patch.object(SCRIPT.subprocess, "run", side_effect=error),
+            contextlib.redirect_stdout(io.StringIO()) as out,
+        ):
+            code = SCRIPT.main(argv)
+        return code, out.getvalue()
+
+    def test_main_fails_with_one_line_on_a_hung_engine(self):
+        code, output = self._main_on_engine_error(
+            subprocess.TimeoutExpired(cmd=["container", "ps"], timeout=60)
+        )
+        self.assertEqual(code, 1)
+        self.assertEqual(len(output.splitlines()), 1)
+        self.assertIn("timed out after 60 seconds", output)
+
+    def test_main_fails_with_one_line_on_a_failing_engine(self):
+        code, output = self._main_on_engine_error(
+            subprocess.CalledProcessError(returncode=1, cmd=["container", "ps"])
+        )
+        self.assertEqual(code, 1)
+        self.assertEqual(len(output.splitlines()), 1)
+        self.assertIn("returned non-zero exit status 1", output)
 
 
 if __name__ == "__main__":

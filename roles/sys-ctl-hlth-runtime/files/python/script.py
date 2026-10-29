@@ -83,6 +83,7 @@ def running_containers() -> list[Container]:
         capture_output=True,
         text=True,
         check=True,
+        timeout=EXEC_TIMEOUT_SECONDS,
     ).stdout.split()
     if not ids:
         return []
@@ -92,6 +93,7 @@ def running_containers() -> list[Container]:
             capture_output=True,
             text=True,
             check=True,
+            timeout=EXEC_TIMEOUT_SECONDS,
         ).stdout
     )
     containers = []
@@ -253,7 +255,12 @@ def main(argv=None) -> int:
     args = parse_args(argv)
     php_floors = json.loads(args.floors)["php"]
     hardened = json.loads(args.hardened)
-    failures, infos = check(running_containers(), php_floors, hardened, probe_php)
+    try:
+        containers = running_containers()
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as exc:
+        print(f"❌ listing the running containers failed: {exc}")
+        return 1
+    failures, infos = check(containers, php_floors, hardened, probe_php)
     for line in infos:
         print(f"ℹ️ {line}")
     for line in failures:

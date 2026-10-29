@@ -58,6 +58,24 @@ class TestReport(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("PHP line 8.4: patch level not in the registry metadata", output)
 
+    def test_an_unversioned_php_package_is_listed_with_unknown_patch_level(self):
+        code, output = self._report(
+            [_ref("web-app-lam", "lam")], [["RUN apt-get install -y php-cli"]]
+        )
+        self.assertEqual(code, 0)
+        self.assertIn(
+            "PHP package php-cli: patch level not in the registry metadata", output
+        )
+        self.assertIn("1 ship PHP", output)
+
+    def test_an_eol_package_line_fails_next_to_a_patched_php_version(self):
+        code, output = self._report(
+            [_ref("web-app-lam", "lam")],
+            [["ENV PHP_VERSION=8.4.27", "RUN apk add php7 php7-fpm"]],
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("PHP 8.4.27: line 7 is end of life", output)
+
     def test_an_eol_php_base_argument_fails_the_report(self):
         code, output = self._report(
             [_ref("web-app-fusiondirectory", "fusiondirectory")],
