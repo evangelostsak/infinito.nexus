@@ -17,7 +17,6 @@ from utils.roles.mapping import ROLE_FILE_VARS_MAIN
 
 FLOORS_FILE = PROJECT_ROOT / "roles" / "sys-ctl-hlth-runtime" / ROLE_FILE_VARS_MAIN
 FLOORS_KEY = "HEALTH_RUNTIME_FLOORS"
-HUB_API = "https://hub.docker.com/v2"
 USER_AGENT = "infinito-nexus-runtime-report"
 PHP_VERSION_PATTERN = re.compile(r"\bPHP_VERSION=([0-9][^\s\"';]*)")
 PHP_BASE_PATTERN = re.compile(r"\bPHP_BASE=(\d+\.\d+)(?![\d.])")
@@ -53,10 +52,10 @@ def _hub_instructions(
     repository: str, tag: str, os_name: str, architecture: str
 ) -> list[str] | None:
     url = (
-        f"{HUB_API}/repositories/{quote(repository, safe='/')}"
+        f"https://hub.docker.com/v2/repositories/{quote(repository, safe='/')}"
         f"/tags/{quote(tag, safe='')}/images"
     )
-    request = urllib.request.Request(  # noqa: S310 - https request to hub.docker.com
+    request = urllib.request.Request(
         url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"}
     )
     try:

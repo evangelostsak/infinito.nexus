@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
-import unittest
-from unittest import mock
+from unittest import TestCase, main, mock
 
 from ansible.errors import AnsibleError
 
@@ -37,7 +36,7 @@ HARDENING = {
 }
 
 
-class TestHardenedServices(unittest.TestCase):
+class TestHardenedServices(TestCase):
     def test_lists_every_mounting_service_once(self):
         entry = dict(
             HARDENING,
@@ -58,7 +57,7 @@ class TestHardenedServices(unittest.TestCase):
         self.assertEqual(MODULE.hardened_services({"php_fpm_hardening": HARDENING}), [])
 
 
-class TestLookup(unittest.TestCase):
+class TestLookup(TestCase):
     def _run(self, volumes_by_role, **kwargs):
         lookup = MODULE.LookupModule()
         lookup._loader = mock.MagicMock()
@@ -87,4 +86,4 @@ class TestLookup(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    main()

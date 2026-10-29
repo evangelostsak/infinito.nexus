@@ -3,9 +3,8 @@ from __future__ import annotations
 import io
 import json
 import tempfile
-import unittest
 from pathlib import Path
-from unittest import mock
+from unittest import TestCase, main, mock
 
 from utils.docker.image import runtime
 
@@ -16,7 +15,7 @@ def _php(version=None, lines=()):
     return runtime.PhpRuntime(version=version, lines=tuple(lines))
 
 
-class TestPhpRuntime(unittest.TestCase):
+class TestPhpRuntime(TestCase):
     def test_reads_php_version_from_an_env_instruction(self):
         self.assertEqual(
             runtime.php_runtime(
@@ -84,7 +83,7 @@ class TestPhpRuntime(unittest.TestCase):
         )
 
 
-class TestPhpFinding(unittest.TestCase):
+class TestPhpFinding(TestCase):
     def test_a_version_below_its_floor_is_a_finding(self):
         self.assertIn(
             "below the security floor 8.4.27",
@@ -116,7 +115,7 @@ class TestPhpFinding(unittest.TestCase):
         self.assertIsNone(runtime.php_finding(_php(lines=["8.3"]), FLOORS))
 
 
-class TestLoadPhpFloors(unittest.TestCase):
+class TestLoadPhpFloors(TestCase):
     def test_reads_the_php_floors_from_the_vars_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "main.yml"
@@ -128,7 +127,7 @@ class TestLoadPhpFloors(unittest.TestCase):
                 self.assertEqual(runtime.load_php_floors(), {"8.4": "8.4.27"})
 
 
-class TestBuildInstructions(unittest.TestCase):
+class TestBuildInstructions(TestCase):
     def test_a_docker_hub_tag_is_read_through_the_hub_api(self):
         with (
             mock.patch.object(
@@ -169,7 +168,7 @@ class TestBuildInstructions(unittest.TestCase):
         hub.assert_not_called()
 
 
-class TestHubInstructions(unittest.TestCase):
+class TestHubInstructions(TestCase):
     def _respond(self, payload):
         response = mock.MagicMock()
         response.__enter__.return_value = io.BytesIO(json.dumps(payload).encode())
@@ -212,4 +211,4 @@ class TestHubInstructions(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    main()
