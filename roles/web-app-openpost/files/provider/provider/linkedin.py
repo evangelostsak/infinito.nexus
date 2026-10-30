@@ -50,7 +50,9 @@ def plain_text(commentary: str) -> str:
     return ESCAPED_MARKUP.sub(r"\1", commentary)
 
 
-def _json(status: int, payload: object, headers: dict[str, str] | None = None) -> Response:
+def _json(
+    status: int, payload: object, headers: dict[str, str] | None = None
+) -> Response:
     return Response(
         status,
         {"Content-Type": "application/json", **(headers or {})},
@@ -72,7 +74,9 @@ def _page(status: int, title: str, body: str) -> Response:
         f"<title>{html.escape(title)}</title></head><body><main>"
         f"<h1>{html.escape(title)}</h1>{body}</main></body></html>"
     )
-    return Response(status, {"Content-Type": "text/html; charset=utf-8"}, document.encode())
+    return Response(
+        status, {"Content-Type": "text/html; charset=utf-8"}, document.encode()
+    )
 
 
 def _hidden(fields: dict[str, str]) -> str:
@@ -124,7 +128,9 @@ class LinkedIn:
             match = pattern.match(request.path)
             if match and request.method == method:
                 return dynamic(request, urllib.parse.unquote(match.group("id")))
-        return _error(404, "NOT_FOUND", f"{request.method} {request.path} is not served")
+        return _error(
+            404, "NOT_FOUND", f"{request.method} {request.path} is not served"
+        )
 
     def health(self, request: Request) -> Response:
         return Response(200, {"Content-Type": "text/plain"}, b"ok")
@@ -166,11 +172,14 @@ class LinkedIn:
         params = request.query
         client = self._client(params)
         if client is None or params.get("response_type") != "code":
-            return _page(400, "Invalid request", "<p>The application is not registered.</p>")
+            return _page(
+                400, "Invalid request", "<p>The application is not registered.</p>"
+            )
         here = "/oauth/v2/authorization?" + urllib.parse.urlencode(params)
         notice = f"<p role='alert'>{html.escape(error)}</p>" if error else ""
         scopes = "".join(
-            f"<li>{html.escape(scope)}</li>" for scope in params.get("scope", "").split()
+            f"<li>{html.escape(scope)}</li>"
+            for scope in params.get("scope", "").split()
         )
         carried = {
             key: params.get(key, "")
@@ -193,7 +202,9 @@ class LinkedIn:
         form = request.form()
         client = self._client(form)
         if client is None or form.get("response_type") != "code":
-            return _page(400, "Invalid request", "<p>The application is not registered.</p>")
+            return _page(
+                400, "Invalid request", "<p>The application is not registered.</p>"
+            )
         redirect_uri, state = form["redirect_uri"], form.get("state", "")
         if form.get("decision") != "allow":
             return _redirect(
@@ -202,9 +213,20 @@ class LinkedIn:
                     {"error": "user_cancelled_authorize", "state": state},
                 )
             )
-        account = self.store.authenticate(form.get("email", ""), form.get("password", ""))
+        account = self.store.authenticate(
+            form.get("email", ""), form.get("password", "")
+        )
         if account is None:
-            carried = {key: form.get(key, "") for key in ("client_id", "redirect_uri", "scope", "state", "response_type")}
+            carried = {
+                key: form.get(key, "")
+                for key in (
+                    "client_id",
+                    "redirect_uri",
+                    "scope",
+                    "state",
+                    "response_type",
+                )
+            }
             return self.authorization_page(
                 Request("GET", "/oauth/v2/authorization", carried, {}, b""),
                 "Wrong email or password.",
@@ -218,18 +240,34 @@ class LinkedIn:
         form = request.form()
         client = self.clients.get(form.get("client_id", ""))
         if client is None or client.secret != form.get("client_secret", ""):
-            return _json(401, {"error": "invalid_client", "error_description": "Client authentication failed"})
+            return _json(
+                401,
+                {
+                    "error": "invalid_client",
+                    "error_description": "Client authentication failed",
+                },
+            )
         try:
             if form.get("grant_type") == "authorization_code":
                 grant = self.store.redeem_code(
-                    form.get("code", ""), form["client_id"], form.get("redirect_uri", "")
+                    form.get("code", ""),
+                    form["client_id"],
+                    form.get("redirect_uri", ""),
                 )
                 return _json(200, self.store.issue_tokens(grant.member, grant.scope))
             if form.get("grant_type") == "refresh_token":
                 return _json(200, self.store.refresh(form.get("refresh_token", "")))
         except StoreError as error:
-            return _json(400, {"error": "invalid_grant", "error_description": str(error)})
-        return _json(400, {"error": "unsupported_grant_type", "error_description": "Unsupported grant type"})
+            return _json(
+                400, {"error": "invalid_grant", "error_description": str(error)}
+            )
+        return _json(
+            400,
+            {
+                "error": "unsupported_grant_type",
+                "error_description": "Unsupported grant type",
+            },
+        )
 
     def _member(self, request: Request) -> Account | None:
         return self.store.member_for(request.bearer())
@@ -237,7 +275,11 @@ class LinkedIn:
     def userinfo(self, request: Request) -> Response:
         account = self._member(request)
         if account is None:
-            return _error(401, "REVOKED_ACCESS_TOKEN", "The token used in the request has been revoked by the user")
+            return _error(
+                401,
+                "REVOKED_ACCESS_TOKEN",
+                "The token used in the request has been revoked by the user",
+            )
         given, _, family = account.name.partition(" ")
         return _json(
             200,
@@ -256,13 +298,19 @@ class LinkedIn:
     def initialize_upload(self, request: Request) -> Response:
         account = self._member(request)
         if account is None:
-            return _error(401, "REVOKED_ACCESS_TOKEN", "The token used in the request has been revoked by the user")
+            return _error(
+                401,
+                "REVOKED_ACCESS_TOKEN",
+                "The token used in the request has been revoked by the user",
+            )
         if request.query.get("action") != "initializeUpload":
             return _error(400, "ILLEGAL_ARGUMENT", "Unsupported action")
         payload = json.loads(request.body or b"{}")
         owner = str((payload.get("initializeUploadRequest") or {}).get("owner", ""))
         if owner != account.urn:
-            return _error(403, "ACCESS_DENIED", "The owner is not the authenticated member")
+            return _error(
+                403, "ACCESS_DENIED", "The owner is not the authenticated member"
+            )
         image = self.store.register_image(owner)
         return _json(
             200,
@@ -278,7 +326,11 @@ class LinkedIn:
     def upload(self, request: Request, upload_id: str) -> Response:
         account = self._member(request)
         if account is None:
-            return _error(401, "REVOKED_ACCESS_TOKEN", "The token used in the request has been revoked by the user")
+            return _error(
+                401,
+                "REVOKED_ACCESS_TOKEN",
+                "The token used in the request has been revoked by the user",
+            )
         try:
             self.store.store_upload(upload_id, account.urn, request.body)
         except StoreError as error:
@@ -288,17 +340,32 @@ class LinkedIn:
     def create_post(self, request: Request) -> Response:
         account = self._member(request)
         if account is None:
-            return _error(401, "REVOKED_ACCESS_TOKEN", "The token used in the request has been revoked by the user")
+            return _error(
+                401,
+                "REVOKED_ACCESS_TOKEN",
+                "The token used in the request has been revoked by the user",
+            )
         payload = json.loads(request.body or b"{}")
         if payload.get("author") != account.urn:
-            return _error(403, "ACCESS_DENIED", "The author is not the authenticated member")
+            return _error(
+                403, "ACCESS_DENIED", "The author is not the authenticated member"
+            )
         visibility = payload.get("visibility")
-        if visibility not in POST_VISIBILITIES or payload.get("lifecycleState") != "PUBLISHED":
-            return _error(422, "UNPROCESSABLE_ENTITY", "Unsupported visibility or lifecycle state")
+        if (
+            visibility not in POST_VISIBILITIES
+            or payload.get("lifecycleState") != "PUBLISHED"
+        ):
+            return _error(
+                422, "UNPROCESSABLE_ENTITY", "Unsupported visibility or lifecycle state"
+            )
         content = payload.get("content") or {}
         media = (content.get("media") or {}).get("id")
         if media and not self.store.uploaded(str(media), account.urn):
-            return _error(422, "UNPROCESSABLE_ENTITY", "The media was never uploaded by this member")
+            return _error(
+                422,
+                "UNPROCESSABLE_ENTITY",
+                "The media was never uploaded by this member",
+            )
         post = self.store.create_post(
             account.urn, str(payload.get("commentary", "")), visibility, content
         )
@@ -320,7 +387,11 @@ class LinkedIn:
 
     def read_post(self, request: Request, post_id: str) -> Response:
         if self._member(request) is None:
-            return _error(401, "REVOKED_ACCESS_TOKEN", "The token used in the request has been revoked by the user")
+            return _error(
+                401,
+                "REVOKED_ACCESS_TOKEN",
+                "The token used in the request has been revoked by the user",
+            )
         body = self._post_body(post_id)
         if body is None:
             return _error(404, "NOT_FOUND", f"Post {post_id} does not exist")
