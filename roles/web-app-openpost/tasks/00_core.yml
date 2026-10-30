@@ -56,6 +56,10 @@
   include_tasks: crossposter/render.yml
   when: OPENPOST_CROSSPOSTER_ENABLED | bool
 
+- name: "🎭 Stage and render the fake provider"
+  include_tasks: provider/render.yml
+  when: OPENPOST_PROVIDER_ENABLED | bool
+
 - name: "🚿 flush handlers for '{{ application_id }}'"
   meta: flush_handlers
 
