@@ -165,7 +165,9 @@ class Store:
             raise StoreError("the refresh token is invalid or expired")
         access = secrets.token_urlsafe(48)
         with self._lock:
-            self._access[access] = Token(token.member, token.scope, now + ACCESS_SECONDS)
+            self._access[access] = Token(
+                token.member, token.scope, now + ACCESS_SECONDS
+            )
         return {
             "access_token": access,
             "expires_in": ACCESS_SECONDS,
