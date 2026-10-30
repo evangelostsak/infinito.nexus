@@ -14,6 +14,6 @@
       {{ system_service_script_exec }}
       --floors '{{ HEALTH_RUNTIME_FLOORS | to_json }}'
       --hardened '{{ HEALTH_RUNTIME_PHP_HARDENED | to_json }}'
-    system_service_force_flush_final: false
+    system_service_force_flush_final: true
 
 - include_tasks: utils/once/flag.yml
