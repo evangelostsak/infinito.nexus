@@ -20,7 +20,9 @@ ANALYSED = ("ready", "failed")
 
 
 def publishable(medium: dict) -> bool:
-    public = bool(medium.get("public_url_checked_at") and medium.get("public_url_ready"))
+    public = bool(
+        medium.get("public_url_checked_at") and medium.get("public_url_ready")
+    )
     analysed = not str(medium.get("mime_type") or "").startswith("video/") or (
         medium.get("analysis_status") in ANALYSED
     )
