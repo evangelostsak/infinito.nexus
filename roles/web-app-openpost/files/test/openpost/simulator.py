@@ -25,6 +25,7 @@ from openpost.api import (
     check,
     draft,
     in_container,
+    provider,
     release,
     renditions,
     revoke_invitations,
@@ -43,8 +44,6 @@ SIMULATOR_TOKENS = (
     "simulator-google-refresh",
     "simulator-tiktok-token",
     "simulator-tiktok-refresh",
-    "simulator-linkedin-token",
-    "simulator-linkedin-refresh",
 )
 SCHEDULE_AHEAD_SECONDS = 120
 SCENARIOS = (
@@ -91,6 +90,40 @@ def simulator_admin(path: str, post: bool) -> object:
     return json.loads(raw) if raw.strip() else None
 
 
+def linkedin_consent(url: str) -> dict[str, str] | str:
+    email = f"openpost-cli-{secrets.token_hex(4)}@linkedin.invalid"
+    password = secrets.token_urlsafe(18)
+    status, _, body = provider(
+        "/signup",
+        {"name": "OpenPost Probe", "email": email, "password": password, "next": ""},
+    )
+    if status != 201:
+        return f"fake LinkedIn sign-up HTTP {status} {body}"
+    carried = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(url).query))
+    status, location, body = provider(
+        "/oauth/v2/authorization",
+        {**carried, "email": email, "password": password, "decision": "allow"},
+    )
+    answer = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(location).query))
+    if status != 302 or "code" not in answer:
+        return f"fake LinkedIn consent HTTP {status} {location or body}"
+    return {"code": answer["code"], "state": answer.get("state", "")}
+
+
+def check_linkedin(tag: str) -> None:
+    status, _, body = provider("/__fake/linkedin/posts")
+    posts = [
+        post
+        for post in (body if isinstance(body, list) else [])
+        if tag in str(post.get("text"))
+    ]
+    check(
+        "the fake LinkedIn holds exactly one post with the tag",
+        status == 200 and len(posts) == 1,
+        f"HTTP {status} {posts}",
+    )
+
+
 def connect(token: str, workspace: str, platform: str, pick: int) -> str:
     status, body = call(
         "GET", f"/accounts/{platform}/auth-url?workspace_id={workspace}", token=token
@@ -103,6 +136,11 @@ def connect(token: str, workspace: str, platform: str, pick: int) -> str:
             "oauth_token": query["oauth_token"][0],
             "oauth_verifier": "simulator-verifier",
         }
+    elif platform == "linkedin":
+        consent = linkedin_consent(str(body["url"]))
+        if isinstance(consent, str):
+            return consent
+        params = consent
     else:
         params = {"code": "simulator-code", "state": query["state"][0]}
     status, location, _ = call_raw(
@@ -378,7 +416,9 @@ def check_simulator(token: str, workspace: str) -> None:
     )
     entries = journal["requests"] if isinstance(journal, dict) else []
     for label in publications:
-        if label in tags:
+        if label == "linkedin":
+            check_linkedin(tags[label])
+        elif label in tags:
             check_journal(entries, label, tags[label])
     if "scheduled" in publications:
         delivered = [
