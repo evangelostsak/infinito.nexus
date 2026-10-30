@@ -63,16 +63,22 @@ class TestGrants(unittest.TestCase):
 
     def test_tokens_identify_the_member_until_they_expire(self) -> None:
         tokens = self.store.issue_tokens(self.member, "openid")
-        self.assertEqual(self.store.member_for(tokens["access_token"]).member, self.member)
+        self.assertEqual(
+            self.store.member_for(tokens["access_token"]).member, self.member
+        )
         self.clock.value += store.ACCESS_SECONDS + 1
         self.assertIsNone(self.store.member_for(tokens["access_token"]))
 
-    def test_a_refresh_keeps_the_refresh_token_and_issues_a_new_access_token(self) -> None:
+    def test_a_refresh_keeps_the_refresh_token_and_issues_a_new_access_token(
+        self,
+    ) -> None:
         tokens = self.store.issue_tokens(self.member, "openid")
         refreshed = self.store.refresh(tokens["refresh_token"])
         self.assertEqual(refreshed["refresh_token"], tokens["refresh_token"])
         self.assertNotEqual(refreshed["access_token"], tokens["access_token"])
-        self.assertEqual(self.store.member_for(refreshed["access_token"]).member, self.member)
+        self.assertEqual(
+            self.store.member_for(refreshed["access_token"]).member, self.member
+        )
 
     def test_an_unknown_refresh_token_is_refused(self) -> None:
         with self.assertRaises(store.StoreError):
