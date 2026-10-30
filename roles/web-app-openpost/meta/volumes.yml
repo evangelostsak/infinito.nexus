@@ -33,6 +33,37 @@ simulator_ca:
       target: /etc/ssl/openpost-trust/simulator-ca.crt
       when: "{{ lookup('config', 'web-app-openpost', 'services.simulator.enabled') | bool }}"
 
+provider_config:
+  type: secret
+  source: "{{ [lookup('container', 'web-app-openpost', 'directories.config'), 'provider', 'provider.json'] | path_join }}"
+  mode: "0400"
+  mounts:
+    - service: provider
+      target: /run/secrets/provider.json
+      uid: "{{ lookup('config', 'web-app-openpost', 'services.provider.uid') }}"
+      gid: "{{ lookup('config', 'web-app-openpost', 'services.provider.uid') }}"
+      when: "{{ lookup('config', 'web-app-openpost', 'services.provider.enabled') | bool }}"
+
+provider_certificate:
+  type: config
+  source: "{{ [lookup('container', 'web-app-openpost', 'directories.config'), 'simulator', 'server.crt'] | path_join }}"
+  mode: "0444"
+  mounts:
+    - service: provider
+      target: /config/server.crt
+      when: "{{ lookup('config', 'web-app-openpost', 'services.provider.enabled') | bool }}"
+
+provider_key:
+  type: secret
+  source: "{{ [lookup('container', 'web-app-openpost', 'directories.config'), 'provider', 'server.key'] | path_join }}"
+  mode: "0400"
+  mounts:
+    - service: provider
+      target: /run/secrets/server.key
+      uid: "{{ lookup('config', 'web-app-openpost', 'services.provider.uid') }}"
+      gid: "{{ lookup('config', 'web-app-openpost', 'services.provider.uid') }}"
+      when: "{{ lookup('config', 'web-app-openpost', 'services.provider.enabled') | bool }}"
+
 root_ca:
   type: config
   source: "{{ CA_TRUST.cert_host }}"
