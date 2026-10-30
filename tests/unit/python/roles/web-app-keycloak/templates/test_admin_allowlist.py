@@ -318,6 +318,8 @@ class TestDeclaredValues(unittest.TestCase):
             ["auth.example.com"],
             [""],
             [42],
+            ["fe80::1%eth0"],
+            ["fe80::%eth0/64"],
         ):
             with self.subTest(value=value), self.assertRaises(AnsibleFilterError):
                 admin_networks(value)

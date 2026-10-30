@@ -1,5 +1,3 @@
-"""Source networks the Keycloak vhost serves its admin paths to."""
-
 from __future__ import annotations
 
 import ipaddress
@@ -39,12 +37,18 @@ def kc_admin_networks(networks: Any) -> list[str]:
                 "address or a CIDR block"
             )
         try:
-            network = str(ipaddress.ip_network(entry.strip(), strict=True))
+            parsed = ipaddress.ip_network(entry.strip(), strict=True)
         except ValueError as exc:
             raise AnsibleFilterError(
                 f"kc_admin_networks: {CONFIG_PATH} entry {entry!r} is not an "
                 f"address or a CIDR block without host bits: {exc}"
             ) from exc
+        if getattr(parsed.network_address, "scope_id", None):
+            raise AnsibleFilterError(
+                f"kc_admin_networks: {CONFIG_PATH} entry {entry!r} carries an "
+                "IPv6 scope ID, which nginx allow/deny does not accept"
+            )
+        network = str(parsed)
         if network not in resolved:
             resolved.append(network)
     return resolved
