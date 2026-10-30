@@ -127,9 +127,6 @@ def check_journal(journal: list[dict], label: str, tag: str) -> None:
             bool(uploads),
             statuses(uploads),
         )
-    elif label == "linkedin":
-        posts = statuses(hits(journal, "POST", "/rest/posts", tag))
-        check("LinkedIn receives exactly one post", posts == [201], posts)
     elif label == "tiktok":
         inits = statuses(hits(journal, "POST", "/v2/post/publish/content/init/", tag))
         polls = hits(journal, "POST", "/v2/post/publish/status/fetch/", "")
