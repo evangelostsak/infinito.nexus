@@ -19,11 +19,17 @@ AUTHORIZE = {
 }
 
 
-def form(method: str, path: str, fields: dict[str, str], headers: dict | None = None) -> Request:
-    return Request(method, path, {}, headers or {}, urllib.parse.urlencode(fields).encode())
+def form(
+    method: str, path: str, fields: dict[str, str], headers: dict | None = None
+) -> Request:
+    return Request(
+        method, path, {}, headers or {}, urllib.parse.urlencode(fields).encode()
+    )
 
 
-def call(method: str, path: str, token: str, body: object = None, query: dict | None = None) -> Request:
+def call(
+    method: str, path: str, token: str, body: object = None, query: dict | None = None
+) -> Request:
     return Request(
         method,
         path,
@@ -41,13 +47,21 @@ class Fixture:
 
     def sign_up(self, email: str = "ada@example.org") -> None:
         response = self.app.handle(
-            form("POST", "/signup", {"name": "Ada Lovelace", "email": email, "password": "pw", "next": ""})
+            form(
+                "POST",
+                "/signup",
+                {"name": "Ada Lovelace", "email": email, "password": "pw", "next": ""},
+            )
         )
         self.assertEqual(response.status, 201)
 
     def code(self, email: str = "ada@example.org") -> str:
         response = self.app.handle(
-            form("POST", "/oauth/v2/authorization", {**AUTHORIZE, "email": email, "password": "pw", "decision": "allow"})
+            form(
+                "POST",
+                "/oauth/v2/authorization",
+                {**AUTHORIZE, "email": email, "password": "pw", "decision": "allow"},
+            )
         )
         self.assertEqual(response.status, 302)
         location = urllib.parse.urlsplit(response.headers["Location"])
@@ -62,7 +76,13 @@ class Fixture:
             form(
                 "POST",
                 "/oauth/v2/accessToken",
-                {"grant_type": "authorization_code", "code": self.code(), "redirect_uri": CALLBACK, "client_id": CLIENT_ID, "client_secret": SECRET},
+                {
+                    "grant_type": "authorization_code",
+                    "code": self.code(),
+                    "redirect_uri": CALLBACK,
+                    "client_id": CLIENT_ID,
+                    "client_secret": SECRET,
+                },
             )
         )
         self.assertEqual(response.status, 200)
@@ -78,18 +98,38 @@ class TestSignUpAndConsent(Fixture, unittest.TestCase):
     def test_a_sign_up_from_the_consent_page_returns_to_it(self) -> None:
         back = "/oauth/v2/authorization?" + urllib.parse.urlencode(AUTHORIZE)
         response = self.app.handle(
-            form("POST", "/signup", {"name": "Ada", "email": "ada@example.org", "password": "pw", "next": back})
+            form(
+                "POST",
+                "/signup",
+                {
+                    "name": "Ada",
+                    "email": "ada@example.org",
+                    "password": "pw",
+                    "next": back,
+                },
+            )
         )
         self.assertEqual((response.status, response.headers["Location"]), (303, back))
 
     def test_a_sign_up_never_redirects_off_the_fake(self) -> None:
         response = self.app.handle(
-            form("POST", "/signup", {"name": "Ada", "email": "ada@example.org", "password": "pw", "next": "https://evil.example/"})
+            form(
+                "POST",
+                "/signup",
+                {
+                    "name": "Ada",
+                    "email": "ada@example.org",
+                    "password": "pw",
+                    "next": "https://evil.example/",
+                },
+            )
         )
         self.assertEqual(response.status, 201)
 
     def test_the_consent_page_names_the_client_and_its_scopes(self) -> None:
-        page = self.app.handle(Request("GET", "/oauth/v2/authorization", AUTHORIZE, {}, b""))
+        page = self.app.handle(
+            Request("GET", "/oauth/v2/authorization", AUTHORIZE, {}, b"")
+        )
         self.assertEqual(page.status, 200)
         self.assertIn(b"OpenPost", page.body)
         self.assertIn(b"w_member_social", page.body)
@@ -97,14 +137,29 @@ class TestSignUpAndConsent(Fixture, unittest.TestCase):
 
     def test_an_unregistered_redirect_uri_is_refused(self) -> None:
         page = self.app.handle(
-            Request("GET", "/oauth/v2/authorization", {**AUTHORIZE, "redirect_uri": "https://evil/cb"}, {}, b"")
+            Request(
+                "GET",
+                "/oauth/v2/authorization",
+                {**AUTHORIZE, "redirect_uri": "https://evil/cb"},
+                {},
+                b"",
+            )
         )
         self.assertEqual(page.status, 400)
 
     def test_wrong_credentials_stay_on_the_consent_page(self) -> None:
         self.sign_up()
         response = self.app.handle(
-            form("POST", "/oauth/v2/authorization", {**AUTHORIZE, "email": "ada@example.org", "password": "wrong", "decision": "allow"})
+            form(
+                "POST",
+                "/oauth/v2/authorization",
+                {
+                    **AUTHORIZE,
+                    "email": "ada@example.org",
+                    "password": "wrong",
+                    "decision": "allow",
+                },
+            )
         )
         self.assertEqual(response.status, 400)
         self.assertIn(b"Wrong email or password", response.body)
@@ -113,15 +168,25 @@ class TestSignUpAndConsent(Fixture, unittest.TestCase):
         response = self.app.handle(
             form("POST", "/oauth/v2/authorization", {**AUTHORIZE, "decision": "deny"})
         )
-        query = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(response.headers["Location"]).query))
-        self.assertEqual(query, {"error": "user_cancelled_authorize", "state": "state-1"})
+        query = dict(
+            urllib.parse.parse_qsl(
+                urllib.parse.urlsplit(response.headers["Location"]).query
+            )
+        )
+        self.assertEqual(
+            query, {"error": "user_cancelled_authorize", "state": "state-1"}
+        )
 
 
 class TestTokens(Fixture, unittest.TestCase):
     def test_a_code_becomes_tokens_that_describe_the_member(self) -> None:
         tokens = self.tokens()
-        profile = json.loads(self.app.handle(call("GET", "/v2/userinfo", tokens["access_token"])).body)
-        self.assertEqual((profile["name"], profile["given_name"]), ("Ada Lovelace", "Ada"))
+        profile = json.loads(
+            self.app.handle(call("GET", "/v2/userinfo", tokens["access_token"])).body
+        )
+        self.assertEqual(
+            (profile["name"], profile["given_name"]), ("Ada Lovelace", "Ada")
+        )
         self.assertTrue(profile["sub"])
 
     def test_a_wrong_client_secret_is_refused(self) -> None:
@@ -130,7 +195,13 @@ class TestTokens(Fixture, unittest.TestCase):
             form(
                 "POST",
                 "/oauth/v2/accessToken",
-                {"grant_type": "authorization_code", "code": self.code(), "redirect_uri": CALLBACK, "client_id": CLIENT_ID, "client_secret": "wrong"},
+                {
+                    "grant_type": "authorization_code",
+                    "code": self.code(),
+                    "redirect_uri": CALLBACK,
+                    "client_id": CLIENT_ID,
+                    "client_secret": "wrong",
+                },
             )
         )
         self.assertEqual(response.status, 401)
@@ -141,21 +212,35 @@ class TestTokens(Fixture, unittest.TestCase):
             form(
                 "POST",
                 "/oauth/v2/accessToken",
-                {"grant_type": "refresh_token", "refresh_token": tokens["refresh_token"], "client_id": CLIENT_ID, "client_secret": SECRET},
+                {
+                    "grant_type": "refresh_token",
+                    "refresh_token": tokens["refresh_token"],
+                    "client_id": CLIENT_ID,
+                    "client_secret": SECRET,
+                },
             )
         )
         refreshed = json.loads(response.body)
-        self.assertEqual(self.app.handle(call("GET", "/v2/userinfo", refreshed["access_token"])).status, 200)
+        self.assertEqual(
+            self.app.handle(
+                call("GET", "/v2/userinfo", refreshed["access_token"])
+            ).status,
+            200,
+        )
 
     def test_an_unknown_token_is_refused(self) -> None:
-        self.assertEqual(self.app.handle(call("GET", "/v2/userinfo", "nope")).status, 401)
+        self.assertEqual(
+            self.app.handle(call("GET", "/v2/userinfo", "nope")).status, 401
+        )
 
 
 class TestPosts(Fixture, unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
         self.token = self.tokens()["access_token"]
-        profile = json.loads(self.app.handle(call("GET", "/v2/userinfo", self.token)).body)
+        profile = json.loads(
+            self.app.handle(call("GET", "/v2/userinfo", self.token)).body
+        )
         self.author = f"urn:li:person:{profile['sub']}"
 
     def post(self, body: dict) -> object:
@@ -174,7 +259,11 @@ class TestPosts(Fixture, unittest.TestCase):
         response = self.post(self.body())
         self.assertEqual(response.status, 201)
         post_id = response.headers["x-restli-id"]
-        read = self.app.handle(call("GET", f"/rest/posts/{urllib.parse.quote(post_id, safe='')}", self.token))
+        read = self.app.handle(
+            call(
+                "GET", f"/rest/posts/{urllib.parse.quote(post_id, safe='')}", self.token
+            )
+        )
         self.assertEqual(json.loads(read.body)["commentary"], r"Hello \#world")
 
     def test_the_feed_page_shows_the_unescaped_text_without_a_token(self) -> None:
@@ -189,27 +278,45 @@ class TestPosts(Fixture, unittest.TestCase):
 
     def test_an_image_post_needs_an_uploaded_image(self) -> None:
         initialized = self.app.handle(
-            call("POST", "/rest/images", self.token, {"initializeUploadRequest": {"owner": self.author}}, {"action": "initializeUpload"})
+            call(
+                "POST",
+                "/rest/images",
+                self.token,
+                {"initializeUploadRequest": {"owner": self.author}},
+                {"action": "initializeUpload"},
+            )
         )
         value = json.loads(initialized.body)["value"]
         media = {"content": {"media": {"id": value["image"]}}}
         self.assertEqual(self.post(self.body(**media)).status, 422)
         upload_path = urllib.parse.urlsplit(value["uploadUrl"]).path
         self.assertEqual(
-            self.app.handle(Request("PUT", upload_path, {}, {"authorization": f"Bearer {self.token}"}, b"\xff\xd8")).status,
+            self.app.handle(
+                Request(
+                    "PUT",
+                    upload_path,
+                    {},
+                    {"authorization": f"Bearer {self.token}"},
+                    b"\xff\xd8",
+                )
+            ).status,
             201,
         )
         self.assertEqual(self.post(self.body(**media)).status, 201)
 
     def test_the_admin_listing_shows_posts_with_plain_text(self) -> None:
         self.post(self.body())
-        posts = json.loads(self.app.handle(Request("GET", "/__fake/linkedin/posts", {}, {}, b"")).body)
+        posts = json.loads(
+            self.app.handle(Request("GET", "/__fake/linkedin/posts", {}, {}, b"")).body
+        )
         self.assertEqual([post["text"] for post in posts], ["Hello #world"])
 
 
 class TestPlainText(unittest.TestCase):
     def test_linkedin_markup_escapes_are_removed(self) -> None:
-        self.assertEqual(plain_text(r"a \#tag \@name \(x\) \\ end"), r"a #tag @name (x) \ end")
+        self.assertEqual(
+            plain_text(r"a \#tag \@name \(x\) \\ end"), r"a #tag @name (x) \ end"
+        )
 
 
 if __name__ == "__main__":
