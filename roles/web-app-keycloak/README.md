@@ -149,7 +149,7 @@ applications:
 
 The OIDC endpoints under `/realms/` and the static assets under `/resources/` stay public.
 
-The deploy itself needs no entry: every `kcadm.sh` login, including the ones `web-app-opentalk` and `web-app-mattermost` make, runs inside the Keycloak container against `KEYCLOAK_SERVER_INTERNAL_URL`. Clients that call `/admin` through the public URL need their source network in the list:
+The deploy's `kcadm.sh` logins need no entry: every one, including the ones `web-app-opentalk` and `web-app-mattermost` make, runs inside the Keycloak container against `KEYCLOAK_SERVER_INTERNAL_URL`. While the list is set, `/` redirects to the account console of the platform realm instead of to `/admin/`, so the CSP health check and the proxy probe, which request `/` from the host itself, need no entry either. Clients that call `/admin` through the public URL need their source network in the list:
 
 - The OpenTalk controller's user search calls the admin REST API from its container, so the vhost sees the container's Docker network address. `NETWORK_INTERNAL_CIDRS` covers the loopback and private ranges those addresses come from.
 - Onion visitors reach the vhost from the Tor daemon's address.
