@@ -10,6 +10,7 @@ OPENPOST_SSO_ENABLED         true when Keycloak provisions users, so the proxy c
 OPENPOST_CONTAINER           resolved OpenPost container, used to reach the simulator admin API
 OPENPOST_SIMULATOR_PLATFORMS JSON list of OpenPost platforms served by the provider simulator, empty without it
 OPENPOST_SIMULATOR_HOST      one simulator alias, whose /__admin API holds the request journal
+OPENPOST_PROVIDER_URL        published plain-HTTP origin of the fake provider that plays LinkedIn, empty without it
 OPENPOST_UNCONFIGURED_PLATFORMS JSON list of commercial platforms without credentials, which must not connect
 OPENPOST_S3_PUBLIC_URL       public bucket URL with a trailing slash, empty when media stays in the role volume
 OPENPOST_DB_CONTAINER        resolved Postgres container
@@ -64,6 +65,7 @@ SIMULATOR_PLATFORMS = json.loads(os.environ["OPENPOST_SIMULATOR_PLATFORMS"])
 UNCONFIGURED_PLATFORMS = json.loads(os.environ["OPENPOST_UNCONFIGURED_PLATFORMS"])
 S3_PUBLIC_URL = os.environ["OPENPOST_S3_PUBLIC_URL"]
 SIMULATOR_ADMIN = "https://" + os.environ["OPENPOST_SIMULATOR_HOST"] + "/__admin"
+PROVIDER_URL = os.environ["OPENPOST_PROVIDER_URL"].rstrip("/")
 DB_CONTAINER = os.environ["OPENPOST_DB_CONTAINER"]
 DB_NAME = os.environ["OPENPOST_DB_NAME"]
 DB_USER = os.environ["OPENPOST_DB_USER"]
@@ -143,6 +145,18 @@ def call_raw(
     request.add_header("Content-Type", "application/json")
     if token:
         request.add_header("Authorization", "Bearer " + token)
+    return _open(request)
+
+
+def provider(
+    path: str, fields: dict[str, str] | None = None
+) -> tuple[int, str, object]:
+    data = urllib.parse.urlencode(fields).encode() if fields is not None else None
+    request = urllib.request.Request(PROVIDER_URL + path, data=data)  # noqa: S310 fixed fake provider origin
+    return _open(request)
+
+
+def _open(request: urllib.request.Request) -> tuple[int, str, object]:
     try:
         with OPENER.open(request, timeout=60) as response:
             raw = response.read().decode()
