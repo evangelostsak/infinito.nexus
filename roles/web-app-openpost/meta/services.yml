@@ -144,14 +144,39 @@ simulator:
     - oauth2.googleapis.com
     - www.googleapis.com
     - open.tiktokapis.com
-    - www.linkedin.com
-    - api.linkedin.com
   providers:
     - x
     - meta
     - youtube
     - tiktok
     - linkedin
+
+# nocheck: dynamic-flag  a sidecar of this role, provided by no other role; it runs exactly while the simulator does
+provider:
+  enabled: "{{ lookup('config', 'web-app-openpost', 'services.simulator.enabled') | bool }}"
+  custom: true
+  modes:
+    compose:
+      enabled: true
+    swarm:
+      enabled: true
+  image: python
+  version: 3.13.7-slim
+  name: openpost-provider
+  uid: 10002
+  cpus: "0.25"
+  mem_reservation: 64m
+  mem_limit: 128m
+  pids_limit: 64
+  ports:
+    internal:
+      http: 8080
+      https: 443
+    local:
+      http: 8101
+  hosts:
+    - www.linkedin.com
+    - api.linkedin.com
 
 # nocheck: dynamic-flag  a sidecar of this role, provided by no other role; it runs exactly while routes are configured
 crossposter:
