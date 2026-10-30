@@ -373,9 +373,7 @@ def check_simulator(token: str, workspace: str) -> None:
         ):
             continue
         if ONION_ORIGIN and kind in ("image", "video"):
-            print(
-                f"[SKIP] {label}: providers cannot fetch media from an onion origin"
-            )
+            print(f"[SKIP] {label}: providers cannot fetch media from an onion origin")
             continue
         targets = (
             connected[platform] if label == "facebook" else connected[platform][:1]
