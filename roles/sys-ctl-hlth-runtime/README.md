@@ -6,7 +6,7 @@ This role checks the language runtime inside every running Docker container. It 
 
 ## Overview
 
-The role installs a check script with a `systemd` service and timer. The check fails, and the failure notifier from [`sys-ctl-alm-compose`](../sys-ctl-alm-compose/README.md) alerts, when a container runs PHP below the security floor of its release line or on an end-of-life line, or when a service that declares `php_hardening` in its `meta/volumes.yml` still reports `expose_php` or `session.upload_progress.enabled` as on. The floors live in `HEALTH_RUNTIME_FLOORS` in [main.yml](./vars/main.yml).
+The role installs a check script with a `systemd` service and timer. The check fails, and the failure notifier from [`sys-ctl-alm-compose`](../sys-ctl-alm-compose/README.md) alerts, when a container runs PHP below the security floor of its release line or on an end-of-life line, or when a service that declares `php_hardening` in its `meta/volumes.yml` still reports `expose_php` or `session.upload_progress.enabled` as on. The floors, the lowest patched release of each `major.minor` line, live in `HEALTH_RUNTIME_FLOORS` in [main.yml](./vars/main.yml).
 
 ## Cosmos
 

@@ -21,7 +21,7 @@ USER_AGENT = "infinito-nexus-runtime-report"
 PHP_VERSION_PATTERN = re.compile(r"\bPHP_VERSION=([0-9][^\s\"';]*)")
 PHP_BASE_PATTERN = re.compile(r"\bPHP_BASE=(\d+\.\d+)(?![\d.])")
 PACKAGE_INSTALL_PATTERN = re.compile(
-    r"\b(?:apk\s+add|(?:apt-get|apt|dnf|microdnf|yum)\s+(?:-\S+\s+)*install)\b"
+    r"\b(?:apk\s+(?:-\S+\s+)*add|(?:apt-get|apt|dnf|microdnf|yum)\s+(?:-\S+\s+)*install)\b"
 )
 PHP_PACKAGE_PATTERN = re.compile(
     r"(?<!\S)(?:[\w.+]+-)*php(\d)(?:\.?(\d))?(?:-[\w.+-]+)?(?:=\S*?)?(?=[;&|\\]*(?:\s|$))"

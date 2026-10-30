@@ -66,6 +66,20 @@ class TestPhpRuntime(TestCase):
             )
         )
 
+    def test_apk_options_before_add_still_name_the_line(self):
+        self.assertEqual(
+            runtime.php_runtime(["RUN apk --no-cache add php7 php7-fpm"]),
+            _php(lines=["7"]),
+        )
+
+    def test_apk_in_a_path_or_comment_is_no_package_install(self):
+        for instruction in (
+            "RUN rm -rf /var/cache/apk/* && cp php7 /srv/add",
+            "RUN echo php7 # apk cache: add nothing",
+        ):
+            with self.subTest(instruction=instruction):
+                self.assertIsNone(runtime.php_runtime([instruction]))
+
     def test_a_pinned_alpine_package_names_its_line(self):
         found = runtime.php_runtime(["RUN apk add --no-cache php84=8.4.27-r0 nginx;"])
         self.assertEqual(found, _php(lines=["8.4"]))

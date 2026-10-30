@@ -1,6 +1,5 @@
 ---
 system_service_id: sys-ctl-hlth-runtime
-# Lowest patched release per runtime line; a line older than every listed one is end of life
 HEALTH_RUNTIME_FLOORS:
   php:
     "8.2": "8.2.35"
