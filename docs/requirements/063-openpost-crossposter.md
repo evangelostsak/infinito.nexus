@@ -1,4 +1,4 @@
-# 041 - OpenPost Crossposter for Automated Fediverse Crossposting
+# 063 - OpenPost Crossposter for Automated Fediverse Crossposting
 
 ## User Story
 
@@ -7,8 +7,8 @@ As an Infinito.Nexus PR manager, I want new posts on our organisation's Mastodon
 ## Background
 
 This requirement implements the crossposting half of the OpenProject user story "sovereign social media publishing and crossposting" (story criterion AC5 and the crossposting part of AC8).
-It builds on [040-web-app-openpost.md](040-web-app-openpost.md), which delivers the OpenPost desk, the egress relay to the deployment's Fediverse instances, the connected Fediverse targets and the provider simulator for X, Facebook, Instagram and YouTube.
-OpenPost's session cookies only accept same-origin requests, so programmatic access uses Bearer API tokens (observed in the 040 egress proof on 2026-10-21).
+It builds on [062-web-app-openpost.md](062-web-app-openpost.md), which delivers the OpenPost desk, the egress relay to the deployment's Fediverse instances, the connected Fediverse targets and the provider simulator for X, Facebook, Instagram and YouTube.
+OpenPost's session cookies only accept same-origin requests, so programmatic access uses Bearer API tokens (observed in the 062 egress proof on 2026-10-21).
 
 No evaluated product forwards Fediverse posts unattended.
 OpenPost's built-in workflows refuse to schedule unless a human approves the exact revision in the same run, and its native imports never dispatch automation ([runtime.go](https://github.com/getopenpost/openpost/blob/0deadaf7bbf3b3be045e783c3eeef323c9e3c440/apps/server/internal/services/workflows/runtime.go)).
@@ -28,13 +28,13 @@ The crossposter therefore lives in the role as a sidecar that detects posts, app
 | Idempotency | Mastodon and Pixelfed honour `Idempotency-Key` for one hour, PeerTube has none, and OpenPost answers a reused key with different input with HTTP 409. | [post_status_service.rb](https://github.com/mastodon/mastodon/blob/v4.7.3/app/services/post_status_service.rb), [OpenPost API reliability](https://github.com/getopenpost/openpost/blob/0deadaf7bbf3b3be045e783c3eeef323c9e3c440/apps/docs/content/docs/automate/api/reliability.mdx) |
 | OpenPost publish API | `POST /api/v1/publications` takes the workspace, title, source text, target accounts or a social set, renditions, media, metadata and an optional `scheduled_at`; `publish-now`, `events` and media upload sessions complete the flow. | [openapi.json](https://github.com/getopenpost/openpost/blob/0deadaf7bbf3b3be045e783c3eeef323c9e3c440/apps/web/openapi.json) |
 | Length rules | Mastodon counts graphemes of content warning plus text with 23 per URL; X weights emoji and CJK characters double; Threads allows 500 characters; Instagram allows 2,200 characters and 30 hashtags. | [status_length_validator.rb](https://github.com/mastodon/mastodon/blob/v4.7.3/app/validators/status_length_validator.rb), [X counting](https://docs.x.com/fundamentals/counting-characters) |
-| Media rules | Pixelfed rejects text-only posts; Mastodon caps video at 99 MB; Instagram accepts JPEG only. | [ApiV1Controller.php](https://github.com/pixelfed/pixelfed/blob/v0.15.1/app/Http/Controllers/Api/ApiV1Controller.php), [media_attachment.rb](https://github.com/mastodon/mastodon/blob/v4.7.3/app/models/media_attachment.rb), [040 platform constraints](040-web-app-openpost.md#platform-constraints) |
+| Media rules | Pixelfed rejects text-only posts; Mastodon caps video at 99 MB; Instagram accepts JPEG only. | [ApiV1Controller.php](https://github.com/pixelfed/pixelfed/blob/v0.15.1/app/Http/Controllers/Api/ApiV1Controller.php), [media_attachment.rb](https://github.com/mastodon/mastodon/blob/v4.7.3/app/models/media_attachment.rb), [062 platform constraints](062-web-app-openpost.md#platform-constraints) |
 | Test tokens | Mastodon disables the password grant and `tootctl` mints no tokens; PeerTube offers a password grant; Pixelfed issues personal access tokens. | [doorkeeper.rb](https://github.com/mastodon/mastodon/blob/v4.7.3/config/initializers/doorkeeper.rb), [tootctl](https://docs.joinmastodon.org/admin/tootctl/) |
 | X cost | A post costs $0.015, a post containing a URL costs $0.20. | [X pricing](https://docs.x.com/x-api/getting-started/pricing) |
 
 ### In-repo analogues
 
-- `web-app-openpost` from [040](040-web-app-openpost.md) provides the desk, the API, the provider simulator and the local Fediverse targets.
+- `web-app-openpost` from [062](062-web-app-openpost.md) provides the desk, the API, the provider simulator and the local Fediverse targets.
 - [`web-app-bluesky`](../../roles/web-app-bluesky/) builds its sidecar from `files/login-broker/Dockerfile`.
 - `roles/web-app-n8n/files/python/provision/` is tested from `tests/unit/python/roles/web-app-n8n/files/provision/`, the pattern for role-local Python tests.
 
@@ -49,13 +49,15 @@ These decisions were confirmed by the operator before implementation starts and 
 | 3 | Detection uses authenticated REST polling with persisted cursors. | The only method that is complete on Mastodon, Pixelfed and PeerTube. |
 | 4 | Crossposting state lives in a `crossposter` schema of the role's Postgres database, unique per source post and target account. | Durable duplicate prevention independent of platform idempotency windows. |
 | 5 | Routes are declared in the inventory with a `review` mode (OpenPost draft) and an `auto` mode (immediate publishing). | Configurable routing with optional manual approval. |
-| 6 | CI covers Mastodon, Pixelfed and PeerTube as sources against local instances, Fediverse targets end to end, and commercial targets through the 040 provider simulator. | Operator decision on automated testing. |
+| 6 | CI covers Mastodon, Pixelfed and PeerTube as sources against local instances, Fediverse targets end to end, and commercial targets through the 062 provider simulator. | Operator decision on automated testing. |
 | 7 | New routes start in `review` mode. | Routes are cleared for unattended publishing one by one. |
 | 8 | Activating a route forwards no existing posts; its cursor starts at the newest item. | Prevents flooding targets with the account history. |
 | 9 | The opt-out hashtag is `nocrosspost`. | Authors can keep a single post local. |
 | 10 | The X attribution template omits the source link. | A post with a URL costs about 13 times more on X. |
 | 11 | One active instance, enforced by a Postgres advisory lock. | Two pollers would race for the same cursors. |
 | 12 | Dead-lettered items are reported by email through the platform mail service. | Failures reach the PR team without another dashboard. |
+| 13 | The end-to-end journey reaches commercial networks through a stateful fake provider owned by the role, piloted on LinkedIn; real provider sandboxes are not used in CI. | Meta has paused programmatic test users, LinkedIn test profiles are created by hand only, X and YouTube offer no sandbox, and CI runs must stay offline, deterministic and free of real accounts. |
+| 14 | The fake is a role-local Python sidecar entity `provider`, enabled with the simulator; the simulator keeps answering for every network the fake does not serve yet. | Networks move to the fake one at a time without losing coverage. |
 
 ## Target Schema
 
@@ -78,7 +80,15 @@ roles/web-app-openpost/files/crossposter/
         ├── mastodon.py
         ├── peertube.py
         └── pixelfed.py
+roles/web-app-openpost/files/provider/
+├── Dockerfile
+└── provider/
+    ├── __init__.py
+    ├── __main__.py
+    ├── linkedin.py
+    └── store.py
 tests/unit/python/roles/web-app-openpost/files/crossposter/
+tests/unit/python/roles/web-app-openpost/files/provider/
 ```
 
 ### Route shape (proposed)
@@ -177,6 +187,18 @@ crossposter:
 - [ ] The Playwright spec shows the administrator persona finding a crossposted draft in the desk, editing it and scheduling it.
 - [ ] `make test` and `make roundtrip apps="web-app-openpost"` are green.
 
+### Fake provider and end-to-end journey
+
+- [ ] The `provider` entity is built from `files/provider/Dockerfile` on the Python base image pinned in `meta/services.yml`, runs as a non-root user, has a healthcheck that works on the slim image, and is enabled exactly when the simulator is.
+- [ ] It answers for `www.linkedin.com` and `api.linkedin.com` on the role network with a certificate OpenPost trusts, and the simulator no longer serves LinkedIn.
+- [ ] A person can create an account on the fake's sign-up page, and the account exists only in the fake's state.
+- [ ] `GET /oauth/v2/authorization` shows sign-in and consent for OpenPost's client and redirects to the registered callback with a single-use code bound to the client id and redirect URI; `POST /oauth/v2/accessToken` exchanges codes and refresh tokens; `GET /v2/userinfo` describes the signed-in account.
+- [ ] `POST /rest/images?action=initializeUpload` and its upload URL store images, `POST /rest/posts` stores a post authored by the token's member and answers its id in `x-restli-id`, and `GET /rest/posts/{id}` returns that post; requests with an unknown token are refused.
+- [ ] The Playwright browser reaches the fake's pages under the real LinkedIn host names by routing them to the fake's published plain-HTTP port; tor rounds skip the journey.
+- [ ] The Playwright spec walks the journey as the administrator: it signs up a new account on the fake, connects it to OpenPost through the fake's consent page, adds it to the review social set, posts on the local Mastodon, finds the crossposter's draft in the desk, edits it and publishes it, then opens the post through the URL OpenPost recorded, finds the edited text, and finds that post exactly once in the fake's delivery list.
+- [ ] The CLI test connects LinkedIn through the fake's code flow instead of calling OpenPost's callback with a fixed code.
+- [x] Unit tests under `tests/unit/python/roles/web-app-openpost/files/provider/` cover sign-up, the code and refresh flows, token checks, and storing and reading posts and images.
+
 ### Documentation
 
 - [ ] `Administration.md` documents the route schema with examples, the review and auto modes, the opt-out hashtag, the attribution templates and their X cost impact, token creation per source platform, and the handling of dead-lettered items.
@@ -189,6 +211,7 @@ crossposter:
 - Push-based detection through Mastodon webhooks, streaming or an ActivityPub follower actor.
 - Bluesky as a crossposting target, because federation through `web-app-bridgy-fed` already reaches it.
 - TikTok publishing, because TikTok's terms exclude in-house upload tools.
+- Serving X, Facebook, Instagram and YouTube from the fake provider; they follow the LinkedIn pilot in later work.
 
 ## Validation Apps
 
@@ -201,7 +224,7 @@ Smoke: post as a test user on the local Mastodon instance, find the draft in the
 
 ## Prerequisites
 
-Every Acceptance Criterion of [040](040-web-app-openpost.md) MUST be checked off before this requirement starts.
+Every Acceptance Criterion of [062](062-web-app-openpost.md) MUST be checked off before this requirement starts.
 The agent MUST read [AGENTS.md](../../AGENTS.md), then [Compose Loop](../agents/action/iteration/compose.md), [Unit Tests](../contributing/actions/testing/unit.md) and the [Playwright contract](../contributing/artefact/files/role/playwright.specs.js.md).
 
 ## Implementation Strategy
@@ -217,6 +240,6 @@ Verify on the deployed Mastodon, Pixelfed and PeerTube versions that the behavio
 
 ## See Also
 
-- Publishing desk: [040-web-app-openpost.md](040-web-app-openpost.md)
+- Publishing desk: [062-web-app-openpost.md](062-web-app-openpost.md)
 - Requirement format: [requirements.md](../contributing/requirements.md)
 - How agents process requirements: [requirements.md](../agents/action/requirements.md)
