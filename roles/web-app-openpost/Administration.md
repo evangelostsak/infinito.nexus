@@ -84,13 +84,15 @@ Every callback URL has the form `https://publish.<DOMAIN_PRIMARY>/api/v1/account
 
 ## Provider simulator
 
-Variant 0 of `meta/variants.yml` starts a WireMock `simulator` on the role network that answers for X, Facebook, Instagram, YouTube, LinkedIn and TikTok under their real API host names.
-The deploy signs a certificate for those names with a per-deploy test CA in the role's config directory, OpenPost trusts that CA through `SSL_CERT_DIR`, and the role renders `simulator-<provider>` credentials instead of the `API` entries for the simulated providers.
+Variant 0 of `meta/variants.yml` starts a WireMock `simulator` on the role network that answers for X, Facebook, Instagram, YouTube and TikTok under their real API host names.
+Next to it runs the fake `provider`, a small stateful Python service built from `files/provider/` that plays LinkedIn on `www.linkedin.com` and `api.linkedin.com`: members sign up on `/signup`, grant OpenPost access on the consent page, and the fake keeps the tokens, images and posts it receives.
+The deploy signs a certificate for all those names with a per-deploy test CA in the role's config directory, OpenPost trusts that CA through `SSL_CERT_DIR`, and the role renders `simulator-<provider>` credentials instead of the `API` entries for the simulated providers.
+The fake also publishes plain HTTP on the local port of `services.provider.ports.local.http`; Playwright routes `https://www.linkedin.com/` there, and `/__fake/linkedin/posts` lists what OpenPost delivered.
 The mappings live in `files/simulator/openpost.json`; a post whose text contains `[simulate-429]`, `[simulate-503]` or `[simulate-400]` gets that answer from the X endpoint once.
 OpenPost v7.22.9 retries a 429 by itself after the reset header, but treats a 503 to a write as an ambiguous delivery: the destination stays in "Manual review required", its retry is refused, and after confirming on the network that nothing was posted the post has to be published again to that destination.
 A destination that failed with a definite rejection can be retried on its own.
 TikTok renditions need `content_posting_method`, `privacy_level` and `music_usage_confirmed`, YouTube renditions need `privacy` and `category_id` and wait for the media analysis to finish, and LinkedIn Organization Pages stay off, so a LinkedIn account connects as the member's personal profile.
-The simulator never runs in production; leave the variant to CI and local tests.
+The simulator and the fake provider never run in production; leave the variant to CI and local tests.
 
 ## Networks
 
@@ -269,7 +271,7 @@ Run these checks against real platforms after onboarding a network and after eve
 | Facebook Pages (simulator) | Text to two Pages | v7.22.9 | 2026-10-22 | Published |
 | Instagram (simulator) | JPEG image | v7.22.9 | 2026-10-22 | Published from a public media URL |
 | YouTube (simulator) | Video | v7.22.9 | 2026-10-22 | Published through a resumable upload |
-| LinkedIn (simulator) | Text | v7.22.9 | 2026-10-22 | Published |
+| LinkedIn (fake provider) | Text, crossposted from Mastodon and edited in the desk | v7.22.9 | not yet verified | CI end-to-end test |
 | TikTok (simulator) | Photo | v7.22.9 | 2026-10-22 | Published |
 | Facebook Pages | Text, image | v7.22.9 | not yet verified | Manual staging check |
 | Instagram | Image | v7.22.9 | not yet verified | Manual staging check |
