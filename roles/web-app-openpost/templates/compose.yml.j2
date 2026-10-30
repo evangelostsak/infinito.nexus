@@ -63,6 +63,26 @@
     {{ lookup('container_networks', aliases=OPENPOST_SIMULATOR_HOSTS) | indent(4) }}
   {% endif %}
 
+  {% if OPENPOST_PROVIDER_ENABLED | bool %}
+  {% set service_name = 'provider' %}
+  {{ service_name }}:
+    {% include 'roles/sys-svc-container/templates/deploy.yml.j2' %}
+    build:
+      context: "{{ OPENPOST_PROVIDER_BUILD_CONTEXT }}"
+      dockerfile: Dockerfile
+      args:
+        PROVIDER_BASE_IMAGE: "{{ OPENPOST_PROVIDER_BASE_IMAGE }}"
+        PROVIDER_BASE_VERSION: "{{ OPENPOST_PROVIDER_BASE_VERSION }}"
+        PROVIDER_UID: "{{ OPENPOST_PROVIDER_UID }}"
+    {{ lookup('container_image', application_id, service_name, image=OPENPOST_PROVIDER_IMAGE) }}
+    {{ lookup('compose_only', 'container_name', OPENPOST_PROVIDER_NAME) }}
+    {{ lookup('compose_only', 'pull_policy', 'never') }}
+    {{ lookup('compose_restart') }}
+    {{ lookup('container_ports', ['provider', 'http', DOCKER_BIND_HOST]) | indent(4) }}
+    {{ lookup('container_volumes', service_name) | indent(4) }}
+    {{ lookup('container_networks', aliases=OPENPOST_PROVIDER_HOSTS) | indent(4) }}
+  {% endif %}
+
 {{ lookup('compose_volumes') }}
 
 {{ lookup('compose_networks') }}
