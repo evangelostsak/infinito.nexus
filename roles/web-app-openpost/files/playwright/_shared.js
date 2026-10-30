@@ -17,6 +17,7 @@ const env = {
   breakglassPassword: decodeDotenvQuotedValue(process.env.BREAKGLASS_PASSWORD),
   mastodonBaseUrl: normalizeBaseUrl(decodeDotenvQuotedValue(process.env.MASTODON_BASE_URL || "")),
   pixelfedBaseUrl: normalizeBaseUrl(decodeDotenvQuotedValue(process.env.PIXELFED_BASE_URL || "")),
+  linkedinFakeUrl: normalizeBaseUrl(decodeDotenvQuotedValue(process.env.LINKEDIN_FAKE_URL || "")),
   organisationWorkspace: decodeDotenvQuotedValue(process.env.ORGANISATION_WORKSPACE),
   oidcEnabled: isServiceEnabled("sso"),
 };
