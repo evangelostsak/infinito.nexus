@@ -1,4 +1,4 @@
-# 040 - OpenPost Publishing Desk Role
+# 062 - OpenPost Publishing Desk Role
 
 ## User Story
 
@@ -7,7 +7,7 @@ As an Infinito.Nexus PR manager, I want a self-hosted [OpenPost](https://github.
 ## Background
 
 This requirement implements the publishing half of the OpenProject user story "sovereign social media publishing and crossposting" (story criteria AC1, AC2, AC3, AC4, AC6, AC7 and the desk part of AC8).
-Automated crossposting from Fediverse accounts (story criterion AC5 and its tests) is specified in [041-openpost-crossposter.md](041-openpost-crossposter.md), which builds on this role.
+Automated crossposting from Fediverse accounts (story criterion AC5 and its tests) is specified in [063-openpost-crossposter.md](063-openpost-crossposter.md), which builds on this role.
 OpenPost is self-hosted and integrated like every other application of the stack: the official upstream image, configured through environment variables, wired into the shared proxy, Keycloak, Postgres, object storage and backups.
 
 ### Evaluation and selection
@@ -107,7 +107,7 @@ These decisions were confirmed by the operator before implementation starts and 
 | 8 | Provider app credentials live in the central `API` SPOT. | One place for proprietary credentials. |
 | 9 | Diagnostics, update check, PostHog telemetry, feedback and public profiles are disabled. | No unnecessary transmission of internal data. |
 | 10 | CI tests Fediverse publishing end to end against local instances through the relay, and the commercial adapters against a role-local provider simulator on the same role network; real platforms are checked manually in staging. | Real OAuth logins, public redirect hosts and per-post billing make real platforms unusable in CI. |
-| 11 | Automated crossposting is a separate sidecar specified in [041](041-openpost-crossposter.md). | Separable deliverable and pull request. |
+| 11 | Automated crossposting is a separate sidecar specified in [063](063-openpost-crossposter.md). | Separable deliverable and pull request. |
 
 ## Target Schema
 
@@ -304,6 +304,6 @@ Prove every relay and simulator change in the live stack via `make compose-exec`
 
 ## See Also
 
-- Automated crossposting: [041-openpost-crossposter.md](041-openpost-crossposter.md)
+- Automated crossposting: [063-openpost-crossposter.md](063-openpost-crossposter.md)
 - Requirement format: [requirements.md](../contributing/requirements.md)
 - How agents process requirements: [requirements.md](../agents/action/requirements.md)
