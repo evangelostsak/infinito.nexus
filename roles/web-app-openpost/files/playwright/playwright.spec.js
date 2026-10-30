@@ -15,4 +15,5 @@ require("./test-login-oidc-biber").register(shared);
 require("./test-publish-mastodon").register(shared);
 require("./test-publish-pixelfed").register(shared);
 require("./test-crossposter-draft").register(shared);
+require("./test-crossposter-linkedin").register(shared);
 require("./test-seaweedfs").register(shared);
