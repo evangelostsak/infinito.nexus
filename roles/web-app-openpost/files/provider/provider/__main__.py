@@ -57,10 +57,20 @@ def handler_for(app: LinkedIn) -> type[BaseHTTPRequestHandler]:
             self.end_headers()
             self.wfile.write(response.body)
 
-        do_GET = do_POST = do_PUT = do_DELETE = _dispatch
+        def do_GET(self) -> None:
+            self._dispatch()
 
-        def log_message(self, format: str, *args: object) -> None:
-            LOG.info("%s %s", self.address_string(), format % args)
+        def do_POST(self) -> None:
+            self._dispatch()
+
+        def do_PUT(self) -> None:
+            self._dispatch()
+
+        def do_DELETE(self) -> None:
+            self._dispatch()
+
+        def log_message(self, message: str, *args: object) -> None:
+            LOG.info("%s %s", self.address_string(), message % args)
 
     return Handler
 
@@ -81,7 +91,7 @@ def serve(config: dict) -> int:
 def health(config: dict) -> int:
     url = f"http://127.0.0.1:{int(config['http_port'])}/__fake/health"
     try:
-        with urllib.request.urlopen(url, timeout=HEALTH_TIMEOUT_SECONDS) as answer:  # noqa: S310 fixed loopback URL
+        with urllib.request.urlopen(url, timeout=HEALTH_TIMEOUT_SECONDS) as answer:
             return 0 if answer.status == 200 else 1
     except (urllib.error.URLError, OSError):
         return 1
