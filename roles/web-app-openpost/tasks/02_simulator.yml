@@ -28,7 +28,7 @@
   ansible.builtin.copy:
     dest: "{{ OPENPOST_SIMULATOR_DIR }}/server.ext"
     content: |
-      subjectAltName={{ OPENPOST_SIMULATOR_HOSTS | map('regex_replace', '^', 'DNS:') | join(',') }}
+      subjectAltName={{ (OPENPOST_SIMULATOR_HOSTS + OPENPOST_PROVIDER_HOSTS) | map('regex_replace', '^', 'DNS:') | join(',') }}
       extendedKeyUsage=serverAuth
     mode: "0640"
   register: openpost_simulator_ext
