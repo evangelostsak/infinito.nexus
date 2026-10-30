@@ -40,7 +40,7 @@ class TestEntry(unittest.TestCase):
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.addCleanup(server.shutdown)
         url = f"http://127.0.0.1:{server.server_address[1]}/__fake/health"
-        with urllib.request.urlopen(url, timeout=5) as answer:  # noqa: S310 local test server
+        with urllib.request.urlopen(url, timeout=5) as answer:
             self.assertEqual((answer.status, answer.read()), (200, b"ok"))
 
     def test_health_fails_without_a_server(self) -> None:
