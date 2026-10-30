@@ -6,8 +6,7 @@ const REVIEW_ROUTE = "ci-review";
 const REVIEW_SET = "Crossposter review";
 const REVIEW_TAG = "crossposterreview";
 
-async function routeReviewToMastodon(page, shared, headers) {
-  const target = await shared.apiAccount(page, headers, "mastodon");
+async function routeReview(page, shared, headers, target) {
   const sets = await shared.apiRequest(page, headers, "GET", `/social-sets?workspace_id=${target.workspace}`);
   const reviewSet = (sets || []).find((item) => item.name === REVIEW_SET);
   expect(reviewSet, `the deploy must create the "${REVIEW_SET}" social set`).toBeTruthy();
@@ -49,6 +48,39 @@ async function crosspostedDraft(page, shared, headers, workspace, marker) {
   return (drafts || []).find((item) => (item.metadata || {}).crossposter_route === REVIEW_ROUTE) || null;
 }
 
+async function awaitCrosspostedDraft(page, shared, headers, workspace, marker, label) {
+  let draft = null;
+  await expect
+    .poll(
+      async () => {
+        draft = await crosspostedDraft(page, shared, headers, workspace, marker);
+        return Boolean(draft);
+      },
+      { timeout: resolveTimeout(180_000), message: `${label}: the crossposter must turn the status into a review draft` },
+    )
+    .toBe(true);
+  return draft;
+}
+
+async function openDraftInDesk(page, shared, marker, label) {
+  await gotoOnion(page, `${shared.env.appBaseUrl}/publications?tab=drafts`, { waitUntil: "domcontentloaded" });
+  await page.getByRole("textbox", { name: /search posts/i }).fill(marker);
+  const listed = page.getByRole("link", { name: new RegExp(marker, "i") }).first();
+  await expect(listed, `${label}: the crossposted draft must be listed among the drafts`).toBeVisible({
+    timeout: resolveTimeout(60_000),
+  });
+  await listed.click();
+  const text = page.getByRole("textbox", { name: /post text/i }).first();
+  await expect(text, `${label}: the draft must open in the composer`).toBeVisible({ timeout: resolveTimeout(60_000) });
+  return text;
+}
+
+exports.REVIEW_TAG = REVIEW_TAG;
+exports.routeReview = routeReview;
+exports.postOnMastodon = postOnMastodon;
+exports.awaitCrosspostedDraft = awaitCrosspostedDraft;
+exports.openDraftInDesk = openDraftInDesk;
+
 exports.register = function (shared) {
   test("administrator: finds a crossposted draft in the desk, edits it and schedules it", async ({ page }) => {
     shared.skipUnlessServiceEnabled("crossposter");
@@ -61,30 +93,10 @@ exports.register = function (shared) {
 
     await shared.signInViaLocal(page, shared.env.breakglassEmail, shared.env.breakglassPassword, label);
     const headers = shared.apiSession();
-    const workspace = await routeReviewToMastodon(page, shared, headers);
+    const workspace = await routeReview(page, shared, headers, await shared.apiAccount(page, headers, "mastodon"));
     await postOnMastodon(page, shared, `Desk review ${marker} #${REVIEW_TAG}`, label);
-
-    let draft = null;
-    await expect
-      .poll(
-        async () => {
-          draft = await crosspostedDraft(page, shared, headers, workspace, marker);
-          return Boolean(draft);
-        },
-        { timeout: resolveTimeout(180_000), message: `${label}: the crossposter must turn the status into a review draft` },
-      )
-      .toBe(true);
-
-    await gotoOnion(page, `${shared.env.appBaseUrl}/publications?tab=drafts`, { waitUntil: "domcontentloaded" });
-    await page.getByRole("textbox", { name: /search posts/i }).fill(marker);
-    const listed = page.getByRole("link", { name: new RegExp(marker, "i") }).first();
-    await expect(listed, `${label}: the crossposted draft must be listed among the drafts`).toBeVisible({
-      timeout: resolveTimeout(60_000),
-    });
-    await listed.click();
-
-    const text = page.getByRole("textbox", { name: /post text/i }).first();
-    await expect(text, `${label}: the draft must open in the composer`).toBeVisible({ timeout: resolveTimeout(60_000) });
+    const draft = await awaitCrosspostedDraft(page, shared, headers, workspace, marker, label);
+    const text = await openDraftInDesk(page, shared, marker, label);
     await text.fill(edited);
     await page.getByRole("main").getByRole("button", { name: /^more$/i }).click();
     await page.getByRole("menuitem", { name: /^schedule$/i }).click();
