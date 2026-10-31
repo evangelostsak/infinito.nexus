@@ -1,5 +1,6 @@
 ---
 # nocheck: clearnet-variant-tor  PeerTube is a publishing target OpenPost reaches server-side through its relay; the onion round never advertises it
+# nocheck: sso-variant-tor  variant 0 runs clearnet only: OpenPost reaches an onion Keycloak only through Tor's SOCKS port, which svc-net-tor opens to the internal ranges and not to the role subnet 192.88.99.0/24
 - services:
     container_backup:
       enabled: true
@@ -87,7 +88,7 @@
       enabled: true
       shared: true
     tor:
-      enabled: true
+      enabled: false
 
 - services:
     container_backup:
