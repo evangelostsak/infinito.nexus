@@ -71,7 +71,7 @@ root_ca:
   mounts:
     - service: openpost
       target: /etc/ssl/openpost-trust/root-ca.crt
-      when: "{{ (lookup('objstore', 'web-app-openpost', 'enabled') | bool) and TLS_MODE == 'self_signed' }}"
+      when: "{{ TLS_MODE == 'self_signed' }}"
 
 crossposter_config:
   type: config
