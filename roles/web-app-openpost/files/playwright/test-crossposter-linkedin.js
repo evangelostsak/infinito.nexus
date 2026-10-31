@@ -24,7 +24,13 @@ async function signUpOnLinkedIn(page, member, label) {
   });
 }
 
+async function linkedInAccountIds(page, shared, headers, workspace) {
+  const accounts = await shared.apiRequest(page, headers, "GET", `/accounts?workspace_id=${workspace}`);
+  return accounts.filter((item) => item.platform === "linkedin").map((item) => item.id);
+}
+
 async function connectLinkedIn(page, shared, headers, workspace, member, label) {
+  const known = await linkedInAccountIds(page, shared, headers, workspace);
   const { url } = await shared.apiRequest(page, headers, "GET", `/accounts/linkedin/auth-url?workspace_id=${workspace}`);
   await gotoOnion(page, url, { waitUntil: "domcontentloaded" });
   await page.getByLabel("Email").fill(member.email);
@@ -43,10 +49,17 @@ async function connectLinkedIn(page, shared, headers, workspace, member, label) 
       selection_ids: [options.find((id) => id.startsWith("person:")) || options[0]],
     });
   }
-  const accounts = await shared.apiRequest(page, headers, "GET", `/accounts?workspace_id=${workspace}`);
-  const account = accounts.find((item) => item.platform === "linkedin" && JSON.stringify(item).includes(member.name));
-  expect(account, `${label}: the LinkedIn member must be connected in the review workspace`).toBeTruthy();
-  return { workspace, account: account.id };
+  let added = [];
+  await expect
+    .poll(
+      async () => {
+        added = (await linkedInAccountIds(page, shared, headers, workspace)).filter((id) => !known.includes(id));
+        return added.length;
+      },
+      { timeout: resolveTimeout(30_000), message: `${label}: the LinkedIn member must be connected in the review workspace` },
+    )
+    .toBe(1);
+  return { workspace, account: added[0] };
 }
 
 async function publishInDesk(page, label) {
