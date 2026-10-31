@@ -124,20 +124,16 @@ exports.register = function (shared) {
         { timeout: resolveTimeout(180_000), message: `${label}: the LinkedIn destination must end published` },
       )
       .toBe("published");
-    expect(rendition.external_url, `${label}: OpenPost must record the URL of the LinkedIn post`).toContain(
-      `${LINKEDIN_ORIGIN}/feed/update/`,
-    );
+    expect(rendition.external_id, `${label}: OpenPost must record the id of the LinkedIn post`).toMatch(/^urn:li:share:/);
 
-    await gotoOnion(page, rendition.external_url, { waitUntil: "domcontentloaded" });
+    await gotoOnion(page, `${LINKEDIN_ORIGIN}/feed/update/${rendition.external_id}`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("article"), `${label}: the LinkedIn post must show the text edited in the desk`).toContainText(edited);
     await expect(page, `${label}: the LinkedIn post must carry the member's name`).toHaveTitle(new RegExp(member.name));
 
     const posts = await (await page.request.get(`${shared.env.linkedinFakeUrl}/__fake/linkedin/posts`)).json();
     const delivered = posts.filter((post) => String(post.text).includes(marker));
     expect(delivered.map((post) => post.text), `${label}: LinkedIn must receive the edited post exactly once`).toEqual([edited]);
-    expect(decodeURIComponent(rendition.external_url), `${label}: OpenPost must link the post LinkedIn created`).toContain(
-      delivered[0].id,
-    );
+    expect(rendition.external_id, `${label}: OpenPost must record the post LinkedIn created`).toBe(delivered[0].id);
 
     await gotoOnion(page, `${shared.env.appBaseUrl}/publications`, { waitUntil: "domcontentloaded" });
     await shared.logout(page, label);
