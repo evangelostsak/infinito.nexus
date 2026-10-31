@@ -184,6 +184,12 @@ async function uploadMedia(page, fileName, label) {
   await addMedia.click();
   const dialog = page.getByRole("dialog", { name: /upload media/i });
   await expect(dialog, `${label}: the upload dialog must open`).toBeVisible({ timeout: resolveTimeout(30_000) });
+  const completed = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      /\/api\/v1\/media\/upload-session\/[^/]+\/complete$/.test(new URL(response.url()).pathname),
+    { timeout: resolveTimeout(60_000) },
+  );
   await dialog.locator('input[type="file"]').first().setInputFiles({
     name: fileName,
     mimeType: "image/png",
@@ -193,6 +199,7 @@ async function uploadMedia(page, fileName, label) {
   if (await confirm.first().isVisible().catch(() => false)) {
     await confirm.first().click();
   }
+  expect((await completed).ok(), `${label}: OpenPost must complete the upload`).toBe(true);
   await expect(
     dialog.getByText(fileName).first(),
     `${label}: the upload dialog must list the file it received`,
@@ -201,6 +208,7 @@ async function uploadMedia(page, fileName, label) {
     await page.keyboard.press("Escape");
   }
   await expect(dialog, `${label}: the upload dialog must close`).toBeHidden({ timeout: resolveTimeout(30_000) });
+  await gotoOnion(page, `${env.appBaseUrl}/media`, { waitUntil: "domcontentloaded" });
   await expect(
     page.getByText(fileName).or(page.locator(`img[alt*="${fileName}"]`)).first(),
     `${label}: the uploaded file must appear in the media library`,
