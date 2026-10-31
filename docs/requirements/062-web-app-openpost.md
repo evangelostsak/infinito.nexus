@@ -266,7 +266,7 @@ simulator:
 
 ### Variants, tests and quality (story AC8)
 
-- [x] `meta/variants.yml` stays within the three-variant limit: variant 0 enables every integration, the simulator and the local Mastodon target, variant 1 adds the local Pixelfed and PeerTube targets with the integrations off, and variant 2 switches everything off, so no single round deploys all three instances; every variant deploys cleanly on a fresh host.
+- [x] `meta/variants.yml` stays within the three-variant limit: variant 0 enables every integration but the onion, the simulator and the local Mastodon target, variant 1 adds the local Pixelfed and PeerTube targets with the integrations off, and variant 2 switches everything off, so no single round deploys all three instances; every variant deploys cleanly on a fresh host.
 - [x] `files/playwright/` covers the `guest`, `biber` and `administrator` personas per the [Playwright contract](../contributing/artefact/files/role/playwright.specs.js.md), with the administrator connecting a Fediverse account and publishing, and `biber` being denied the organisation workspace.
 - [x] `files/test/test.sh` with `templates/test.env.j2` covers readiness, the telemetry flags, the egress relay and its negative controls, token encryption at rest, Fediverse delivery and the simulator journal assertions.
 - [ ] `make compose-playwright role=web-app-openpost` exits 0 without stub tests and ends logged out.
